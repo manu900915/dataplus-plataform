@@ -28,6 +28,11 @@ class EditItem extends EditRecord
     {
         return [
             $this->getSaveFormAction()->label('Guardar Cambios'),
+            Actions\Action::make('cancel')
+                ->label('Cancelar')
+                ->color('gray')
+                ->icon('heroicon-o-x-mark')
+                ->url(fn () => ItemResource::getUrl('index')),
         ];
     }
 
@@ -35,11 +40,10 @@ class EditItem extends EditRecord
     {
         $almacenId = $data['almacen_inicial_id'] ?? null;
         $stockInicial = $data['stock_inicial'] ?? 0;
-        
         unset($data['almacen_inicial_id'], $data['stock_inicial']);
-        
+
         $record->update($data);
-        
+
         if ($almacenId && $stockInicial > 0 && $record->stock_actual == 0) {
             $record->mover(
                 tipo: 'entrada',
@@ -52,7 +56,7 @@ class EditItem extends EditRecord
                 ]
             );
         }
-        
+
         return $record;
     }
 

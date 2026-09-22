@@ -1,0 +1,41 @@
+/* Sidebar header */
+.fi-sidebar-header {
+}
+
+/* Logo cuando está EXPANDIDO - mostrar logo combinado */
+.fi-sidebar-header-logo img {
+}
+
+/* Logo cuando está CONTRAÍDO - mostrar solo circular */
+.fi-sidebar.fi-sidebar-collapsed .fi-sidebar-header-logo {
+}
+
+.fi-sidebar.fi-sidebar-collapsed .fi-sidebar-header-logo img {
+}
+
+/* Animaciones del sidebar */
+.fi-sidebar {
+}
+
+/* Items del menú */
+.fi-sidebar-nav a {
+}
+
+.fi-sidebar-nav a:hover {
+    transform: translateX(4px);
+}
+
+/* Scrollbar */
+.fi-sidebar-nav {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(75, 85, 99, 0.5) transparent;
+}
+
+.fi-sidebar-nav::-webkit-scrollbar {
+    width: 6px;
+}
+
+.fi-sidebar-nav::-webkit-scrollbar-thumb {
+    background-color: rgba(75, 85, 99, 0.5);
+    border-radius: 20px;
+}

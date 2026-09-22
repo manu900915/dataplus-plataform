@@ -20,16 +20,19 @@ RUN apt-get update && apt-get install -y \
     libonig-dev \
     libxml2-dev \
     libicu-dev \
+    libldap2-dev \
+    && docker-php-ext-configure ldap \
     && docker-php-ext-install \
-        pdo_pgsql \
-        pgsql \
-        zip \
-        mbstring \
-        exif \
-        pcntl \
-        bcmath \
-        gd \
-        intl \
+    ldap \
+    pdo_pgsql \
+    pgsql \
+    zip \
+    mbstring \
+    exif \
+    pcntl \
+    bcmath \
+    gd \
+    intl \
     && docker-php-ext-enable intl \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
@@ -38,10 +41,10 @@ RUN apt-get update && apt-get install -y \
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 # Node.js
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /var/www
 
@@ -54,7 +57,6 @@ RUN chmod 1777 /tmp
 RUN pecl install redis && docker-php-ext-enable redis
 
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
-
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

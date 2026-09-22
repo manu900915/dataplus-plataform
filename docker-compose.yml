@@ -63,8 +63,42 @@ services:
     networks:
       - dataplus-network
 
+  # ✅ NUEVO: LLDAP para autenticación
+  lldap:
+    image: nitnelave/lldap:latest
+    container_name: dataplus-lldap
+    restart: unless-stopped
+    ports:
+      - "3890:3890"    # LDAP
+      - "17170:17170"  # Web interface
+    environment:
+      # Configuración del dominio LDAP
+      LLDAP_LDAP_DOMAIN: "dataplus.local"
+      LLDAP_LDAP_BASE_DN: "dc=dataplus,dc=local"
+
+      # Usuario administrador
+      LLDAP_LDAP_USER_DN: "admin"
+      LLDAP_LDAP_USER_PASS: "Data.1234"  # ⚠️ Cambia esto en producción
+
+      # Atributos LDAP
+      LLDAP_LDAP_USER_EMAIL_ATTRIBUTE: "mail"
+      LLDAP_LDAP_USER_DISPLAY_NAME_ATTRIBUTE: "displayName"
+
+      # URL pública
+      LLDAP_HTTP_URL: "http://localhost:17170"
+
+      LLDAP_LDAP_OPTIONS__ENCRYPTION_REQUIRED: "false"
+
+      # JWT secret (genera uno único)
+      LLDAP_JWT_SECRET: "dataplus-jwt-secret-key-change-in-production"
+    volumes:
+      - lldap_data:/data
+    networks:
+      - dataplus-network
+
 volumes:
   pgdata:
+  lldap_data:  # ✅ Volumen persistente para LLDAP
 
 networks:
   dataplus-network:

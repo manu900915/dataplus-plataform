@@ -19,6 +19,7 @@ use Filament\Tables\Table;
 class ItemResource extends Resource
 {
     protected static ?string $model = Item::class;
+
     protected static ?string $navigationGroup = 'Inventario';
     protected static ?string $navigationLabel = 'Items';
     protected static ?string $modelLabel = 'Item';
@@ -136,8 +137,8 @@ class ItemResource extends Resource
                         ->default(0)
                         ->minValue(0)
                         ->disabled(fn (Get $get) => $get('es_equipamiento'))
-                        ->helperText(fn (Get $get) => $get('es_equipamiento') 
-                            ? 'Para equipamiento, use Movimientos para agregar/quitar' 
+                        ->helperText(fn (Get $get) => $get('es_equipamiento')
+                            ? 'Para equipamiento, use Movimientos para agregar/quitar'
                             : 'Editable solo para materiales'),
 
                     Forms\Components\TextInput::make('stock_minimo')
@@ -275,9 +276,7 @@ class ItemResource extends Resource
                     ->label('Movimiento')
                     ->url(fn (Item $r) => InventarioMovimientoResource::getUrl('create', ['item_id' => $r->id])),
             ])
-            ->headerActions([
-                Tables\Actions\CreateAction::make(),
-            ])
+            // ✅ ELIMINADO headerActions para evitar botón duplicado
             ->defaultSort('created_at', 'desc');
     }
 
