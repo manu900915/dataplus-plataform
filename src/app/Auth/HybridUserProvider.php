@@ -37,14 +37,56 @@ class HybridUserProvider implements UserProvider
 
     public function retrieveByCredentials(array $credentials): ?Authenticatable
     {
-        // Filament envía 'email', no 'username'. Buscamos por email.
-        $loginField = isset($credentials['email']) ? 'email' : 'name';
-        
-        if (empty($credentials[$loginField])) {
+        // Filament envía 'email'. Si el usuario no existe localmente,
+        // intentamos sincronizarlo desde LLDAP al vuelo.
+        $email = $credentials['email'] ?? ($credentials['username'] ?? null);
+
+        if (empty($email)) {
             return null;
         }
 
-        return User::where($loginField, $credentials[$loginField])->first();
+        $user = User::where('email', $email)->first();
+
+        if (!$user) {
+            $user = $this->syncFromLdap($email);
+        }
+
+        return $user;
+    }
+
+    protected function syncFromLdap(string $email): ?User
+    {
+        try {
+            $ldap = Container::getConnection('default');
+            $ldapUser = $ldap->query()->whereEquals('mail', $email)->first();
+
+            if (!$ldapUser) {
+                return null;
+            }
+
+            $user = new User();
+            $user->name = $ldapUser['displayName'][0] ?? $email;
+            $user->email = $email;
+            $user->ldap_uid = $ldapUser['uid'][0] ?? $email;
+            $user->password = ''; // autenticación vía LDAP
+            $user->activo = true;
+            $user->save();
+
+            Log::info("Usuario sincronizado desde LLDAP: {$email}");
+
+            if (method_exists($user, 'assignRole')) {
+                try {
+                    $user->assignRole(config('auth.default_role', 'tecnico'));
+                } catch (\Throwable $e) {
+                    Log::warning('No se pudo asignar rol por defecto: '.$e->getMessage());
+                }
+            }
+
+            return $user;
+        } catch (\Throwable $e) {
+            Log::error('Fallo sincronizando usuario LDAP: '.$e->getMessage());
+            return null;
+        }
     }
 
     public function validateCredentials(Authenticatable $user, array $credentials): bool
@@ -54,7 +96,16 @@ class HybridUserProvider implements UserProvider
             return $this->authenticateLdap($user, $credentials);
         }
 
+        // Usuario desactivado: denegar siempre
+        if (property_exists($user, 'activo') && $user->activo === false) {
+            return false;
+        }
+
         // Si NO tiene ldap_uid, autenticamos contra la BD local (PostgreSQL)
+        if (empty($credentials['password'])) {
+            return false;
+        }
+
         return $this->hasher->check($credentials['password'], $user->getAuthPassword());
     }
 
@@ -82,8 +133,10 @@ class HybridUserProvider implements UserProvider
             }
 
             // Intentar bind con la contraseña proporcionada
-            $bindDn = $ldapUser['dn'];
-            $ldap->auth()->attempt($bindDn, $credentials['password']);
+            $bindDn = is_array($ldapUser['dn']) ? $ldapUser['dn'][0] : $ldapUser['dn'];
+            if (!$ldap->auth()->attempt($bindDn, $credentials['password'], true)) {
+                return false;
+            }
 
             Log::info("LDAP auth successful for user: {$user->email}");
             return true;

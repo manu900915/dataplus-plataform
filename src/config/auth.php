@@ -30,4 +30,7 @@ return [
     ],
 
     'password_timeout' => 10800,
+
+    // Rol que se asigna automaticamente a usuarios sincronizados desde LLDAP
+    'default_role' => env('LDAP_DEFAULT_ROLE', 'tecnico'),
 ];

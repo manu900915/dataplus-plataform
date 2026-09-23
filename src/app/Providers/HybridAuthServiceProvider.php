@@ -11,10 +11,7 @@ class HybridAuthServiceProvider extends ServiceProvider
     public function boot()
     {
         Auth::provider('hybrid', function ($app, array $config) {
-            return new HybridUserProvider(
-                $app['hash'],
-                $config['model']
-            );
+            return new HybridUserProvider($app['hash']);
         });
     }
 }

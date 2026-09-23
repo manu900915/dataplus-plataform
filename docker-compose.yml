@@ -78,7 +78,7 @@ services:
 
       # Usuario administrador
       LLDAP_LDAP_USER_DN: "admin"
-      LLDAP_LDAP_USER_PASS: "Data.1234"  # ⚠️ Cambia esto en producción
+      LLDAP_LDAP_USER_PASS: ${LLDAP_ADMIN_PASS:-Data.1234}  # Se lee de .env (dev usa default)
 
       # Atributos LDAP
       LLDAP_LDAP_USER_EMAIL_ATTRIBUTE: "mail"
@@ -89,8 +89,8 @@ services:
 
       LLDAP_LDAP_OPTIONS__ENCRYPTION_REQUIRED: "false"
 
-      # JWT secret (genera uno único)
-      LLDAP_JWT_SECRET: "dataplus-jwt-secret-key-change-in-production"
+      # JWT secret (se define en .env)
+      LLDAP_JWT_SECRET: "${LLDAP_JWT_SECRET:-dataplus-jwt-secret-change-me}"
     volumes:
       - lldap_data:/data
     networks:
