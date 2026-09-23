@@ -1,0 +1,119 @@
+# ============================================================
+# DOCKER COMPOSE - PRODUCCIÓN (VPS)
+# Uso: docker compose -f docker-compose.prod.yml up -d --build
+# Todos los nombres llevan prefijo "dp-prod-" para NO chocar
+# con los contenedores que ya tienes corriendo en el servidor.
+# Los puertos del host están desplazados para evitar conflictos.
+# Configura las credenciales reales en el archivo .env
+# ============================================================
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dp-prod-app
+    restart: unless-stopped
+    working_dir: /var/www
+    env_file:
+      - .env
+    volumes:
+      - ./src:/var/www
+      - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini:ro
+    networks:
+      - dp-prod-network
+
+  db:
+    image: postgres:16-alpine
+    container_name: dp-prod-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-dataplus}
+      POSTGRES_USER: ${POSTGRES_USER:-dataplus}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
+    volumes:
+      - dp-prod-pgdata:/var/lib/postgresql/data
+    # ⚠️ Puerto NO expuesto al host en producción (solo acceso interno por red).
+    # Descomenta solo si necesitas conectarte desde fuera (ej. DBeaver):
+    # ports:
+    #   - "5433:5432"
+    networks:
+      - dp-prod-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dataplus} -d ${POSTGRES_DB:-dataplus}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: dp-prod-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - dp-prod-redisdata:/data
+    networks:
+      - dp-prod-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nginx:
+    image: nginx:alpine
+    container_name: dp-prod-nginx
+    restart: unless-stopped
+    ports:
+      - "8080:80"   # 👈 Cambiado de 8000 a 8080 para no chocar en el VPS
+    volumes:
+      - ./src:/var/www:ro
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - dp-prod-network
+    depends_on:
+      - app
+
+  # Mailpit solo accesible internamente.
+  # Si necesitas la web de Mailpit, descomenta los ports:
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: dp-prod-mailpit
+    restart: unless-stopped
+    # ports:
+    #   - "8026:8025"   # Web UI (desplazado de 8025 a 8026)
+    #   - "1026:1025"   # SMTP (desplazado de 1025 a 1026)
+    networks:
+      - dp-prod-network
+
+  # LLDAP para autenticación LDAP
+  lldap:
+    image: nitnelave/lldap:latest
+    container_name: dp-prod-lldap
+    restart: unless-stopped
+    ports:
+      - "3891:3890"     # LDAP (desplazado de 3890 a 3891)
+      - "17171:17170"   # Web interface (desplazado de 17170 a 17171)
+    environment:
+      LLDAP_LDAP_DOMAIN: "dataplus.local"
+      LLDAP_LDAP_BASE_DN: "dc=dataplus,dc=local"
+      LLDAP_LDAP_USER_DN: "admin"
+      LLDAP_LDAP_USER_PASS: ${LLDAP_ADMIN_PASS:?Define LLDAP_ADMIN_PASS en .env}
+      LLDAP_LDAP_USER_EMAIL_ATTRIBUTE: "mail"
+      LLDAP_LDAP_USER_DISPLAY_NAME_ATTRIBUTE: "displayName"
+      LLDAP_HTTP_URL: "http://localhost:17171"
+      LLDAP_LDAP_OPTIONS__ENCRYPTION_REQUIRED: "false"
+      LLDAP_JWT_SECRET: ${LLDAP_JWT_SECRET:?Define LLDAP_JWT_SECRET en .env}
+    volumes:
+      - dp-prod-lldap_data:/data
+    networks:
+      - dp-prod-network
+
+volumes:
+  dp-prod-pgdata:
+  dp-prod-redisdata:
+  dp-prod-lldap_data:
+
+networks:
+  dp-prod-network:
+    driver: bridge
