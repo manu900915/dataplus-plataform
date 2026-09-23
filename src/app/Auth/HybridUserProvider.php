@@ -97,7 +97,13 @@ class HybridUserProvider implements UserProvider
         }
 
         // Usuario desactivado: denegar siempre
-        if (property_exists($user, 'activo') && $user->activo === false) {
+        if ($user->activo === false) {
+            return false;
+        }
+
+        // Bloquear bypass LDAP: si el registro local no tiene password hasheado
+        // pero sí ldap_uid vacío/anómalo, no permitir check contra hash ''
+        if (!$user->ldap_uid && empty($user->getAuthPassword())) {
             return false;
         }
 
