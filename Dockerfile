@@ -38,6 +38,10 @@ RUN mkdir -p /tmp && chmod 1777 /tmp \
     # Extensión redis vía PECL
     && pecl install redis \
     && docker-php-ext-enable redis \
+    # Verificación en tiempo de build: la extensión ldap DEBE estar cargada.
+    # Si no, el build falla aquí (no en producción con "ldap_escape undefined").
+    && php -m | grep -qi '^ldap$' \
+    && php -r 'exit(function_exists("ldap_escape") ? 0 : 1);' \
     # Node.js 20.x en la misma capa (evita un segundo apt-get update)
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
