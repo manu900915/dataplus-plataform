@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dataplus-app
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./src:/var/www
+      - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    networks:
+      - dataplus-network
+    depends_on:
+      - db
+      - redis
+
+  db:
+    image: postgres:16-alpine
+    container_name: dataplus-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: dataplus
+      POSTGRES_USER: dataplus
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - dataplus-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: dataplus-redis
+    restart: unless-stopped
+    networks:
+      - dataplus-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: dataplus-nginx
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    volumes:
+      - ./src:/var/www
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - dataplus-network
+    depends_on:
+      - app
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: dataplus-mailpit
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+    networks:
+      - dataplus-network
+
+  # ✅ NUEVO: LLDAP para autenticación
+  lldap:
+    image: nitnelave/lldap:latest
+    container_name: dataplus-lldap
+    restart: unless-stopped
+    ports:
+      - "3890:3890"    # LDAP
+      - "17170:17170"  # Web interface
+    environment:
+      # Configuración del dominio LDAP
+      LLDAP_LDAP_DOMAIN: "dataplus.local"
+      LLDAP_LDAP_BASE_DN: "dc=dataplus,dc=local"
+
+      # Usuario administrador
+      LLDAP_LDAP_USER_DN: "admin"
+      LLDAP_LDAP_USER_PASS: "Data.1234"  # ⚠️ Cambia esto en producción
+
+      # Atributos LDAP
+      LLDAP_LDAP_USER_EMAIL_ATTRIBUTE: "mail"
+      LLDAP_LDAP_USER_DISPLAY_NAME_ATTRIBUTE: "displayName"
+
+      # URL pública
+      LLDAP_HTTP_URL: "http://localhost:17170"
+
+      LLDAP_LDAP_OPTIONS__ENCRYPTION_REQUIRED: "false"
+
+      # JWT secret (genera uno único)
+      LLDAP_JWT_SECRET: "dataplus-jwt-secret-key-change-in-production"
+    volumes:
+      - lldap_data:/data
+    networks:
+      - dataplus-network
+
+volumes:
+  pgdata:
+  lldap_data:  # ✅ Volumen persistente para LLDAP
+
+networks:
+  dataplus-network:
+    driver: bridge

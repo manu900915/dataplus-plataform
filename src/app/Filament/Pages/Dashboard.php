@@ -24,7 +24,7 @@ class Dashboard extends Page
      */
     public function getData(): array
     {
-        return Cache::remember('dashboard:stats:v2', now()->addMinutes(5), function () {
+        return Cache::remember('dashboard:stats:v4', now()->addMinutes(5), function () {
             return [
                 'proyectos_activos' => Proyecto::whereIn('estado', ['borrador', 'en_progreso'])->count(),
                 'proyectos_mes' => Proyecto::where('estado', 'completado')->whereMonth('created_at', now()->month)->count(),
@@ -43,9 +43,26 @@ class Dashboard extends Page
                 'usuarios' => User::where('activo', true)->count(),
                 'clientes' => Cliente::count(),
                 'clientes_activos' => Cliente::where('activo', true)->count(),
-                'recientes' => Proyecto::latest()->take(6)->get(),
-                'alertas_stock' => Item::whereColumn('stock_actual', '<=', 'stock_minimo')->orderBy('stock_actual')->take(10)->get(),
-                'top_proyectos' => Proyecto::orderByDesc('presupuesto_total')->take(5)->get(),
+                'recientes' => Proyecto::latest()->take(6)->get()->map(fn (Proyecto $proyecto): array => [
+                    'nombre' => $proyecto->nombre,
+                    'created_at' => $proyecto->created_at?->diffForHumans(),
+                    'estado' => $proyecto->estado,
+                ])->all(),
+                'alertas_stock' => Item::whereColumn('stock_actual', '<=', 'stock_minimo')
+                    ->orderBy('stock_actual')
+                    ->take(10)
+                    ->get()
+                    ->map(fn (Item $item): array => [
+                        'nombre' => $item->nombre,
+                        'codigo' => $item->codigo,
+                        'stock_actual' => $item->stock_actual,
+                        'unidad_medida' => $item->unidad_medida,
+                        'stock_minimo' => $item->stock_minimo,
+                    ])->all(),
+                'top_proyectos' => Proyecto::orderByDesc('presupuesto_total')->take(5)->get()->map(fn (Proyecto $proyecto): array => [
+                    'nombre' => $proyecto->nombre,
+                    'presupuesto_total' => (float) $proyecto->presupuesto_total,
+                ])->all(),
                 'max_presupuesto' => (float) (Proyecto::max('presupuesto_total') ?: 1),
             ];
         });

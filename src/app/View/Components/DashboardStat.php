@@ -26,6 +26,19 @@ class DashboardStat extends Component
         'fuchsia'   => 'from-fuchsia-500 to-pink-700',
     ];
 
+    protected const GRADIENT_STYLES = [
+        'blue' => 'linear-gradient(135deg, #0ea5e9, #1d4ed8)',
+        'green' => 'linear-gradient(135deg, #10b981, #0f766e)',
+        'red' => 'linear-gradient(135deg, #f43f5e, #b91c1c)',
+        'amber' => 'linear-gradient(135deg, #f59e0b, #c2410c)',
+        'purple' => 'linear-gradient(135deg, #8b5cf6, #6b21a8)',
+        'indigo' => 'linear-gradient(135deg, #6366f1, #1e40af)',
+        'emerald' => 'linear-gradient(135deg, #10b981, #15803d)',
+        'slate' => 'linear-gradient(135deg, #64748b, #334155)',
+        'cyan' => 'linear-gradient(135deg, #06b6d4, #0369a1)',
+        'fuchsia' => 'linear-gradient(135deg, #d946ef, #be185d)',
+    ];
+
     public function __construct(
         public string $label,
         public string|int|float $value,
@@ -57,6 +70,11 @@ class DashboardStat extends Component
         return self::GRADIENTS[$this->color] ?? self::GRADIENTS['blue'];
     }
 
+    public function gradientStyle(): string
+    {
+        return self::GRADIENT_STYLES[$this->color] ?? self::GRADIENT_STYLES['blue'];
+    }
+
     /** Columnas responsivas según cantidad de tarjetas del grupo. */
     public function columnClasses(): string
     {
@@ -69,6 +87,9 @@ class DashboardStat extends Component
 
     public function render()
     {
-        return view('components.dashboard-stat');
+        return view('components.dashboard-stat', [
+            'gradientClasses' => $this->gradientClasses(),
+            'gradientStyle' => $this->gradientStyle(),
+        ]);
     }
 }
