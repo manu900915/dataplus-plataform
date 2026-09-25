@@ -2,12 +2,15 @@
 
 namespace App\Filament\Widgets;
 
+use App\Filament\Concerns\AnimatedCharts;
 use App\Models\Proyecto;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Support\Facades\DB;
 
 class OperacionesChart extends ChartWidget
 {
+    use AnimatedCharts;
+
     protected static ?string $heading = 'Proyectos I+D por Estado Kanban';
     protected static ?int $sort = 3;
     protected int | string | array $columnSpan = 1;
@@ -45,5 +48,16 @@ class OperacionesChart extends ChartWidget
     protected function getType(): string
     {
         return 'bar';
+    }
+
+    protected function getOptions(): array
+    {
+        return $this->animatedOptions([
+            'plugins' => ['legend' => ['display' => false]],
+            'scales' => [
+                'y' => ['beginAtZero' => true, 'ticks' => ['stepSize' => 1], 'grid' => ['display' => false], 'border' => ['display' => false]],
+                'x' => ['grid' => ['display' => false], 'border' => ['display' => false]],
+            ],
+        ]);
     }
 }

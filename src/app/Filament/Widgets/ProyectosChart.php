@@ -2,12 +2,15 @@
 
 namespace App\Filament\Widgets;
 
+use App\Filament\Concerns\AnimatedCharts;
 use App\Models\Proyecto;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Support\Facades\DB;
 
 class ProyectosChart extends ChartWidget
 {
+    use AnimatedCharts;
+
     protected static ?string $heading = 'Proyectos por Estado';
     protected static ?int $sort = 2;
     protected int | string | array $columnSpan = 'full';
@@ -54,14 +57,17 @@ class ProyectosChart extends ChartWidget
 
     protected function getOptions(): array
     {
-        return [
-            'responsive' => true,
-            'plugins' => [
-                'legend' => ['display' => false],
-            ],
+        return $this->animatedOptions([
+            'plugins' => ['legend' => ['display' => false]],
             'scales' => [
-                'y' => ['beginAtZero' => true, 'ticks' => ['stepSize' => 1]],
+                'y' => [
+                    'beginAtZero' => true,
+                    'ticks' => ['stepSize' => 1],
+                    'grid' => ['display' => false],
+                    'border' => ['display' => false],
+                ],
+                'x' => ['grid' => ['display' => false], 'border' => ['display' => false]],
             ],
-        ];
+        ]);
     }
 }

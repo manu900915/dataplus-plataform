@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+
 /* Sidebar header */
 .fi-sidebar-header {
 }
@@ -39,3 +41,34 @@
     background-color: rgba(75, 85, 99, 0.5);
     border-radius: 20px;
 }
+
+/* ============================================================
+   Dashboard Dataplus — tipografía, cards y gráficos (v2)
+   ============================================================ */
+
+/* Fuente display para todo el panel de control */
+/* Headings de widgets (ChartWidget / StatsOverview) con la misma fuente */
+.fi-wi-widget h3, .fi-section h3 {
+    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif !important;
+    letter-spacing: -0.01em;
+}
+
+/* Cards de stats: sombra suave + elevación al hover */
+.fi-fo-stats-overview .grid > div,
+.dash-card {
+    transition: transform .25s ease, box-shadow .25s ease;
+}
+.dash-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 16px 32px -12px rgba(2, 132, 199, .35);
+}
+
+/* Contenedores de gráfico más redondeados y limpios */
+.fi-wi-chart {
+    border-radius: 1rem;
+}
+
+/* Scrollbar fino para listas del dashboard */
+.dash-root ::-webkit-scrollbar { width: 6px; height: 6px; }
+.dash-root ::-webkit-scrollbar-thumb { background: rgba(100,116,139,.4); border-radius: 999px; }
+.dash-root ::-webkit-scrollbar-track { background: transparent; }

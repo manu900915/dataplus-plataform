@@ -2,12 +2,15 @@
 
 namespace App\Filament\Widgets;
 
+use App\Filament\Concerns\AnimatedCharts;
 use App\Models\LineaPresupuesto;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Support\Facades\DB;
 
 class FinanzasChart extends ChartWidget
 {
+    use AnimatedCharts;
+
     protected static ?string $heading = 'Distribución del Presupuesto por Tipo';
     protected static ?int $sort = 5;
     protected int | string | array $columnSpan = 2;
@@ -68,12 +71,13 @@ class FinanzasChart extends ChartWidget
 
     protected function getOptions(): array
     {
-        return [
+        return $this->animatedOptions([
             'indexAxis' => 'y',
-            'responsive' => true,
-            'plugins' => [
-                'legend' => ['display' => false],
+            'plugins' => ['legend' => ['display' => false]],
+            'scales' => [
+                'x' => ['beginAtZero' => true, 'grid' => ['display' => false], 'border' => ['display' => false]],
+                'y' => ['grid' => ['display' => false], 'border' => ['display' => false]],
             ],
-        ];
+        ]);
     }
 }

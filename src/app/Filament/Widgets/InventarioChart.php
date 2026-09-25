@@ -2,12 +2,15 @@
 
 namespace App\Filament\Widgets;
 
+use App\Filament\Concerns\AnimatedCharts;
 use App\Models\Item;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Support\Facades\DB;
 
 class InventarioChart extends ChartWidget
 {
+    use AnimatedCharts;
+
     protected static ?string $heading = 'Inventario por Categoría';
     protected static ?int $sort = 4;
     protected int | string | array $columnSpan = 2;
@@ -53,11 +56,11 @@ class InventarioChart extends ChartWidget
 
     protected function getOptions(): array
     {
-        return [
-            'responsive' => true,
+        return $this->animatedOptions([
+            'cutout' => '62%',
             'plugins' => [
-                'legend' => ['position' => 'bottom'],
+                'legend' => ['position' => 'right'],
             ],
-        ];
+        ]);
     }
 }
