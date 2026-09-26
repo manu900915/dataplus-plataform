@@ -9,10 +9,10 @@
         <a href="{{ filament()->getUrl() }}">
             <img 
                 alt="{{ filament()->getBrandName() }} logo" 
-                src="{{ filament()->getBrandLogo() }}" 
-                style="height: {{ filament()->getBrandLogoHeight() ?? '2.5rem' }};" 
-                class="fi-logo flex"
+                src="{{ asset('images/9.png') }}"
+                class="fi-logo flex h-10 w-10 rounded-full"
             >
+            <span class="fi-custom-brand-name">dataplus</span>
         </a>
     </div>
 

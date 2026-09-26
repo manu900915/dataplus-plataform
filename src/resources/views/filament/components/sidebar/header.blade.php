@@ -27,8 +27,8 @@
         x-transition:leave-end="opacity-0 -translate-x-2"
         class="flex items-center gap-2"
     >
-        <img src="{{ asset('images/9.png') }}" alt="Dataplus" class="h-10 w-10 rounded-full flex-shrink-0">
-        <img src="{{ asset('images/logo-dataplus.png') }}" alt="Dataplus Platform" class="h-8 w-auto object-contain flex-shrink-0">
+        <img src="{{ asset('images/9.png') }}" alt="Dataplus" class="h-10 w-10 flex-shrink-0 rounded-full">
+        <span class="fi-custom-brand-name">dataplus</span>
     </div>
 
     {{-- Logo cuando está CONTRAÍDO --}}

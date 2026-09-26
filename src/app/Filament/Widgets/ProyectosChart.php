@@ -43,7 +43,7 @@ class ProyectosChart extends ChartWidget
                         'rgb(16, 185, 129)',
                         'rgb(239, 68, 68)',
                     ],
-                    'borderWidth' => 1,
+                    'borderWidth' => 0,
                 ],
             ],
             'labels' => ['Borrador', 'En Progreso', 'Completado', 'Cancelado'],

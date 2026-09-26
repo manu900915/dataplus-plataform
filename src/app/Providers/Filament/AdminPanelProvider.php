@@ -26,8 +26,9 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login()
-            ->brandLogo(asset('images/logo-combinado.png'))
-            ->brandLogoHeight('2.5rem')
+            ->brandLogo(asset('images/9.png'))
+            ->brandName('dataplus')
+            ->brandLogoHeight('2.25rem')
             ->colors([
                 'primary' => Color::Blue,
             ])

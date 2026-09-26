@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (isCollapsed) {
                 logoContainer.innerHTML = '<img src="/images/9.png" alt="Dataplus" class="h-10 w-10 rounded-full">';
             } else {
-                logoContainer.innerHTML = '<div class="flex items-center gap-2"><img src="/images/9.png" alt="Dataplus" class="h-10 w-10 rounded-full flex-shrink-0"><img src="/images/logo-dataplus.png" alt="Dataplus Platform" class="h-8 w-auto object-contain flex-shrink-0"></div>';
+                logoContainer.innerHTML = '<div class="flex items-center gap-2"><img src="/images/9.png" alt="Dataplus" class="h-10 w-10 rounded-full flex-shrink-0"><span class="fi-custom-brand-name">dataplus</span></div>';
             }
         }
         

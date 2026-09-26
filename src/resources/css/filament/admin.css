@@ -8,6 +8,43 @@
     border-bottom-color: rgba(148, 163, 184, .16);
 }
 
+.fi-sidebar-header .fi-logo {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 999px;
+    object-fit: cover;
+}
+
+.fi-sidebar-header .fi-brand-name {
+    color: rgb(15 23 42);
+    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+}
+
+.fi-sidebar-header a:has(.fi-custom-brand-name) {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+}
+
+.fi-custom-brand-name {
+    color: rgb(15 23 42);
+    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+}
+
+.dark .fi-custom-brand-name {
+    color: rgb(248 250 252);
+}
+
+.dark .fi-sidebar-header .fi-brand-name {
+    color: rgb(248 250 252);
+}
+
 /* Logo cuando está EXPANDIDO - mostrar logo combinado */
 .fi-sidebar-header-logo img {
 }
@@ -75,6 +112,20 @@
     border-radius: 1rem;
     min-width: 0;
     overflow: hidden;
+}
+
+.fi-wi-chart .fi-section-content {
+    padding: 1rem 1.25rem 1.25rem;
+}
+
+.fi-wi-chart canvas {
+    max-width: 100%;
+}
+
+@media (prefers-color-scheme: dark) {
+    .fi-wi-chart .fi-section-content {
+        background: rgb(17 24 39 / .18);
+    }
 }
 
 /* Decorative accents remain visible even when a dashboard container is resized. */
