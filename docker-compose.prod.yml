@@ -19,13 +19,18 @@ services:
       # El contenedor db se llama dp-prod-db, no "db"
       DB_HOST: dp-prod-db
       REDIS_HOST: dp-prod-redis
-      LDAP_HOST: dp-prod-lldap
       MAIL_HOST: dp-prod-mailpit
+      # LDAP_HOST y LDAP_PORT se leen de .env (apuntan al LLDAP YA existente en el VPS)
+    extra_hosts:
+      # Permite usar host.docker.internal para llegar a servicios del host
+      # (p.ej. tu lldap corriendo fuera de este compose)
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./src:/var/www
       - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini:ro
     networks:
       - dp-prod-network
+      - proxy_net   # para alcanzar el lldap/proxy que ya corre en esa red
     depends_on:
       db:
         condition: service_healthy
@@ -67,32 +72,6 @@ services:
       timeout: 5s
       retries: 5
 
-  lldap:
-    image: nitnelave/lldap:stable
-    container_name: dp-prod-lldap
-    restart: unless-stopped
-    ports:
-      - "${LLDAP_LDAP_PORT:-3891}:3890"     # LDAP (desplazado para no chocar)
-      - "${LLDAP_HTTP_PORT:-17171}:17170"   # Web UI
-    environment:
-      LLDAP_LDAP_DOMAIN: "${LLDAP_LDAP_DOMAIN:-dataplus.cu}"
-      LLDAP_LDAP_BASE_DN: "${LLDAP_BASE_DN:-dc=dataplus,dc=cu}"
-      LLDAP_LDAP_USER_DN: "${LLDAP_ADMIN_USER:-admin}"
-      LLDAP_LDAP_USER_PASS: "${LLDAP_ADMIN_PASS:?Define LLDAP_ADMIN_PASS en .env}"
-      LLDAP_JWT_SECRET: "${LLDAP_JWT_SECRET:?Define LLDAP_JWT_SECRET en .env}"
-      LLDAP_LDAP_OPTIONS__ENCRYPTION_REQUIRED: "false"
-      LLDAP_HTTP_URL: "${LLDAP_PUBLIC_URL:-http://localhost:17171}"
-    volumes:
-      - dp-prod-lldap_data:/data
-    networks:
-      - dp-prod-network
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:17170/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
-
   nginx:
     image: nginx:alpine
     container_name: dp-prod-nginx
@@ -116,7 +95,6 @@ services:
 volumes:
   dp-prod-pgdata:
   dp-prod-redisdata:
-  dp-prod-lldap_data:
 
 networks:
   dp-prod-network:

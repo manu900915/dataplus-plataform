@@ -40,9 +40,9 @@ log "Construyendo imagen..."
 docker compose -f "$COMPOSE_FILE" build app
 
 # 4) Levantar infraestructura y aplicar migraciones antes del relanzamiento
-log "Arrancando db/redis/lldap si hace falta..."
-docker compose -f "$COMPOSE_FILE" up -d db redis lldap mailpit 2>/dev/null || \
-docker compose -f "$COMPOSE_FILE" up -d db redis lldap
+#    (lldap NO se levanta aqui: ya existe uno en produccion, se usa via LDAP_HOST en .env)
+log "Arrancando db/redis/mailpit si hace falta..."
+docker compose -f "$COMPOSE_FILE" up -d db redis mailpit
 
 log "Ejecutando migraciones..."
 docker compose -f "$COMPOSE_FILE" run --rm app php artisan migrate --force
