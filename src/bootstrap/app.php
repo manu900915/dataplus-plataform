@@ -12,6 +12,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Confía en los headers X-Forwarded-* del proxy inverso (nginx/openresty)
+        // para que Laravel detecte HTTPS y genere URLs de assets con https://
+        // (evita el "Mixed Content Blocking" del navegador).
+        $middleware->trustProxies(at: '*');
         $middleware->web(append: [
             \App\Http\Middleware\SecurityHeaders::class,
         ]);
