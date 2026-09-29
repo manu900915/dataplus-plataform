@@ -91,9 +91,18 @@ class HybridUserProvider implements UserProvider
 
     public function validateCredentials(Authenticatable $user, array $credentials): bool
     {
-        // Si tiene ldap_uid, autenticamos contra LDAP
+        // Si tiene ldap_uid, autenticamos contra LDAP.
+        // Fallback: si el bind LDAP falla (host inaccesible, clave cambiada, etc.)
+        // y el usuario local tiene un hash de contraseña válido, se permite acceso local.
         if ($user->ldap_uid) {
-            return $this->authenticateLdap($user, $credentials);
+            if ($this->authenticateLdap($user, $credentials)) {
+                return true;
+            }
+            if (!empty($user->getAuthPassword())) {
+                Log::warning("LDAP falló para {$user->email}; intentando fallback local.");
+                return $this->hasher->check($credentials['password'] ?? '', $user->getAuthPassword());
+            }
+            return false;
         }
 
         // Usuario desactivado: denegar siempre
