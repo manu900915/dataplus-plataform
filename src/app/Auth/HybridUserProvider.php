@@ -54,13 +54,23 @@ class HybridUserProvider implements UserProvider
         return $user;
     }
 
-    protected function syncFromLdap(string $email): ?User
+         protected function syncFromLdap(string $email): ?User
     {
         try {
-            $ldap = Container::getConnection('default');
+            // 1. DEBUG: Registrar qué configuración está usando Laravel en este instante
+            $currentHost = config('ldap.connections.default.hosts')[0] ?? 'UNKNOWN';
+            \Illuminate\Support\Facades\Log::info("Intentando sincronizar LDAP. Host en config: {$currentHost}, Email: {$email}");
+
+            $ldap = \LdapRecord\Container::getConnection('default');
+            
+            // 2. DEBUG: Verificar qué hosts tiene la conexión real de LdapRecord
+            $ldapConfig = $ldap->getConfiguration();
+            \Illuminate\Support\Facades\Log::info("Hosts reales en la conexión LdapRecord: " . json_encode($ldapConfig->get('hosts')));
+
             $ldapUser = $ldap->query()->whereEquals('mail', $email)->first();
 
             if (!$ldapUser) {
+                \Illuminate\Support\Facades\Log::warning("Usuario no encontrado en LDAP: {$email}");
                 return null;
             }
 
@@ -72,19 +82,19 @@ class HybridUserProvider implements UserProvider
             $user->activo = true;
             $user->save();
 
-            Log::info("Usuario sincronizado desde LLDAP: {$email}");
+            \Illuminate\Support\Facades\Log::info("Usuario sincronizado exitosamente desde LLDAP: {$email}");
 
             if (method_exists($user, 'assignRole')) {
                 try {
-                    $user->assignRole(config('auth.default_role', 'tecnico'));
+                    $user->assignRole(config('auth.default_role', 'Tecnico')); // Nota: Mayúscula inicial si así lo creaste
                 } catch (\Throwable $e) {
-                    Log::warning('No se pudo asignar rol por defecto: '.$e->getMessage());
+                    \Illuminate\Support\Facades\Log::warning('No se pudo asignar rol por defecto: '.$e->getMessage());
                 }
             }
 
             return $user;
         } catch (\Throwable $e) {
-            Log::error('Fallo sincronizando usuario LDAP: '.$e->getMessage());
+            \Illuminate\Support\Facades\Log::error('Fallo sincronizando usuario LDAP: '.$e->getMessage());
             return null;
         }
     }

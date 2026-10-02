@@ -1,4 +1,4 @@
-FROM php:8.3-fpm
+FROM registry.docker.ir/php:8.3-fpm
 
 # Variables de entorno para directorios temporales
 ENV TMPDIR=/tmp \
@@ -50,7 +50,7 @@ RUN mkdir -p /tmp && chmod 1777 /tmp \
     && rm -rf /var/lib/apt/lists/*
 
 # Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+COPY --from=registry.docker.ir/composer:latest /usr/bin/composer /usr/bin/composer
 
 # Permisos de usuario + asegurar permisos de /tmp
 RUN usermod -u 1000 www-data \
