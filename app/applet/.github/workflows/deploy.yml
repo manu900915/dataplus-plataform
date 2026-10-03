@@ -8,9 +8,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  # ============================================================
-  # 1. Continuous Integration (Lint, Static Analysis & Tests)
-  # ============================================================
   test:
     name: Run Tests & Build Validation
     runs-on: ubuntu-latest
@@ -35,19 +32,18 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
+          cache-dependency-path: src/package-lock.json
 
       - name: Install Node Dependencies & Build Assets
+        working-directory: ./src
         run: |
           npm ci || npm install
           npm run build
 
-  # ============================================================
-  # 2. Continuous Deployment to Production VPS
-  # ============================================================
   deploy:
     name: Deploy to Production VPS (srv3.dataplus.cu)
     needs: test
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
 
     steps:
