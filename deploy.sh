@@ -48,6 +48,9 @@ docker compose -f "$COMPOSE_FILE" build app
 # Asegurar que la red externa proxy_net exista
 docker network inspect proxy_net >/dev/null 2>&1 || docker network create proxy_net
 
+# Limpiar cualquier cache vieja de config que impida arrancar
+rm -f src/bootstrap/cache/*.php 2>/dev/null || true
+
 log "Arrancando db/redis/mailpit si hace falta..."
 docker compose -f "$COMPOSE_FILE" up -d db redis mailpit
 
