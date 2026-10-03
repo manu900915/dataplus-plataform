@@ -9,7 +9,7 @@ on:
 
 jobs:
   # ============================================================
-  # 1. Continuous Integration (Compilación y Build de Vite)
+  # 1. Continuous Integration (Compilación y Verificación)
   # ============================================================
   build:
     name: Build & Validate React/Vite App
@@ -29,35 +29,27 @@ jobs:
           npm run build
 
   # ============================================================
-  # 2. Continuous Deployment to Production VPS
+  # 2. Despliegue directo en tu VPS con Self-Hosted Runner
   # ============================================================
   deploy:
-    name: Deploy to Production VPS (srv3.dataplus.cu)
+    name: Deploy directly on VPS
     needs: build
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
-      - name: Execute Deployment via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
-          script_stop: true
-          command_timeout: 15m
-          script: |
-            echo "🚀 Iniciando despliegue automatizado en VPS..."
-            cd ${{ secrets.SERVER_PATH || '/opt/dataplus-platform' }}
-            
-            # Verificar existencia del script de despliegue
-            if [ ! -f "deploy.sh" ]; then
-              echo "❌ Error: deploy.sh no encontrado en el directorio del proyecto."
-              exit 1
-            fi
-            
-            chmod +x deploy.sh
-            ./deploy.sh
-            
-            echo "✅ Despliegue completado con éxito."
+      - name: Run Deploy Script on VPS
+        run: |
+          echo "🚀 Ejecutando despliegue local en VPS..."
+          # Ir a la carpeta donde tienes el proyecto clonado en el VPS:
+          cd "${{ secrets.SERVER_PATH || '/opt/dataplus-platform' }}"
+          
+          if [ ! -f "deploy.sh" ]; then
+            echo "❌ Error: deploy.sh no encontrado en $(pwd)"
+            exit 1
+          fi
+          
+          chmod +x deploy.sh
+          ./deploy.sh
+          
+          echo "✅ Despliegue completado con éxito."
