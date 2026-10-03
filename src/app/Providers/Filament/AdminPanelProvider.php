@@ -5,6 +5,7 @@ namespace App\Providers\Filament;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\NavigationGroup;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Assets\Css;
@@ -26,11 +27,27 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login()
-            ->brandLogo(asset('images/9.png'))
-            ->brandName('dataplus')
-            ->brandLogoHeight('2.25rem')
+            ->brandLogo(fn () => view('filament.components.brand-logo'))
+            ->brandName('Dataplus S.R.L.')
+            ->brandLogoHeight('2.5rem')
             ->colors([
-                'primary' => Color::Blue,
+                'primary' => Color::Sky,
+            ])
+            ->navigationGroups([
+                NavigationGroup::make('Operaciones')
+                    ->icon('heroicon-o-cpu-chip'),
+                NavigationGroup::make('Proyectos')
+                    ->icon('heroicon-o-briefcase'),
+                NavigationGroup::make('Inventario')
+                    ->icon('heroicon-o-archive-box'),
+                NavigationGroup::make('Finanzas')
+                    ->icon('heroicon-o-banknotes'),
+                NavigationGroup::make('Reportes')
+                    ->icon('heroicon-o-chart-bar'),
+                NavigationGroup::make('Administración')
+                    ->icon('heroicon-o-shield-check'),
+                NavigationGroup::make('Configuración')
+                    ->icon('heroicon-o-cog-6-tooth'),
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')

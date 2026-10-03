@@ -24,6 +24,7 @@ class LdapSettings extends Page implements HasForms
     protected static ?string $navigationGroup = 'Configuración';
 
     protected static ?string $navigationLabel = 'Servidor LDAP';
+    protected static ?int $navigationSort = 1;
 
     protected static ?string $title = 'Integración y Directorio LDAP';
 
