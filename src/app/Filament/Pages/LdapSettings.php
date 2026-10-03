@@ -4,27 +4,35 @@ namespace App\Filament\Pages;
 
 use App\Models\LdapConfiguration;
 use Filament\Forms;
+use Filament\Forms\Concerns\InteractsWithForms;
+use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Form;
-use Filament\Pages\Page;
 use Filament\Notifications\Notification;
+use Filament\Pages\Page;
 use LdapRecord\Container;
 use LdapRecord\Connection;
 
-class LdapSettings extends Page
+class LdapSettings extends Page implements HasForms
 {
-    protected static ?string $navigationIcon = 'heroicon-o-server';
+    use InteractsWithForms;
+
     protected static string $view = 'filament.pages.ldap-settings';
-    
-    protected static ?string $navigationGroup = 'Administración';
-    protected static ?int $navigationSort = 1;
+
+    protected static ?string $navigationIcon = 'heroicon-o-server-stack';
+
+    protected static ?string $navigationGroup = 'Configuración';
+
     protected static ?string $navigationLabel = 'Configuración LDAP';
+
+    protected static ?string $title = 'Servidor de Autenticación LDAP';
 
     public ?array $data = [];
 
     public function mount(): void
     {
         $config = LdapConfiguration::first();
-        $this->form->fill($config ? $config->toArray() : [
+
+        $defaultData = [
             'host' => 'lldap',
             'port' => 3890,
             'base_dn' => 'dc=dataplus,dc=cu',
@@ -32,60 +40,70 @@ class LdapSettings extends Page
             'tls' => false,
             'timeout' => 5,
             'is_active' => true,
-        ]);
+        ];
+
+        $this->form->fill($config ? $config->toArray() : $defaultData);
     }
 
     public function form(Form $form): Form
     {
         return $form
             ->schema([
-                Forms\Components\Section::make('Conexión al Servidor')
+                Forms\Components\Section::make('Conexión')
                     ->description('Configura los parámetros de red para conectar con LLDAP')
                     ->schema([
                         Forms\Components\TextInput::make('host')
-                            ->label('Host del Servidor')
+                            ->label('Servidor / Host')
                             ->required()
                             ->helperText('Ej: lldap, host.docker.internal, o una IP'),
+
                         Forms\Components\TextInput::make('port')
                             ->label('Puerto')
                             ->numeric()
+                            ->default(3890)
                             ->required()
-                            ->default(3890),
+                            ->helperText('LLDAP usa 3890 por defecto (o 6360 para SSL)'),
+
+                        Forms\Components\Toggle::make('ssl')
+                            ->label('Usar SSL (ldaps://)')
+                            ->helperText('Activar solo si el puerto configurado es SSL (ej: 6360)'),
+
+                        Forms\Components\Toggle::make('tls')
+                            ->label('Usar STARTTLS')
+                            ->helperText('Negociar TLS sobre la conexión estándar'),
+
+                        Forms\Components\TextInput::make('timeout')
+                            ->label('Timeout (segundos)')
+                            ->numeric()
+                            ->default(5)
+                            ->required(),
+                    ])->columns(2),
+
+                Forms\Components\Section::make('Credenciales y Base DN')
+                    ->description('Usuario con permisos para buscar en el directorio LDAP')
+                    ->schema([
                         Forms\Components\TextInput::make('base_dn')
                             ->label('Base DN')
                             ->required()
-                            ->default('dc=dataplus,dc=cu'),
-                        Forms\Components\Toggle::make('ssl')
-                            ->label('Usar SSL (ldaps://)')
-                            ->default(false),
-                        Forms\Components\Toggle::make('tls')
-                            ->label('Usar StartTLS')
-                            ->default(false)
-                            ->helperText('Recomendado para conexiones seguras en puerto 3890'),
-                        Forms\Components\TextInput::make('timeout')
-                            ->label('Tiempo de espera (segundos)')
-                            ->numeric()
-                            ->default(5),
-                    ])->columns(2),
+                            ->default('dc=dataplus,dc=cu')
+                            ->columnSpanFull(),
 
-                Forms\Components\Section::make('Credenciales de Bind')
-                    ->description('Usuario con permisos para buscar en el directorio LDAP')
-                    ->schema([
                         Forms\Components\TextInput::make('username')
-                            ->label('Bind Username (DN completo)')
-                            ->placeholder('uid=admin,ou=people,dc=dataplus,dc=cu'),
-                        Forms\Components\TextInput::make('password')
-                            ->label('Contraseña')
-                            ->password()
-                            ->revealable(),
-                    ])->columns(2),
+                            ->label('Bind DN (Usuario Administrador / Servicio)')
+                            ->helperText('Ej: uid=admin,ou=people,dc=dataplus,dc=cu')
+                            ->columnSpanFull(),
 
-                Forms\Components\Section::make('Estado')
-                    ->schema([
+                        Forms\Components\TextInput::make('password')
+                            ->label('Contraseña de Bind')
+                            ->password()
+                            ->revealable()
+                            ->helperText('Dejar en blanco para mantener la contraseña actual')
+                            ->columnSpanFull(),
+
                         Forms\Components\Toggle::make('is_active')
                             ->label('Habilitar autenticación LDAP')
                             ->default(true)
-                            ->helperText('Si se desactiva, el sistema solo usará autenticación local.'),
+                            ->helperText('Si se desactiva, solo se usará autenticación local'),
                     ]),
             ])
             ->statePath('data');
@@ -96,59 +114,41 @@ class LdapSettings extends Page
         $data = $this->form->getState();
 
         try {
-            // Crear una conexión temporal con los datos del formulario
             $connection = new Connection([
                 'hosts' => [$data['host']],
-                'port' => $data['port'],
+                'port' => (int) $data['port'],
                 'base_dn' => $data['base_dn'],
                 'username' => $data['username'],
                 'password' => $data['password'],
-                'timeout' => $data['timeout'],
-                'options' => [
-                    LDAP_OPT_PROTOCOL_VERSION => 3,
-                    LDAP_OPT_NETWORK_TIMEOUT => $data['timeout'],
-                ],
+                'use_tls' => (bool) ($data['ssl'] || $data['tls']),
+                'timeout' => (int) ($data['timeout'] ?? 5),
             ]);
 
-            // Si SSL está activado, usar ldaps://
-            if ($data['ssl']) {
-                $connection->getConfiguration()->set('use_ssl', true);
-            }
-
-            // Si TLS está activado, usar StartTLS
-            if ($data['tls']) {
-                $connection->getConfiguration()->set('use_tls', true);
-            }
-
-            // Intentar conectar
             $connection->connect();
-
-            // Intentar hacer bind con las credenciales
-            if ($data['username'] && $data['password']) {
-                $connection->auth()->bind($data['username'], $data['password']);
-            }
 
             Notification::make()
                 ->title('✅ Conexión LDAP exitosa')
-                ->body("Conectado a {$data['host']}:{$data['port']} correctamente.")
+                ->body("Conectado correctamente a {$data['host']}:{$data['port']}")
                 ->success()
                 ->send();
 
         } catch (\LdapRecord\Auth\BindException $e) {
             Notification::make()
                 ->title('❌ Error de autenticación LDAP')
-                ->body("No se pudo hacer bind: " . $e->getDetailedError()?->getDiagnosticMessage() ?? $e->getMessage())
+                ->body('Credenciales incorrectas: ' . $e->getMessage())
                 ->danger()
                 ->send();
+
         } catch (\LdapRecord\LdapRecordException $e) {
             Notification::make()
-                ->title(' Error de conexión LDAP')
-                ->body($e->getMessage())
+                ->title('❌ Error de conexión LDAP')
+                ->body('No se pudo contactar el servidor: ' . $e->getMessage())
                 ->danger()
                 ->send();
+
         } catch (\Exception $e) {
             Notification::make()
-                ->title(' Error inesperado')
+                ->title('❌ Error inesperado')
                 ->body($e->getMessage())
                 ->danger()
                 ->send();
@@ -156,28 +156,35 @@ class LdapSettings extends Page
     }
 
     public function save(): void
-{
-    $data = $this->form->getState();
-    
-    // Guardar o actualizar la configuración (solo mantenemos 1 registro)
-    LdapConfiguration::updateOrCreate(['id' => 1], $data);
+    {
+        $data = $this->form->getState();
 
-    // Actualizar la configuración de Laravel en tiempo de ejecución
-    config([
-        'ldap.connections.default.hosts' => [$data['host']],
-        'ldap.connections.default.port' => (int) $data['port'],
-        'ldap.connections.default.base_dn' => $data['base_dn'],
-        'ldap.connections.default.username' => $data['username'],
-        'ldap.connections.default.password' => $data['password'],
-        'ldap.connections.default.use_ssl' => $data['ssl'],
-        'ldap.connections.default.use_tls' => $data['tls'],
-        'ldap.connections.default.timeout' => (int) ($data['timeout'] ?? 5),
-    ]);
+        // Guardar o actualizar la configuración (solo mantenemos 1 registro)
+        LdapConfiguration::updateOrCreate(['id' => 1], $data);
 
-    Notification::make()
-        ->title('Configuración LDAP guardada exitosamente')
-        ->body('Los cambios se aplicarán en la próxima autenticación.')
-        ->success()
-        ->send();
-}
+        // Actualizar la configuración de Laravel en tiempo de ejecución
+        $useTls = (bool) ($data['ssl'] || $data['tls']);
+        config([
+            'ldap.connections.default.hosts' => [$data['host']],
+            'ldap.connections.default.port' => (int) $data['port'],
+            'ldap.connections.default.base_dn' => $data['base_dn'],
+            'ldap.connections.default.username' => $data['username'],
+            'ldap.connections.default.password' => $data['password'],
+            'ldap.connections.default.use_tls' => $useTls,
+            'ldap.connections.default.timeout' => (int) ($data['timeout'] ?? 5),
+        ]);
+
+        $defaultConn = config('ldap.connections.default', []);
+        if (is_array($defaultConn)) {
+            unset($defaultConn['ssl'], $defaultConn['use_ssl'], $defaultConn['tls']);
+            $defaultConn['use_tls'] = $useTls;
+            config(['ldap.connections.default' => $defaultConn]);
+        }
+
+        Notification::make()
+            ->title('Configuración LDAP guardada exitosamente')
+            ->body('Los cambios se aplicarán en la próxima autenticación.')
+            ->success()
+            ->send();
+    }
 }

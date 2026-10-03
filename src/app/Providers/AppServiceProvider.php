@@ -14,6 +14,7 @@ use App\Policies\InventarioMovimientoPolicy;
 use App\Policies\ItemPolicy;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\ServiceProvider;
+use LdapRecord\Configuration\DomainConfiguration;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -26,7 +27,12 @@ class AppServiceProvider extends ServiceProvider
 
     public function register(): void
     {
-        //
+        // Permitir opciones legadas en LdapRecord v4 sin lanzar excepción
+        if (class_exists(DomainConfiguration::class)) {
+            DomainConfiguration::extend('ssl', false);
+            DomainConfiguration::extend('use_ssl', false);
+            DomainConfiguration::extend('tls', false);
+        }
     }
 
     public function boot(): void
@@ -37,17 +43,18 @@ class AppServiceProvider extends ServiceProvider
         });
 
         // 2. Cargar configuración LDAP desde la BD si existe y está activa
+        $useTls = false;
         try {
             $ldapConfig = \App\Models\LdapConfiguration::first();
             if ($ldapConfig && $ldapConfig->is_active) {
+                $useTls = (bool) ($ldapConfig->use_tls ?? $ldapConfig->tls ?? $ldapConfig->use_ssl ?? $ldapConfig->ssl ?? false);
                 config([
                     'ldap.connections.default.hosts' => [$ldapConfig->host],
                     'ldap.connections.default.port' => (int) $ldapConfig->port,
                     'ldap.connections.default.base_dn' => $ldapConfig->base_dn,
                     'ldap.connections.default.username' => $ldapConfig->username,
                     'ldap.connections.default.password' => $ldapConfig->password,
-                    'ldap.connections.default.use_ssl' => (bool) $ldapConfig->ssl,
-                    'ldap.connections.default.use_tls' => (bool) $ldapConfig->tls,
+                    'ldap.connections.default.use_tls' => $useTls,
                     'ldap.connections.default.timeout' => (int) ($ldapConfig->timeout ?? 5),
                 ]);
             }
@@ -55,10 +62,11 @@ class AppServiceProvider extends ServiceProvider
             // Si la tabla no existe o falla la BD, continuar con la del .env
         }
 
-        // Blindaje contra 'Option ssl does not exist' en LdapRecord
+        // Limpiar claves legadas de la configuración de conexión
         $defaultConn = config('ldap.connections.default', []);
         if (is_array($defaultConn)) {
-            unset($defaultConn['ssl'], $defaultConn['tls']);
+            unset($defaultConn['ssl'], $defaultConn['use_ssl'], $defaultConn['tls']);
+            $defaultConn['use_tls'] = $useTls ?: (bool) ($defaultConn['use_tls'] ?? false);
             config(['ldap.connections.default' => $defaultConn]);
         }
     }

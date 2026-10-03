@@ -10,7 +10,6 @@ return [
             'port' => (int) env('LDAP_PORT', 3890),
             'base_dn' => env('LDAP_BASE_DN', 'dc=dataplus,dc=cu'),
             'timeout' => (int) env('LDAP_TIMEOUT', 5),
-            'use_ssl' => (bool) env('LDAP_SSL', false),
             'use_tls' => (bool) env('LDAP_TLS', false),
         ],
     ],
