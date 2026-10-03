@@ -9,10 +9,10 @@ on:
 
 jobs:
   # ============================================================
-  # 1. Continuous Integration (Compilación y Verificación)
+  # 1. Compilación de Assets (Laravel Vite)
   # ============================================================
   build:
-    name: Build & Validate React/Vite App
+    name: Build & Validate Assets
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -24,12 +24,13 @@ jobs:
           node-version: 20
 
       - name: Install Dependencies & Build Frontend
+        working-directory: ./src
         run: |
           npm install
           npm run build
 
   # ============================================================
-  # 2. Despliegue directo en tu VPS con Self-Hosted Runner
+  # 2. Despliegue en tu VPS con Self-Hosted Runner
   # ============================================================
   deploy:
     name: Deploy directly on VPS
@@ -40,7 +41,7 @@ jobs:
     steps:
       - name: Run Deploy Script on VPS
         run: |
-          echo "🚀 Ejecutando despliegue local en VPS..."
+          echo "🚀 Ejecutando despliegue en VPS..."
           cd "${{ secrets.SERVER_PATH || '/opt/dataplus-platform' }}"
           
           if [ ! -f "deploy.sh" ]; then
