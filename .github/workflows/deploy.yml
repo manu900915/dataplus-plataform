@@ -34,6 +34,7 @@ jobs:
           cache: 'npm'
 
       - name: Install Node Dependencies & Build Assets
+        working-directory: ./src
         run: |
           npm ci || npm install
           npm run build
