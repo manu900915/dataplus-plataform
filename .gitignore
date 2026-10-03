@@ -1,1 +1,8 @@
-(empty)
+.env
+.env.*
+!.env.example
+node_modules/
+vendor/
+backups/
+proyecto-backup-*.tar.gz
+actions-runner/
