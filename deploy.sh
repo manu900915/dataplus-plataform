@@ -33,7 +33,7 @@ fi
 
 # 2) Actualizar código
 log "Actualizando código desde GitHub..."
-git pull --ff-only origin main
+for i in 1 2 3; do git pull --ff-only origin main && break || { echo "Reintentando git pull ($i/3)..."; sleep 3; }; done
 
 # 3) Construir imagen (Dockerfile cachea capas, rápido si no cambió)
 log "Construyendo imagen..."
