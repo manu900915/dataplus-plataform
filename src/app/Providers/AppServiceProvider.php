@@ -46,8 +46,8 @@ class AppServiceProvider extends ServiceProvider
                 'ldap.connections.default.base_dn' => $ldapConfig->base_dn,
                 'ldap.connections.default.username' => $ldapConfig->username,
                 'ldap.connections.default.password' => $ldapConfig->password,
-                'ldap.connections.default.ssl' => $ldapConfig->ssl,
-                'ldap.connections.default.tls' => $ldapConfig->tls,
+                'ldap.connections.default.use_ssl' => $ldapConfig->ssl,
+                'ldap.connections.default.use_tls' => $ldapConfig->tls,
                 'ldap.connections.default.timeout' => $ldapConfig->timeout,
             ]);
         }

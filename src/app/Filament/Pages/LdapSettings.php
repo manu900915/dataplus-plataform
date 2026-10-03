@@ -169,8 +169,8 @@ class LdapSettings extends Page
         'ldap.connections.default.base_dn' => $data['base_dn'],
         'ldap.connections.default.username' => $data['username'],
         'ldap.connections.default.password' => $data['password'],
-        'ldap.connections.default.ssl' => $data['ssl'],
-        'ldap.connections.default.tls' => $data['tls'],
+        'ldap.connections.default.use_ssl' => $data['ssl'],
+        'ldap.connections.default.use_tls' => $data['tls'],
         'ldap.connections.default.timeout' => $data['timeout'],
     ]);
 
