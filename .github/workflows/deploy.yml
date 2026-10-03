@@ -12,7 +12,7 @@ jobs:
   # 1. Continuous Integration (Compilación y Verificación)
   # ============================================================
   build:
-    name: Build & Validate React/Vite App
+    name: Build & Validate Assets
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -24,6 +24,7 @@ jobs:
           node-version: 20
 
       - name: Install Dependencies & Build Frontend
+        working-directory: ./src
         run: |
           npm install
           npm run build

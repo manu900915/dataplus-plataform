@@ -1,0 +1,166 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+
+/* Sidebar header */
+.fi-sidebar-header {
+    background:
+        radial-gradient(circle at 10% 0%, rgba(14, 165, 233, .16), transparent 45%),
+        linear-gradient(180deg, rgba(15, 23, 42, .98), rgba(17, 24, 39, .98));
+    border-bottom-color: rgba(148, 163, 184, .16);
+}
+
+.fi-sidebar-header .fi-logo {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 999px;
+    object-fit: cover;
+}
+
+.fi-sidebar-header .fi-brand-name {
+    color: rgb(15 23 42);
+    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+}
+
+.fi-sidebar-header a:has(.fi-custom-brand-name) {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+}
+
+.fi-custom-brand-name {
+    color: rgb(15 23 42);
+    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+}
+
+.dark .fi-custom-brand-name {
+    color: rgb(248 250 252);
+}
+
+.dark .fi-sidebar-header .fi-brand-name {
+    color: rgb(248 250 252);
+}
+
+/* Logo cuando está EXPANDIDO - mostrar logo combinado */
+.fi-sidebar-header-logo img {
+}
+
+/* Logo cuando está CONTRAÍDO - mostrar solo circular */
+.fi-sidebar.fi-sidebar-collapsed .fi-sidebar-header-logo {
+}
+
+.fi-sidebar.fi-sidebar-collapsed .fi-sidebar-header-logo img {
+}
+
+/* Animaciones del sidebar */
+.fi-sidebar {
+    box-shadow: 12px 0 32px -24px rgba(2, 132, 199, .45);
+    transition: width .3s ease, transform .3s ease, box-shadow .3s ease;
+}
+
+/* Items del menú */
+.fi-sidebar-nav a {
+    transition: transform .2s ease, background-color .2s ease, color .2s ease;
+}
+
+.fi-sidebar-nav a:hover {
+    transform: translateX(4px);
+}
+
+/* Scrollbar */
+.fi-sidebar-nav {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(75, 85, 99, 0.5) transparent;
+}
+
+.fi-sidebar-nav::-webkit-scrollbar {
+    width: 6px;
+}
+
+.fi-sidebar-nav::-webkit-scrollbar-thumb {
+    background-color: rgba(75, 85, 99, 0.5);
+    border-radius: 20px;
+}
+
+/* ============================================================
+   Dashboard Dataplus — tipografía, cards y gráficos (v2)
+   ============================================================ */
+
+/* Fuente display para todo el panel de control */
+/* Headings de widgets (ChartWidget / StatsOverview) con la misma fuente */
+.fi-wi-widget h3, .fi-section h3 {
+    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif !important;
+    letter-spacing: -0.01em;
+}
+
+/* Cards de stats: sombra suave + elevación al hover */
+.fi-fo-stats-overview .grid > div,
+.dash-card {
+    transition: transform .25s ease, box-shadow .25s ease;
+}
+.dash-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 16px 32px -12px rgba(2, 132, 199, .35);
+}
+
+/* Contenedores de gráfico más redondeados y limpios */
+.fi-wi-chart {
+    border-radius: 1rem;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.fi-wi-chart .fi-section-content {
+    padding: 1rem 1.25rem 1.25rem;
+}
+
+.fi-wi-chart canvas {
+    max-width: 100%;
+}
+
+@media (prefers-color-scheme: dark) {
+    .fi-wi-chart .fi-section-content {
+        background: rgb(17 24 39 / .18);
+    }
+}
+
+/* Decorative accents remain visible even when a dashboard container is resized. */
+.dash-panel {
+    min-width: 0;
+    overflow: hidden;
+    box-shadow: 0 10px 30px -24px rgba(15, 23, 42, .45);
+    transition: box-shadow .25s ease, border-color .25s ease;
+}
+
+.dash-panel:hover {
+    border-color: rgba(14, 165, 233, .35);
+    box-shadow: 0 18px 36px -28px rgba(2, 132, 199, .55);
+}
+
+@media (max-width: 639px) {
+    .fi-main-ctn {
+        padding-inline: .75rem;
+    }
+
+    .fi-wi-widget {
+        min-width: 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fi-sidebar,
+    .fi-sidebar-nav a,
+    .dash-panel,
+    .dash-card {
+        transition: none;
+    }
+}
+
+/* Scrollbar fino para listas del dashboard */
+.dash-root ::-webkit-scrollbar { width: 6px; height: 6px; }
+.dash-root ::-webkit-scrollbar-thumb { background: rgba(100,116,139,.4); border-radius: 999px; }
+.dash-root ::-webkit-scrollbar-track { background: transparent; }
