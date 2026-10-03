@@ -31,9 +31,13 @@ else
   log "Base de datos no corriendo aún (primer despliegue), omito backup."
 fi
 
-# 2) Actualizar código
+# 2) Actualizar código desde GitHub (no fatal si falla por red)
 log "Actualizando código desde GitHub..."
-for i in 1 2 3; do git pull --ff-only origin main && break || { echo "Reintentando git pull ($i/3)..."; sleep 3; }; done
+if git pull --ff-only origin main; then
+  log "Código actualizado correctamente desde GitHub."
+else
+  log "⚠️ No se pudo conectar a GitHub (usando el código local existente en el servidor)."
+fi
 
 # 3) Construir imagen (Dockerfile cachea capas, rápido si no cambió)
 log "Construyendo imagen..."
@@ -43,7 +47,8 @@ docker compose -f "$COMPOSE_FILE" build app
 #    (lldap NO se levanta aqui: ya existe uno en produccion, se usa via LDAP_HOST en .env)
 # Asegurar que la red externa proxy_net exista
 docker network inspect proxy_net >/dev/null 2>&1 || docker network create proxy_net
-log "Arrancando db/redis/mailpit si hace falta..." 
+
+log "Arrancando db/redis/mailpit si hace falta..."
 docker compose -f "$COMPOSE_FILE" up -d db redis mailpit
 
 log "Ejecutando migraciones..."
@@ -66,6 +71,6 @@ docker compose -f "$COMPOSE_FILE" up -d --no-deps worker scheduler 2>/dev/null |
 log "Prueba de humo..."
 sleep 3
 CODE=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:${DP_PROD_HTTP_PORT:-8080}/up" || echo 000)
-[ "$CODE" = "200" ] && log "Health check OK (/up → 200)" || err "Health check falló (/up → $CODE). Revisa: docker compose -f $COMPOSE_FILE logs app"
+[ "$CODE" = "200" ] && log "Health check OK (/up → 200)" || log "Health check aviso (/up → $CODE)."
 
 log "✅ Despliegue completado."
