@@ -41,7 +41,6 @@ jobs:
       - name: Run Deploy Script on VPS
         run: |
           echo "🚀 Ejecutando despliegue local en VPS..."
-          # Ir a la carpeta donde tienes el proyecto clonado en el VPS:
           cd "${{ secrets.SERVER_PATH || '/opt/dataplus-platform' }}"
           
           if [ ! -f "deploy.sh" ]; then
@@ -49,7 +48,6 @@ jobs:
             exit 1
           fi
           
-          chmod +x deploy.sh
-          ./deploy.sh
+          bash ./deploy.sh
           
           echo "✅ Despliegue completado con éxito."
