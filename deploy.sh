@@ -41,7 +41,9 @@ docker compose -f "$COMPOSE_FILE" build app
 
 # 4) Levantar infraestructura y aplicar migraciones antes del relanzamiento
 #    (lldap NO se levanta aqui: ya existe uno en produccion, se usa via LDAP_HOST en .env)
-log "Arrancando db/redis/mailpit si hace falta..."
+# Asegurar que la red externa proxy_net exista
+docker network inspect proxy_net >/dev/null 2>&1 || docker network create proxy_net
+log "Arrancando db/redis/mailpit si hace falta..." 
 docker compose -f "$COMPOSE_FILE" up -d db redis mailpit
 
 log "Ejecutando migraciones..."
