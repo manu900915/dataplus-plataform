@@ -3,13 +3,14 @@
 namespace App\Filament\Pages;
 
 use App\Models\LdapConfiguration;
+use App\Models\User;
+use App\Services\LdapSyncService;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
-use LdapRecord\Container;
 use LdapRecord\Connection;
 
 class LdapSettings extends Page implements HasForms
@@ -22,11 +23,20 @@ class LdapSettings extends Page implements HasForms
 
     protected static ?string $navigationGroup = 'Configuración';
 
-    protected static ?string $navigationLabel = 'Configuración LDAP';
+    protected static ?string $navigationLabel = 'Servidor LDAP';
 
-    protected static ?string $title = 'Servidor de Autenticación LDAP';
+    protected static ?string $title = 'Integración y Directorio LDAP';
 
     public ?array $data = [];
+
+    public string $activeTab = 'config'; // 'config', 'directory', 'diagnostics'
+
+    public ?bool $connectionStatus = null;
+    public ?float $connectionLatency = null;
+    public ?string $connectionMessage = null;
+
+    public array $directoryUsers = [];
+    public bool $loadingUsers = false;
 
     public function mount(): void
     {
@@ -49,120 +59,149 @@ class LdapSettings extends Page implements HasForms
     {
         return $form
             ->schema([
-                Forms\Components\Section::make('Conexión')
-                    ->description('Configura los parámetros de red para conectar con LLDAP')
+                Forms\Components\Grid::make(3)
                     ->schema([
-                        Forms\Components\TextInput::make('host')
-                            ->label('Servidor / Host')
-                            ->required()
-                            ->helperText('Ej: lldap, host.docker.internal, o una IP'),
+                        Forms\Components\Section::make('Conectividad de Red')
+                            ->description('Parámetros de red hacia el contenedor o host LLDAP')
+                            ->schema([
+                                Forms\Components\TextInput::make('host')
+                                    ->label('Servidor / Host')
+                                    ->placeholder('lldap o host.docker.internal')
+                                    ->required()
+                                    ->helperText('Nombre del servicio docker o IP del servidor'),
 
-                        Forms\Components\TextInput::make('port')
-                            ->label('Puerto')
-                            ->numeric()
-                            ->default(3890)
-                            ->required()
-                            ->helperText('LLDAP usa 3890 por defecto (o 6360 para SSL)'),
+                                Forms\Components\TextInput::make('port')
+                                    ->label('Puerto')
+                                    ->numeric()
+                                    ->default(3890)
+                                    ->required()
+                                    ->helperText('3890 estándar LLDAP, 6360 para LDAPS'),
 
-                        Forms\Components\Toggle::make('ssl')
-                            ->label('Usar SSL (ldaps://)')
-                            ->helperText('Activar solo si el puerto configurado es SSL (ej: 6360)'),
+                                Forms\Components\TextInput::make('timeout')
+                                    ->label('Timeout (segundos)')
+                                    ->numeric()
+                                    ->default(5)
+                                    ->required(),
+                            ])->columnSpan(2),
 
-                        Forms\Components\Toggle::make('tls')
-                            ->label('Usar STARTTLS')
-                            ->helperText('Negociar TLS sobre la conexión estándar'),
+                        Forms\Components\Section::make('Seguridad de Canal')
+                            ->description('Cifrado y activación')
+                            ->schema([
+                                Forms\Components\Toggle::make('is_active')
+                                    ->label('LDAP Habilitado')
+                                    ->default(true)
+                                    ->helperText('Activa la autenticación híbrida'),
 
-                        Forms\Components\TextInput::make('timeout')
-                            ->label('Timeout (segundos)')
-                            ->numeric()
-                            ->default(5)
-                            ->required(),
-                    ])->columns(2),
+                                Forms\Components\Toggle::make('ssl')
+                                    ->label('Cifrado LDAPS')
+                                    ->helperText('Requiere puerto SSL (ej: 6360)'),
 
-                Forms\Components\Section::make('Credenciales y Base DN')
-                    ->description('Usuario con permisos para buscar en el directorio LDAP')
+                                Forms\Components\Toggle::make('tls')
+                                    ->label('STARTTLS')
+                                    ->helperText('Negociar TLS sobre puerto plano'),
+                            ])->columnSpan(1),
+                    ]),
+
+                Forms\Components\Section::make('Autenticación y Búsqueda (Bind)')
+                    ->description('Credenciales de la cuenta de servicio autorizada para explorar el directorio')
                     ->schema([
                         Forms\Components\TextInput::make('base_dn')
-                            ->label('Base DN')
+                            ->label('Base DN del Directorio')
                             ->required()
                             ->default('dc=dataplus,dc=cu')
-                            ->columnSpanFull(),
+                            ->helperText('Raíz de búsqueda para usuarios y grupos')
+                            ->columnSpan(1),
 
                         Forms\Components\TextInput::make('username')
-                            ->label('Bind DN (Usuario Administrador / Servicio)')
-                            ->helperText('Ej: uid=admin,ou=people,dc=dataplus,dc=cu')
-                            ->columnSpanFull(),
+                            ->label('Bind DN (Usuario de Servicio)')
+                            ->helperText('Ejemplo: uid=admin,ou=people,dc=dataplus,dc=cu')
+                            ->columnSpan(1),
 
                         Forms\Components\TextInput::make('password')
                             ->label('Contraseña de Bind')
                             ->password()
                             ->revealable()
-                            ->helperText('Dejar en blanco para mantener la contraseña actual')
+                            ->helperText('Dejar en blanco para conservar la clave actual')
                             ->columnSpanFull(),
-
-                        Forms\Components\Toggle::make('is_active')
-                            ->label('Habilitar autenticación LDAP')
-                            ->default(true)
-                            ->helperText('Si se desactiva, solo se usará autenticación local'),
-                    ]),
+                    ])->columns(2),
             ])
             ->statePath('data');
     }
 
-    public function testConnection(): void
+    public function testConnection(LdapSyncService $syncService): void
     {
-        $data = $this->form->getState();
+        $result = $syncService->testConnection();
 
-        try {
-            $connection = new Connection([
-                'hosts' => [$data['host']],
-                'port' => (int) $data['port'],
-                'base_dn' => $data['base_dn'],
-                'username' => $data['username'],
-                'password' => $data['password'],
-                'use_tls' => (bool) ($data['ssl'] || $data['tls']),
-                'timeout' => (int) ($data['timeout'] ?? 5),
-            ]);
+        $this->connectionStatus = $result['success'];
+        $this->connectionLatency = $result['latency'] ?? null;
+        $this->connectionMessage = $result['message'];
 
-            $connection->connect();
-
+        if ($result['success']) {
             Notification::make()
-                ->title('✅ Conexión LDAP exitosa')
-                ->body("Conectado correctamente a {$data['host']}:{$data['port']}")
+                ->title('✅ Conexión LDAP Exitosa')
+                ->body("Respuesta en {$result['latency']} ms desde {$result['host']}:{$result['port']}")
                 ->success()
                 ->send();
-
-        } catch (\LdapRecord\Auth\BindException $e) {
+        } else {
             Notification::make()
-                ->title('❌ Error de autenticación LDAP')
-                ->body('Credenciales incorrectas: ' . $e->getMessage())
-                ->danger()
-                ->send();
-
-        } catch (\LdapRecord\LdapRecordException $e) {
-            Notification::make()
-                ->title('❌ Error de conexión LDAP')
-                ->body('No se pudo contactar el servidor: ' . $e->getMessage())
-                ->danger()
-                ->send();
-
-        } catch (\Exception $e) {
-            Notification::make()
-                ->title('❌ Error inesperado')
-                ->body($e->getMessage())
+                ->title('❌ Error al contactar LDAP')
+                ->body($result['message'])
                 ->danger()
                 ->send();
         }
+    }
+
+    public function loadDirectoryUsers(LdapSyncService $syncService): void
+    {
+        $this->loadingUsers = true;
+        $this->directoryUsers = $syncService->getDirectoryUsers();
+        $this->loadingUsers = false;
+        $this->activeTab = 'directory';
+
+        Notification::make()
+            ->title('Directorio actualizado')
+            ->body(count($this->directoryUsers) . ' usuarios encontrados en LDAP.')
+            ->info()
+            ->send();
+    }
+
+    public function syncAllUsers(LdapSyncService $syncService): void
+    {
+        $result = $syncService->syncAllUsers();
+
+        // Actualizar lista en pantalla si estaba cargada
+        $this->directoryUsers = $syncService->getDirectoryUsers();
+
+        Notification::make()
+            ->title('🚀 Sincronización Completada')
+            ->body("Total en LDAP: {$result['total']} | Nuevos importados: {$result['imported']} | Actualizados: {$result['updated']}")
+            ->success()
+            ->send();
+    }
+
+    public function syncIndividual(string $uid, string $email, string $name, LdapSyncService $syncService): void
+    {
+        $syncService->syncSingleUser([
+            'uid'   => $uid,
+            'email' => $email,
+            'name'  => $name,
+        ]);
+
+        $this->directoryUsers = $syncService->getDirectoryUsers();
+
+        Notification::make()
+            ->title('Usuario sincronizado')
+            ->body("El usuario {$name} ({$uid}) ya está disponible en DataPlus.")
+            ->success()
+            ->send();
     }
 
     public function save(): void
     {
         $data = $this->form->getState();
 
-        // Guardar o actualizar la configuración (solo mantenemos 1 registro)
         LdapConfiguration::updateOrCreate(['id' => 1], $data);
 
-        // Actualizar la configuración de Laravel en tiempo de ejecución
         $useTls = (bool) ($data['ssl'] || $data['tls']);
         config([
             'ldap.connections.default.hosts' => [$data['host']],
@@ -182,9 +221,19 @@ class LdapSettings extends Page implements HasForms
         }
 
         Notification::make()
-            ->title('Configuración LDAP guardada exitosamente')
-            ->body('Los cambios se aplicarán en la próxima autenticación.')
+            ->title('Configuración guardada')
+            ->body('Los parámetros de LDAP han sido actualizados en la base de datos.')
             ->success()
             ->send();
+    }
+
+    public function getSyncedCountProperty(): int
+    {
+        return User::whereNotNull('ldap_uid')->count();
+    }
+
+    public function getTotalUsersProperty(): int
+    {
+        return User::count();
     }
 }

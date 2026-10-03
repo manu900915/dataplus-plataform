@@ -195,6 +195,13 @@ class UserResource extends Resource
                         'Vendedor' => 'warning',
                         default => 'gray',
                     }),
+                Tables\Columns\TextColumn::make('ldap_uid')
+                    ->label('Origen')
+                    ->formatStateUsing(fn ($state) => $state ? 'LDAP' : 'Local')
+                    ->badge()
+                    ->color(fn ($state) => $state ? 'info' : 'gray')
+                    ->sortable(),
+
                 Tables\Columns\IconColumn::make('activo')
                     ->label('Activo')
                     ->boolean(),
