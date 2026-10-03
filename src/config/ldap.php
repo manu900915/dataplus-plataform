@@ -2,15 +2,16 @@
 
 return [
     'logging' => env('LDAP_LOGGING', true),
-
     'connections' => [
         'default' => [
             'hosts' => [env('LDAP_HOST', 'lldap')],
             'username' => env('LDAP_USERNAME', 'uid=admin,ou=people,dc=dataplus,dc=cu'),
             'password' => env('LDAP_PASSWORD', ''),
-            'port' => env('LDAP_PORT', 3890),
+            'port' => (int) env('LDAP_PORT', 3890),
             'base_dn' => env('LDAP_BASE_DN', 'dc=dataplus,dc=cu'),
-            'timeout' => env('LDAP_TIMEOUT', 5),
+            'timeout' => (int) env('LDAP_TIMEOUT', 5),
+            'use_ssl' => (bool) env('LDAP_SSL', false),
+            'use_tls' => (bool) env('LDAP_TLS', false),
         ],
     ],
 ];

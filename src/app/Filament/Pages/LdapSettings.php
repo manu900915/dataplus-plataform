@@ -165,13 +165,13 @@ class LdapSettings extends Page
     // Actualizar la configuración de Laravel en tiempo de ejecución
     config([
         'ldap.connections.default.hosts' => [$data['host']],
-        'ldap.connections.default.port' => $data['port'],
+        'ldap.connections.default.port' => (int) $data['port'],
         'ldap.connections.default.base_dn' => $data['base_dn'],
         'ldap.connections.default.username' => $data['username'],
         'ldap.connections.default.password' => $data['password'],
         'ldap.connections.default.use_ssl' => $data['ssl'],
         'ldap.connections.default.use_tls' => $data['tls'],
-        'ldap.connections.default.timeout' => $data['timeout'],
+        'ldap.connections.default.timeout' => (int) ($data['timeout'] ?? 5),
     ]);
 
     Notification::make()

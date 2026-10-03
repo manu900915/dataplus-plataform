@@ -30,30 +30,36 @@ class AppServiceProvider extends ServiceProvider
     }
 
     public function boot(): void
-{
-    // 1. Registrar el driver de autenticación híbrido (LDAP + Local)
-    Auth::provider('hybrid', function ($app, array $config) {
-        return new HybridUserProvider($app->make('hash'), $config['model']);
-    });
+    {
+        // 1. Registrar el driver de autenticación híbrido (LDAP + Local)
+        Auth::provider('hybrid', function ($app, array $config) {
+            return new HybridUserProvider($app->make('hash'), $config['model']);
+        });
 
-    // 2. Cargar configuración LDAP desde la BD si existe y está activa
-    try {
-        $ldapConfig = \App\Models\LdapConfiguration::first();
-        if ($ldapConfig && $ldapConfig->is_active) {
-            config([
-                'ldap.connections.default.hosts' => [$ldapConfig->host],
-                'ldap.connections.default.port' => $ldapConfig->port,
-                'ldap.connections.default.base_dn' => $ldapConfig->base_dn,
-                'ldap.connections.default.username' => $ldapConfig->username,
-                'ldap.connections.default.password' => $ldapConfig->password,
-                'ldap.connections.default.use_ssl' => $ldapConfig->ssl,
-                'ldap.connections.default.use_tls' => $ldapConfig->tls,
-                'ldap.connections.default.timeout' => $ldapConfig->timeout,
-            ]);
+        // 2. Cargar configuración LDAP desde la BD si existe y está activa
+        try {
+            $ldapConfig = \App\Models\LdapConfiguration::first();
+            if ($ldapConfig && $ldapConfig->is_active) {
+                config([
+                    'ldap.connections.default.hosts' => [$ldapConfig->host],
+                    'ldap.connections.default.port' => (int) $ldapConfig->port,
+                    'ldap.connections.default.base_dn' => $ldapConfig->base_dn,
+                    'ldap.connections.default.username' => $ldapConfig->username,
+                    'ldap.connections.default.password' => $ldapConfig->password,
+                    'ldap.connections.default.use_ssl' => (bool) $ldapConfig->ssl,
+                    'ldap.connections.default.use_tls' => (bool) $ldapConfig->tls,
+                    'ldap.connections.default.timeout' => (int) ($ldapConfig->timeout ?? 5),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            // Si la tabla no existe o falla la BD, continuar con la del .env
         }
-    } catch (\Exception $e) {
-        // Si la tabla no existe (primera vez), usar configuración del .env
-        \Log::debug('Usando configuración LDAP del .env: ' . $e->getMessage());
+
+        // Blindaje contra 'Option ssl does not exist' en LdapRecord
+        $defaultConn = config('ldap.connections.default', []);
+        if (is_array($defaultConn)) {
+            unset($defaultConn['ssl'], $defaultConn['tls']);
+            config(['ldap.connections.default' => $defaultConn]);
+        }
     }
-}
 }
