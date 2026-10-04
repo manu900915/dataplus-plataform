@@ -36,8 +36,23 @@ class ClienteResource extends Resource
                             ->label('ID Cliente')
                             ->required()
                             ->unique(ignoreRecord: true)
-                            ->maxLength(20)
+                            ->maxLength(25)
                             ->prefix('CLI-')
+                            ->default(function () {
+                                $year = now()->year;
+                                $maxId = Cliente::where('codigo', 'like', "CLI-{$year}-%")
+                                    ->get()
+                                    ->map(function ($c) use ($year) {
+                                        if (preg_match("/^CLI-{$year}-(\d+)$/", $c->codigo, $matches)) {
+                                            return (int) $matches[1];
+                                        }
+                                        return 0;
+                                    })
+                                    ->max();
+
+                                $next = ($maxId ?? 0) + 1;
+                                return "{$year}-{$next}";
+                            })
                             ->afterStateHydrated(function (Forms\Components\TextInput $component, $state) {
                                 if (is_string($state) && str_starts_with($state, 'CLI-')) {
                                     $component->state(substr($state, 4));
@@ -53,7 +68,7 @@ class ClienteResource extends Resource
                             ->validationMessages([
                                 'regex' => 'El ID solo puede contener letras, números y guiones.',
                             ])
-                            ->helperText('El prefijo "CLI-" es fijo. Solo edita la parte posterior.'),
+                            ->helperText('Formato automático CLI-año-ID (ej: CLI-2026-247).'),
 
                         Forms\Components\Select::make('tipo_persona')
                             ->label('Tipo de persona')
