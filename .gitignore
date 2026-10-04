@@ -2,7 +2,9 @@
 .env.*
 !.env.example
 node_modules/
-vendor/
+/vendor/
+src/vendor/
+!src/resources/views/vendor/
 backups/
 proyecto-backup-*.tar.gz
 actions-runner/

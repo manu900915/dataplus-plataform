@@ -30,6 +30,7 @@ class ClienteResource extends Resource
     protected static ?string $pluralModelLabel = 'Clientes';
 
     protected static ?int $navigationSort = 2;
+    protected static ?string $recordTitleAttribute = 'nombre';
 
     /**
      * Eager load relationships to prevent N+1 queries during form hydration and listing.

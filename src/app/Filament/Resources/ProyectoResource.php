@@ -26,6 +26,7 @@ class ProyectoResource extends Resource
     protected static ?string $modelLabel = 'Proyecto';
     protected static ?string $pluralModelLabel = 'Proyectos';
     protected static ?int $navigationSort = 2;
+    protected static ?string $recordTitleAttribute = 'nombre';
 
     public static function form(Form $form): Form
     {
