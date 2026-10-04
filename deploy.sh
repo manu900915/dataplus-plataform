@@ -69,6 +69,8 @@ log "Optimizando Laravel..."
 docker compose -f "$COMPOSE_FILE" exec -T app php artisan config:cache
 docker compose -f "$COMPOSE_FILE" exec -T app php artisan route:cache
 docker compose -f "$COMPOSE_FILE" exec -T app php artisan view:cache
+docker compose -f "$COMPOSE_FILE" exec -T app php artisan icons:cache || true
+docker compose -f "$COMPOSE_FILE" exec -T app php artisan filament:cache-components || true
 
 # 8) Worker/scheduler si existen en el compose
 docker compose -f "$COMPOSE_FILE" up -d --no-deps worker scheduler 2>/dev/null || true

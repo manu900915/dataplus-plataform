@@ -4,7 +4,6 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ClienteResource\Pages;
 use App\Filament\Resources\ServicioResource;
-
 use App\Helpers\CubanLocations;
 use App\Models\Brigada;
 use App\Models\Cliente;
@@ -16,6 +15,7 @@ use Filament\Forms\Set;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class ClienteResource extends Resource
 {
@@ -30,6 +30,20 @@ class ClienteResource extends Resource
     protected static ?string $pluralModelLabel = 'Clientes';
 
     protected static ?int $navigationSort = 2;
+
+    /**
+     * Eager load relationships to prevent N+1 queries during form hydration and listing.
+     */
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->with([
+                'contactos',
+                'ubicaciones.tipoNegocio',
+                'ubicaciones.servicios.brigada',
+                'ubicaciones.servicios.tecnico',
+            ]);
+    }
 
     public static function form(Form $form): Form
     {
@@ -57,17 +71,18 @@ class ClienteResource extends Resource
                                             ->placeholder('2026-44')
                                             ->default(function () {
                                                 $year = now()->year;
-                                                $maxId = Cliente::where('codigo', 'like', "CLI-{$year}-%")
-                                                    ->get()
-                                                    ->map(function ($c) use ($year) {
-                                                        if (preg_match("/^CLI-{$year}-(\d+)$/", $c->codigo, $matches)) {
-                                                            return (int) $matches[1];
+                                                // Optimizado: consultar solo la columna código sin hidratar modelos
+                                                $codigos = Cliente::where('codigo', 'like', "CLI-{$year}-%")->pluck('codigo');
+                                                $maxId = 0;
+                                                foreach ($codigos as $cod) {
+                                                    if (preg_match("/^CLI-{$year}-(\d+)$/", $cod, $matches)) {
+                                                        $num = (int) $matches[1];
+                                                        if ($num > $maxId) {
+                                                            $maxId = $num;
                                                         }
-                                                        return 0;
-                                                    })
-                                                    ->max();
-
-                                                $next = ($maxId ?? 0) + 1;
+                                                    }
+                                                }
+                                                $next = $maxId + 1;
                                                 return "{$year}-{$next}";
                                             })
                                             ->afterStateHydrated(function (Forms\Components\TextInput $component, $state) {
@@ -80,7 +95,6 @@ class ClienteResource extends Resource
                                                 if (str_starts_with($state, 'CLI-')) {
                                                     return $state;
                                                 }
-                                                // Si solo escribió el número, le asignamos el año actual
                                                 if (is_numeric($state)) {
                                                     $year = now()->year;
                                                     return "CLI-{$year}-{$state}";
@@ -177,6 +191,7 @@ class ClienteResource extends Resource
                                             ->label(false)
                                             ->addActionLabel('➕ Agregar otro contacto')
                                             ->collapsible()
+                                            ->collapsed()
                                             ->itemLabel(fn (array $state): ?string =>
                                                 ($state['nombre'] ?? 'Nuevo contacto') . ' - ' . ($state['responsabilidad'] ?? 'Sin responsabilidad')
                                             )
@@ -249,7 +264,7 @@ class ClienteResource extends Resource
                                             ->label(false)
                                             ->addActionLabel('➕ Agregar Nueva Locación (Casa o Negocio)')
                                             ->collapsible()
-                                            ->cloneable()
+                                            ->collapsed() // Colapsado por defecto: acelera drásticamente la carga de la página
                                             ->itemLabel(fn (array $state): ?string =>
                                                 (($state['tipo'] ?? '') === 'negocio' ? '🏢 Negocio: ' : '🏠 Casa: ') .
                                                 ($state['nombre'] ?? 'Nueva Locación')
@@ -334,6 +349,7 @@ class ClienteResource extends Resource
                                                             ->label(false)
                                                             ->addActionLabel('➕ Agregar Servicio a esta Locación')
                                                             ->collapsible()
+                                                            ->collapsed() // Colapsado por defecto: evita hidratar cientos de campos innecesarios
                                                             ->itemLabel(fn (array $state): ?string =>
                                                                 '🔧 ' . ($state['tipo'] ?? 'Servicio') . ' — Estado: ' . ($state['estado'] ?? 'Activo')
                                                             )
@@ -391,7 +407,7 @@ class ClienteResource extends Resource
                     ->badge()
                     ->color('warning')
                     ->getStateUsing(function ($record): int {
-                        return $record->ubicaciones()->where('tipo', 'negocio')->count();
+                        return $record->ubicaciones->where('tipo', 'negocio')->count();
                     }),
 
                 Tables\Columns\TextColumn::make('residenciales_count')
@@ -399,7 +415,7 @@ class ClienteResource extends Resource
                     ->badge()
                     ->color('info')
                     ->getStateUsing(function ($record): int {
-                        return $record->ubicaciones()->where('tipo', 'residencial')->count();
+                        return $record->ubicaciones->where('tipo', 'residencial')->count();
                     }),
 
                 Tables\Columns\TextColumn::make('ubicaciones_count')

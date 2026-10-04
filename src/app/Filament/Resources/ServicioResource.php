@@ -13,6 +13,7 @@ use Filament\Forms\Get;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class ServicioResource extends Resource
 {
@@ -28,9 +29,46 @@ class ServicioResource extends Resource
 
     protected static ?int $navigationSort = 2;
 
+    // Cache local por solicitud para evitar consultas N+1 en opciones
+    protected static ?array $brigadasCache = null;
+    protected static ?array $tecnicosCache = null;
+
+    public static function getBrigadasOptions(): array
+    {
+        if (static::$brigadasCache === null) {
+            static::$brigadasCache = Brigada::where('activa', true)
+                ->orderBy('nombre')
+                ->pluck('nombre', 'id')
+                ->map(fn ($nombre) => '👥 ' . $nombre)
+                ->toArray();
+        }
+        return static::$brigadasCache;
+    }
+
+    public static function getTecnicosOptions(): array
+    {
+        if (static::$tecnicosCache === null) {
+            static::$tecnicosCache = User::where('activo', true)
+                ->orderBy('name')
+                ->pluck('name', 'id')
+                ->map(fn ($nombre) => '👤 ' . $nombre)
+                ->toArray();
+        }
+        return static::$tecnicosCache;
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->with([
+                'ubicacion.cliente',
+                'brigada',
+                'tecnico',
+            ]);
+    }
+
     public static function form(Form $form): Form
     {
-        // Detectar si venimos de un cliente o ubicación específica por URL
         $clienteId = request('cliente_id');
         $ubicacionId = request('ubicacion_id');
 
@@ -42,9 +80,18 @@ class ServicioResource extends Resource
                     ->schema([
                         Forms\Components\Select::make('cliente_id')
                             ->label('Cliente')
-                            ->options(Cliente::where('activo', true)->pluck('nombre', 'id'))
                             ->searchable()
-                            ->preload()
+                            ->getSearchResultsUsing(fn (string $search): array =>
+                                Cliente::where('activo', true)
+                                    ->where(function ($q) use ($search) {
+                                        $q->where('nombre', 'ilike', "%{$search}%")
+                                          ->orWhere('codigo', 'ilike', "%{$search}%");
+                                    })
+                                    ->limit(30)
+                                    ->pluck('nombre', 'id')
+                                    ->toArray()
+                            )
+                            ->getOptionLabelUsing(fn ($value): ?string => Cliente::find($value)?->nombre)
                             ->live()
                             ->default($clienteId)
                             ->afterStateUpdated(fn ($set) => $set('cliente_ubicacion_id', null))
@@ -115,26 +162,14 @@ class ServicioResource extends Resource
                 ->schema([
                     Forms\Components\Select::make('brigada_id')
                         ->label('Brigada que hizo la instalación')
-                        ->options(fn () =>
-                            Brigada::where('activa', true)
-                                ->orderBy('nombre')
-                                ->pluck('nombre', 'id')
-                                ->map(fn ($nombre) => '👥 ' . $nombre)
-                                ->toArray()
-                        )
+                        ->options(fn () => static::getBrigadasOptions())
                         ->searchable()
                         ->preload()
                         ->placeholder('Seleccione una brigada...'),
 
                     Forms\Components\Select::make('tecnico_id')
                         ->label('Técnico / Especialista responsable')
-                        ->options(fn () =>
-                            User::where('activo', true)
-                                ->orderBy('name')
-                                ->pluck('name', 'id')
-                                ->map(fn ($nombre) => '👤 ' . $nombre)
-                                ->toArray()
-                        )
+                        ->options(fn () => static::getTecnicosOptions())
                         ->searchable()
                         ->preload()
                         ->placeholder('Seleccione un especialista...'),
