@@ -7,6 +7,7 @@ use App\Models\Cliente;
 use App\Models\ClienteUbicacion;
 use App\Models\Incidencia;
 use App\Models\Servicio;
+use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -63,9 +64,9 @@ class IncidenciaResource extends Resource
     {
         return $form
             ->schema([
-                // ─── SECCIÓN 1: Clasificación y Origen ───
+                // ─── SECCIÓN 1: Clasificación y Origen (Comercial / Mesa de Entrada) ───
                 Forms\Components\Section::make('Cliente y Sistema Afectado')
-                    ->description('Seleccione el cliente, la sede y el servicio técnico instalado sobre el cual se reporta la falla.')
+                    ->description('Registrado por Comercial / Atención al Cliente.')
                     ->columns(3)
                     ->schema([
                         Forms\Components\Select::make('cliente_id')
@@ -187,13 +188,14 @@ class IncidenciaResource extends Resource
                         Forms\Components\Select::make('estado')
                             ->label('Estado Operativo')
                             ->options([
-                                'Pendiente'   => 'Pendiente (Nueva)',
-                                'Asignada'    => 'Asignada a Técnico',
-                                'En_Progreso' => 'En Progreso (En Intervención)',
-                                'En_Espera'   => 'En Espera (Repuestos/Aprobación)',
-                                'Resuelta'    => 'Resuelta (Trabajo Finalizado)',
-                                'Cerrada'     => 'Cerrada (Conformidad Cliente)',
-                                'Cancelada'   => 'Cancelada',
+                                'Pendiente'           => '1. Pendiente (Mesa de Entrada)',
+                                'Asignada'            => '2. Asignada a Técnico / Brigada',
+                                'En_Progreso'         => '3. En Progreso (Intervención)',
+                                'En_Espera'           => '4. En Espera (Repuestos/Cliente)',
+                                'Resuelta'            => '5. Culminada por Técnico (Por Revisar Supervisor)',
+                                'Revisada_Supervisor' => '6. Visto Bueno Supervisor (Por Cerrar Comercial)',
+                                'Cerrada'             => '7. Cerrada (Conformidad Cliente)',
+                                'Cancelada'           => 'Cancelada',
                             ])
                             ->required()
                             ->default('Pendiente')
@@ -211,7 +213,7 @@ class IncidenciaResource extends Resource
                             ->maxLength(255),
 
                         Forms\Components\Textarea::make('descripcion')
-                            ->label('Descripción de la falla reportada')
+                            ->label('Descripción de la falla reportada por el cliente')
                             ->required()
                             ->rows(3)
                             ->placeholder('Indique síntomas, cuándo comenzó el problema y cualquier detalle aportado por el cliente...'),
@@ -305,8 +307,8 @@ class IncidenciaResource extends Resource
                             }),
                     ]),
 
-                // ─── SECCIÓN 6: Resolución y Cierre (visible en edición) ───
-                Forms\Components\Section::make('Detalle de Cierre y Costos')
+                // ─── SECCIÓN 6: Resolución Técnica (Técnico / Especialista) ───
+                Forms\Components\Section::make('Resolución Técnica y Costos')
                     ->visible(fn (string $context): bool => $context === 'edit')
                     ->columns(2)
                     ->schema([
@@ -315,12 +317,6 @@ class IncidenciaResource extends Resource
                             ->columnSpanFull()
                             ->rows(3)
                             ->placeholder('Detalle de las acciones realizadas para resolver la falla...'),
-
-                        Forms\Components\Textarea::make('notas_internas')
-                            ->label('Notas Internas (Solo Staff)')
-                            ->columnSpanFull()
-                            ->rows(2)
-                            ->placeholder('Comentarios reservados para el equipo interno...'),
 
                         Forms\Components\Toggle::make('requiere_repuestos')
                             ->label('¿Requirió Repuestos / Materiales?')
@@ -331,6 +327,48 @@ class IncidenciaResource extends Resource
                             ->numeric()
                             ->prefix('$')
                             ->maxValue(999999.99),
+                    ]),
+
+                // ─── SECCIÓN 7: Control de Calidad del Supervisor ───
+                Forms\Components\Section::make('Control de Calidad (Supervisor)')
+                    ->visible(fn (string $context, ?Incidencia $record): bool => $context === 'edit' && in_array($record?->estado, ['Resuelta', 'Revisada_Supervisor', 'Cerrada']))
+                    ->columns(2)
+                    ->schema([
+                        Forms\Components\Select::make('revisado_por')
+                            ->label('Supervisor Revisor')
+                            ->relationship('supervisorRevisor', 'name')
+                            ->disabled(),
+
+                        Forms\Components\DateTimePicker::make('fecha_revision_supervisor')
+                            ->label('Fecha de Visto Bueno')
+                            ->disabled(),
+
+                        Forms\Components\Textarea::make('notas_supervisor')
+                            ->label('Dictamen Técnico del Supervisor')
+                            ->columnSpanFull()
+                            ->rows(2)
+                            ->placeholder('Conformidad técnica del trabajo realizado...'),
+                    ]),
+
+                // ─── SECCIÓN 8: Cierre Comercial y del Cliente ───
+                Forms\Components\Section::make('Cierre Comercial y Conformidad del Cliente')
+                    ->visible(fn (string $context, ?Incidencia $record): bool => $context === 'edit' && in_array($record?->estado, ['Revisada_Supervisor', 'Cerrada']))
+                    ->columns(2)
+                    ->schema([
+                        Forms\Components\Toggle::make('conformidad_cliente')
+                            ->label('¿Cliente conforme con el servicio y resolución?')
+                            ->default(true),
+
+                        Forms\Components\Select::make('cerrado_por')
+                            ->label('Comercial que Cierra')
+                            ->relationship('cerrador', 'name')
+                            ->disabled(),
+
+                        Forms\Components\Textarea::make('observaciones_cierre_comercial')
+                            ->label('Observaciones de Cierre Comercial')
+                            ->columnSpanFull()
+                            ->rows(2)
+                            ->placeholder('Notas de contacto con el cliente (satisfacción, garantía o facturación)...'),
                     ]),
             ]);
     }
@@ -365,15 +403,26 @@ class IncidenciaResource extends Resource
                         'info'      => 'Asignada',
                         'warning'   => 'En_Progreso',
                         'purple'    => 'En_Espera',
-                        'success'   => 'Resuelta',
-                        'secondary' => 'Cerrada',
+                        'primary'   => 'Resuelta',
+                        'success'   => ['Revisada_Supervisor', 'Cerrada'],
                         'danger'    => 'Cancelada',
-                    ]),
+                    ])
+                    ->formatStateUsing(fn ($state) => match ($state) {
+                        'Pendiente'           => 'Pendiente',
+                        'Asignada'            => 'Asignada',
+                        'En_Progreso'         => 'En Progreso',
+                        'En_Espera'           => 'En Espera',
+                        'Resuelta'            => 'Culminada (Técnico)',
+                        'Revisada_Supervisor' => 'VºBº Supervisor',
+                        'Cerrada'             => 'Cerrada (Comercial)',
+                        'Cancelada'           => 'Cancelada',
+                        default               => $state,
+                    }),
 
                 Tables\Columns\TextColumn::make('titulo')
                     ->label('Asunto')
                     ->searchable()
-                    ->limit(32)
+                    ->limit(30)
                     ->tooltip(fn ($record) => $record->titulo),
 
                 Tables\Columns\TextColumn::make('cliente.nombre')
@@ -461,13 +510,14 @@ class IncidenciaResource extends Resource
             ->filters([
                 Tables\Filters\SelectFilter::make('estado')
                     ->options([
-                        'Pendiente'   => 'Pendiente',
-                        'Asignada'    => 'Asignada',
-                        'En_Progreso' => 'En Progreso',
-                        'En_Espera'   => 'En Espera',
-                        'Resuelta'    => 'Resuelta',
-                        'Cerrada'     => 'Cerrada',
-                        'Cancelada'   => 'Cancelada',
+                        'Pendiente'           => 'Pendiente',
+                        'Asignada'            => 'Asignada',
+                        'En_Progreso'         => 'En Progreso',
+                        'En_Espera'           => 'En Espera',
+                        'Resuelta'            => 'Culminada por Técnico',
+                        'Revisada_Supervisor' => 'VºBº Supervisor',
+                        'Cerrada'             => 'Cerrada',
+                        'Cancelada'           => 'Cancelada',
                     ])
                     ->multiple(),
 
@@ -489,17 +539,17 @@ class IncidenciaResource extends Resource
 
                 Tables\Filters\Filter::make('vencidas_sla')
                     ->label('SLA Vencido')
-                    ->query(fn (Builder $query) => $query->where('fecha_limite', '<', now())->whereNotIn('estado', ['Resuelta', 'Cerrada', 'Cancelada'])),
+                    ->query(fn (Builder $query) => $query->where('fecha_limite', '<', now())->whereNotIn('estado', ['Resuelta', 'Revisada_Supervisor', 'Cerrada', 'Cancelada'])),
             ])
             ->actions([
-                // ─── Acción Rápida: Tomar Incidencia (Asignar a mí) ───
+                // ─── 1. Tomar Incidencia (Técnico se auto-asigna) ───
                 Tables\Actions\Action::make('tomar')
                     ->label('Tomar')
                     ->icon('heroicon-m-hand-raised')
                     ->color('info')
                     ->requiresConfirmation()
                     ->modalHeading('¿Tomar esta incidencia?')
-                    ->modalDescription('Se asignará a tu usuario como responsable y pasará automáticamente al estado "En Progreso".')
+                    ->modalDescription('Se asignará a tu usuario técnico y pasará a "En Progreso".')
                     ->visible(fn (Incidencia $record) => in_array($record->estado, ['Pendiente', 'Asignada']) && $record->tecnico_id !== auth()->id())
                     ->action(function (Incidencia $record) {
                         $record->update([
@@ -516,7 +566,40 @@ class IncidenciaResource extends Resource
                             ->send();
                     }),
 
-                // ─── Acción Rápida: Iniciar Trabajo ───
+                // ─── 2. Asignar (Comercial / Supervisor) ───
+                Tables\Actions\Action::make('asignar')
+                    ->label('Asignar')
+                    ->icon('heroicon-m-user-plus')
+                    ->color('gray')
+                    ->visible(fn (Incidencia $record) => in_array($record->estado, ['Pendiente', 'Asignada']))
+                    ->form([
+                        Forms\Components\Select::make('tecnico_id')
+                            ->label('Técnico Responsable')
+                            ->options(User::role(['Técnico', 'Supervisor', 'Administrador'])->pluck('name', 'id'))
+                            ->searchable()
+                            ->required(),
+
+                        Forms\Components\Select::make('brigada_id')
+                            ->label('Brigada Asignada (Opcional)')
+                            ->relationship('brigada', 'nombre')
+                            ->searchable(),
+                    ])
+                    ->action(function (Incidencia $record, array $data) {
+                        $record->update([
+                            'tecnico_id'       => $data['tecnico_id'],
+                            'brigada_id'       => $data['brigada_id'] ?? null,
+                            'estado'           => 'Asignada',
+                            'fecha_asignacion' => now(),
+                        ]);
+
+                        Notification::make()
+                            ->title('Incidencia Asignada')
+                            ->body("La incidencia {$record->codigo} ha sido asignada.")
+                            ->success()
+                            ->send();
+                    }),
+
+                // ─── 3. Iniciar Trabajo (Técnico) ───
                 Tables\Actions\Action::make('iniciar')
                     ->label('Iniciar')
                     ->icon('heroicon-m-play')
@@ -535,32 +618,28 @@ class IncidenciaResource extends Resource
                             ->send();
                     }),
 
-                // ─── Acción Rápida: Resolver Incidencia ───
+                // ─── 4. Culminar / Resolver (Técnico) ───
                 Tables\Actions\Action::make('resolver')
-                    ->label('Resolver')
+                    ->label('Culminar')
                     ->icon('heroicon-m-check-circle')
-                    ->color('success')
+                    ->color('primary')
                     ->visible(fn (Incidencia $record) => in_array($record->estado, ['Asignada', 'En_Progreso', 'En_Espera']))
                     ->form([
                         Forms\Components\Textarea::make('solucion')
                             ->label('Solución Aplicada / Trabajo Realizado')
                             ->required()
                             ->rows(3)
-                            ->placeholder('Describa brevemente qué se reparó o reemplazó...'),
+                            ->placeholder('Describa qué se reparó o reemplazó...'),
 
                         Forms\Components\Toggle::make('requiere_repuestos')
-                            ->label('¿Requirió Repuestos o Cambio de Piezas?')
+                            ->label('¿Requirió Repuestos o Materiales?')
                             ->default(false),
 
                         Forms\Components\TextInput::make('costo_estimado')
-                            ->label('Costo Total ($)')
+                            ->label('Costo Estimado Intervención ($)')
                             ->numeric()
                             ->prefix('$')
                             ->placeholder('0.00'),
-
-                        Forms\Components\Textarea::make('notas_internas')
-                            ->label('Notas Internas (Opcional)')
-                            ->rows(2),
                     ])
                     ->action(function (Incidencia $record, array $data) {
                         $record->update([
@@ -568,13 +647,73 @@ class IncidenciaResource extends Resource
                             'solucion'           => $data['solucion'],
                             'requiere_repuestos' => $data['requiere_repuestos'] ?? false,
                             'costo_estimado'     => $data['costo_estimado'] ?? null,
-                            'notas_internas'     => $data['notas_internas'] ?? $record->notas_internas,
                             'fecha_resolucion'   => now(),
                         ]);
 
                         Notification::make()
-                            ->title('Incidencia Resuelta')
-                            ->body("La incidencia {$record->codigo} fue marcada como Resuelta exitosamente.")
+                            ->title('Incidencia Culminada por Técnico')
+                            ->body("Pasa a revisión del Supervisor.")
+                            ->success()
+                            ->send();
+                    }),
+
+                // ─── 5. Visto Bueno (Supervisor) ───
+                Tables\Actions\Action::make('aprobar_supervisor')
+                    ->label('VºBº Supervisor')
+                    ->icon('heroicon-m-shield-check')
+                    ->color('success')
+                    ->visible(fn (Incidencia $record) => $record->estado === 'Resuelta')
+                    ->form([
+                        Forms\Components\Textarea::make('notas_supervisor')
+                            ->label('Dictamen Técnico del Supervisor')
+                            ->required()
+                            ->rows(2)
+                            ->placeholder('Certifico que la solución técnica es conforme y los materiales son correctos.'),
+                    ])
+                    ->action(function (Incidencia $record, array $data) {
+                        $record->update([
+                            'estado'                    => 'Revisada_Supervisor',
+                            'revisado_por'              => auth()->id(),
+                            'fecha_revision_supervisor' => now(),
+                            'notas_supervisor'          => $data['notas_supervisor'],
+                        ]);
+
+                        Notification::make()
+                            ->title('Visto Bueno Otorgado')
+                            ->body("Incidencia {$record->codigo} aprobada. Lista para cierre comercial con el cliente.")
+                            ->success()
+                            ->send();
+                    }),
+
+                // ─── 6. Cierre Comercial con Cliente (Comercial) ───
+                Tables\Actions\Action::make('cierre_comercial')
+                    ->label('Cerrar')
+                    ->icon('heroicon-m-document-check')
+                    ->color('success')
+                    ->visible(fn (Incidencia $record) => $record->estado === 'Revisada_Supervisor')
+                    ->form([
+                        Forms\Components\Toggle::make('conformidad_cliente')
+                            ->label('¿Cliente confirma satisfacción y buen funcionamiento?')
+                            ->default(true)
+                            ->required(),
+
+                        Forms\Components\Textarea::make('observaciones_cierre_comercial')
+                            ->label('Observaciones de Cierre Comercial')
+                            ->rows(2)
+                            ->placeholder('Detalles de la llamada o acta de conformidad (garantía / facturado)...'),
+                    ])
+                    ->action(function (Incidencia $record, array $data) {
+                        $record->update([
+                            'estado'                         => 'Cerrada',
+                            'cerrado_por'                    => auth()->id(),
+                            'conformidad_cliente'            => $data['conformidad_cliente'] ?? true,
+                            'observaciones_cierre_comercial' => $data['observaciones_cierre_comercial'] ?? null,
+                            'fecha_cierre'                   => now(),
+                        ]);
+
+                        Notification::make()
+                            ->title('Incidencia Cerrada')
+                            ->body("El ciclo de la incidencia {$record->codigo} ha sido cerrado comercialmente.")
                             ->success()
                             ->send();
                     }),

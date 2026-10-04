@@ -49,6 +49,11 @@ class Proyecto extends Model
         return $this->hasMany(LineaPresupuesto::class, 'proyecto_id');
     }
 
+    public function solicitud(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(SolicitudServicio::class, 'proyecto_id');
+    }
+
     public function calcularPresupuesto(): float
     {
         $total = $this->lineasPresupuesto()->sum('subtotal');

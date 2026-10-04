@@ -26,32 +26,30 @@ class ListIncidencias extends ListRecords
             'todas' => Tab::make('Todas')
                 ->badge(Incidencia::count()),
 
-            'pendientes' => Tab::make('Pendientes')
+            'pendientes' => Tab::make('1. Pendientes')
                 ->badge(Incidencia::where('estado', 'Pendiente')->count())
-                ->badgeColor('warning')
+                ->badgeColor('gray')
                 ->modifyQueryUsing(fn (Builder $query) => $query->where('estado', 'Pendiente')),
 
-            'en_curso' => Tab::make('En Curso')
+            'en_curso' => Tab::make('2. En Campo')
                 ->badge(Incidencia::whereIn('estado', ['Asignada', 'En_Progreso', 'En_Espera'])->count())
                 ->badgeColor('info')
                 ->modifyQueryUsing(fn (Builder $query) => $query->whereIn('estado', ['Asignada', 'En_Progreso', 'En_Espera'])),
 
-            'sla_vencido' => Tab::make('SLA Vencido')
-                ->badge(
-                    Incidencia::where('fecha_limite', '<', now())
-                        ->whereNotIn('estado', ['Resuelta', 'Cerrada', 'Cancelada'])
-                        ->count()
-                )
-                ->badgeColor('danger')
-                ->modifyQueryUsing(
-                    fn (Builder $query) => $query->where('fecha_limite', '<', now())
-                        ->whereNotIn('estado', ['Resuelta', 'Cerrada', 'Cancelada'])
-                ),
+            'revisar_supervisor' => Tab::make('3. Por Revisar (Supervisor)')
+                ->badge(Incidencia::where('estado', 'Resuelta')->count())
+                ->badgeColor('warning')
+                ->modifyQueryUsing(fn (Builder $query) => $query->where('estado', 'Resuelta')),
 
-            'resueltas' => Tab::make('Resueltas')
-                ->badge(Incidencia::whereIn('estado', ['Resuelta', 'Cerrada'])->count())
+            'cerrar_comercial' => Tab::make('4. Por Cerrar (Comercial)')
+                ->badge(Incidencia::where('estado', 'Revisada_Supervisor')->count())
+                ->badgeColor('primary')
+                ->modifyQueryUsing(fn (Builder $query) => $query->where('estado', 'Revisada_Supervisor')),
+
+            'cerradas' => Tab::make('5. Cerradas')
+                ->badge(Incidencia::where('estado', 'Cerrada')->count())
                 ->badgeColor('success')
-                ->modifyQueryUsing(fn (Builder $query) => $query->whereIn('estado', ['Resuelta', 'Cerrada'])),
+                ->modifyQueryUsing(fn (Builder $query) => $query->where('estado', 'Cerrada')),
         ];
     }
 }

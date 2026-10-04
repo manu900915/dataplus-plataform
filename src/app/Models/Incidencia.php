@@ -24,6 +24,9 @@ class Incidencia extends Model
         'diagnostico',
         'tecnico_id',
         'brigada_id',
+        'revisado_por',
+        'fecha_revision_supervisor',
+        'notas_supervisor',
         'estado',
         'prioridad',
         'fecha_reporte',
@@ -35,8 +38,11 @@ class Incidencia extends Model
         'solucion',
         'notas_internas',
         'requiere_repuestos',
+        'conformidad_cliente',
+        'observaciones_cierre_comercial',
         'costo_estimado',
-        'creado_por'
+        'creado_por',
+        'cerrado_por',
     ];
 
     protected $casts = [
@@ -45,8 +51,10 @@ class Incidencia extends Model
         'fecha_inicio_trabajo' => 'datetime',
         'fecha_limite' => 'datetime',
         'fecha_resolucion' => 'datetime',
+        'fecha_revision_supervisor' => 'datetime',
         'fecha_cierre' => 'datetime',
         'requiere_repuestos' => 'boolean',
+        'conformidad_cliente' => 'boolean',
         'costo_estimado' => 'decimal:2',
     ];
 
@@ -75,9 +83,19 @@ class Incidencia extends Model
         return $this->belongsTo(Brigada::class, 'brigada_id');
     }
 
+    public function supervisorRevisor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'revisado_por');
+    }
+
     public function creador(): BelongsTo
     {
         return $this->belongsTo(User::class, 'creado_por');
+    }
+
+    public function cerrador(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cerrado_por');
     }
 
     /**
@@ -87,12 +105,12 @@ class Incidencia extends Model
     {
         return $this->fecha_limite 
             && $this->fecha_limite->isPast() 
-            && !in_array($this->estado, ['Resuelta', 'Cerrada', 'Cancelada']);
+            && !in_array($this->estado, ['Resuelta', 'Revisada_Supervisor', 'Cerrada', 'Cancelada']);
     }
 
     public function getHorasRestantesAttribute(): ?int
     {
-        if (!$this->fecha_limite || in_array($this->estado, ['Resuelta', 'Cerrada', 'Cancelada'])) {
+        if (!$this->fecha_limite || in_array($this->estado, ['Resuelta', 'Revisada_Supervisor', 'Cerrada', 'Cancelada'])) {
             return null;
         }
 
@@ -109,7 +127,7 @@ class Incidencia extends Model
     }
 
     /**
-     * Tiempo total de resolución (desde el reporte hasta que se marcó resuelta)
+     * Tiempo total de resolución técnica (desde reporte hasta que el técnico la marcó resuelta)
      */
     public function getTiempoResolucionTextoAttribute(): ?string
     {
@@ -136,7 +154,7 @@ class Incidencia extends Model
     }
 
     /**
-     * Tiempo real de trabajo del técnico en sitio
+     * Tiempo de intervención en sitio
      */
     public function getTiempoIntervencionTextoAttribute(): ?string
     {
@@ -181,7 +199,7 @@ class Incidencia extends Model
     }
 
     /**
-     * Verifica si se cumplió con el SLA pactado
+     * Verifica si se cumplió con el SLA
      */
     public function getCumplioSlaAttribute(): ?bool
     {
@@ -204,7 +222,6 @@ class Incidencia extends Model
             }
             $incidencia->creado_por = auth()->id() ?? 1;
 
-            // Auto-cálculo de SLA si no se especificó fecha límite
             if (empty($incidencia->fecha_limite)) {
                 $incidencia->fecha_limite = match ($incidencia->prioridad) {
                     'Critica' => now()->addHours(8),
@@ -229,8 +246,16 @@ class Incidencia extends Model
                 $incidencia->fecha_resolucion = now();
             }
 
+            if ($incidencia->isDirty('estado') && $incidencia->estado === 'Revisada_Supervisor' && !$incidencia->fecha_revision_supervisor) {
+                $incidencia->fecha_revision_supervisor = now();
+                $incidencia->revisado_por = auth()->id();
+            }
+
             if ($incidencia->isDirty('estado') && $incidencia->estado === 'Cerrada' && !$incidencia->fecha_cierre) {
                 $incidencia->fecha_cierre = now();
+                if (!$incidencia->cerrado_por) {
+                    $incidencia->cerrado_por = auth()->id();
+                }
             }
         });
     }
