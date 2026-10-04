@@ -257,3 +257,86 @@ aside:not([class*="w-64"]):not([class*="w-72"]):not([class*="w-80"]) .fi-brand-d
 .fi-page-header .fi-breadcrumbs {
     display: none !important;
 }
+
+/* ============================================================
+   Ajustes Críticos de Estilo Topbar (Remoción de bordes azules)
+   ============================================================ */
+.fi-global-search-field .fi-input-wrp,
+.fi-global-search-field,
+.fi-global-search-field * {
+    --tw-ring-color: transparent !important;
+    --tw-ring-offset-shadow: none !important;
+    --tw-ring-shadow: none !important;
+    box-shadow: none !important;
+}
+
+.fi-global-search-field .fi-input-wrp {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.dp-global-search-input,
+.fi-global-search-field input {
+    background: #0d1726 !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 10px !important;
+    color: #e2e8f0 !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    height: 38px !important;
+    padding-left: 40px !important;
+    padding-right: 48px !important;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+    outline: none !important;
+}
+
+.dp-global-search-input:focus,
+.fi-global-search-field input:focus {
+    border-color: #00e5a3 !important;
+    background: #0f1c30 !important;
+    box-shadow: 0 0 0 3px rgba(0, 229, 163, 0.15), inset 0 2px 4px rgba(0, 0, 0, 0.4) !important;
+    outline: none !important;
+}
+
+.dp-global-search-input::placeholder,
+.fi-global-search-field input::placeholder {
+    color: #64748b !important;
+}
+
+.dp-avatar-box {
+    width: 38px !important;
+    height: 38px !important;
+    border-radius: 9px !important;
+    background: linear-gradient(135deg, #00e5a3 0%, #059669 100%) !important;
+    color: #022c22 !important;
+    font-weight: 900 !important;
+    font-size: 14px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: 0 4px 14px rgba(0, 229, 163, 0.35) !important;
+    flex-shrink: 0 !important;
+    letter-spacing: -0.02em !important;
+}
+
+.dp-bell-btn:hover {
+    background: #111e33 !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+    color: #ffffff !important;
+}
+
+.dp-user-btn:hover {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.dp-menu-item:hover {
+    background: rgba(255, 255, 255, 0.06) !important;
+    color: #ffffff !important;
+}
+
+.dp-menu-item-logout:hover {
+    background: rgba(239, 68, 68, 0.12) !important;
+    color: #fca5a5 !important;
+}
