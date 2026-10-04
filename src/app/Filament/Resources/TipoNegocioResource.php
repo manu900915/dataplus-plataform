@@ -17,6 +17,7 @@ class TipoNegocioResource extends Resource
     protected static ?string $modelLabel = 'Tipo de Negocio';
     protected static ?string $pluralModelLabel = 'Tipos de Negocio';
     protected static ?int $navigationSort = 3;
+    protected static ?string $recordTitleAttribute = 'nombre';
 
     public static function form(Form $form): Form
     {
@@ -27,11 +28,9 @@ class TipoNegocioResource extends Resource
                     ->unique(ignoreRecord: true)
                     ->maxLength(100)
                     ->placeholder('Ej: Restaurante, Barbería, Tienda, etc.'),
-
                 Forms\Components\Textarea::make('descripcion')
                     ->rows(2)
                     ->placeholder('Breve descripción de este tipo de negocio'),
-
                 Forms\Components\Toggle::make('activo')
                     ->label('Activo')
                     ->default(true),
@@ -46,19 +45,17 @@ class TipoNegocioResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->weight('font-bold'),
-
                 Tables\Columns\TextColumn::make('descripcion')
                     ->limit(50)
                     ->toggleable(),
-
                 Tables\Columns\IconColumn::make('activo')
                     ->boolean(),
-
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime('d/m/Y')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
+            ->defaultSort('nombre', 'asc')
             ->filters([
                 Tables\Filters\TernaryFilter::make('activo'),
             ])
