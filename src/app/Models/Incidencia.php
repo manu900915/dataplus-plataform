@@ -99,6 +99,99 @@ class Incidencia extends Model
         return (int) now()->diffInHours($this->fecha_limite, false);
     }
 
+    public function getHorasVencidaAttribute(): ?int
+    {
+        if (!$this->esta_vencida) {
+            return null;
+        }
+
+        return (int) $this->fecha_limite->diffInHours(now());
+    }
+
+    /**
+     * Tiempo total de resolución (desde el reporte hasta que se marcó resuelta)
+     */
+    public function getTiempoResolucionTextoAttribute(): ?string
+    {
+        if (!$this->fecha_resolucion) {
+            return null;
+        }
+
+        $inicio = $this->fecha_reporte ?? $this->created_at;
+        if (!$inicio) {
+            return null;
+        }
+
+        $minutos = $inicio->diffInMinutes($this->fecha_resolucion);
+        $dias = intdiv($minutos, 1440);
+        $horas = intdiv($minutos % 1440, 60);
+        $restoMinutos = $minutos % 60;
+
+        $partes = [];
+        if ($dias > 0) $partes[] = "{$dias}d";
+        if ($horas > 0) $partes[] = "{$horas}h";
+        if ($restoMinutos > 0 || empty($partes)) $partes[] = "{$restoMinutos}m";
+
+        return implode(' ', $partes);
+    }
+
+    /**
+     * Tiempo real de trabajo del técnico en sitio
+     */
+    public function getTiempoIntervencionTextoAttribute(): ?string
+    {
+        if (!$this->fecha_inicio_trabajo || !$this->fecha_resolucion) {
+            return null;
+        }
+
+        $minutos = $this->fecha_inicio_trabajo->diffInMinutes($this->fecha_resolucion);
+        $dias = intdiv($minutos, 1440);
+        $horas = intdiv($minutos % 1440, 60);
+        $restoMinutos = $minutos % 60;
+
+        $partes = [];
+        if ($dias > 0) $partes[] = "{$dias}d";
+        if ($horas > 0) $partes[] = "{$horas}h";
+        if ($restoMinutos > 0 || empty($partes)) $partes[] = "{$restoMinutos}m";
+
+        return implode(' ', $partes);
+    }
+
+    /**
+     * Tiempo transcurrido para incidencias activas
+     */
+    public function getTiempoTranscurridoTextoAttribute(): string
+    {
+        $inicio = $this->fecha_reporte ?? $this->created_at;
+        if (!$inicio) {
+            return '-';
+        }
+
+        $minutos = $inicio->diffInMinutes(now());
+        $dias = intdiv($minutos, 1440);
+        $horas = intdiv($minutos % 1440, 60);
+        $restoMinutos = $minutos % 60;
+
+        $partes = [];
+        if ($dias > 0) $partes[] = "{$dias}d";
+        if ($horas > 0) $partes[] = "{$horas}h";
+        if ($restoMinutos > 0 || empty($partes)) $partes[] = "{$restoMinutos}m";
+
+        return implode(' ', $partes);
+    }
+
+    /**
+     * Verifica si se cumplió con el SLA pactado
+     */
+    public function getCumplioSlaAttribute(): ?bool
+    {
+        if (!$this->fecha_resolucion || !$this->fecha_limite) {
+            return null;
+        }
+
+        return $this->fecha_resolucion->lte($this->fecha_limite);
+    }
+
     protected static function boot(): void
     {
         parent::boot();

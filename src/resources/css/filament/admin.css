@@ -340,3 +340,17 @@ aside:not([class*="w-64"]):not([class*="w-72"]):not([class*="w-80"]) .fi-brand-d
     background: rgba(239, 68, 68, 0.12) !important;
     color: #fca5a5 !important;
 }
+
+/* ============================================================
+   Sidebar Navigation Badges (Contadores del Menú Lateral)
+   ============================================================ */
+.fi-sidebar-item-badge,
+.fi-sidebar-nav .fi-badge {
+    font-size: 0.72rem !important;
+    font-weight: 700 !important;
+    padding: 0.12rem 0.5rem !important;
+    border-radius: 9999px !important;
+    line-height: 1 !important;
+    margin-left: auto !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4) !important;
+}

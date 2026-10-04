@@ -29,21 +29,34 @@ class IncidenciaResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        $activas = static::getModel()::whereIn('estado', ['Pendiente', 'Asignada', 'En_Progreso', 'En_Espera'])->count();
-        return $activas > 0 ? (string) $activas : null;
+        try {
+            $activas = static::getModel()::whereIn('estado', ['Pendiente', 'Asignada', 'En_Progreso', 'En_Espera'])->count();
+            return $activas > 0 ? (string) $activas : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     public static function getNavigationBadgeColor(): ?string
     {
-        $criticasOVencidas = static::getModel()::whereIn('estado', ['Pendiente', 'Asignada', 'En_Progreso', 'En_Espera'])
-            ->where(function ($query) {
-                $query->where('prioridad', 'Critica')
-                    ->orWhere(function ($q) {
-                        $q->whereNotNull('fecha_limite')->where('fecha_limite', '<', now());
-                    });
-            })->exists();
+        try {
+            $criticasOVencidas = static::getModel()::whereIn('estado', ['Pendiente', 'Asignada', 'En_Progreso', 'En_Espera'])
+                ->where(function ($query) {
+                    $query->where('prioridad', 'Critica')
+                        ->orWhere(function ($q) {
+                            $q->whereNotNull('fecha_limite')->where('fecha_limite', '<', now());
+                        });
+                })->exists();
 
-        return $criticasOVencidas ? 'danger' : 'warning';
+            return $criticasOVencidas ? 'danger' : 'warning';
+        } catch (\Throwable $e) {
+            return 'warning';
+        }
+    }
+
+    public static function getNavigationBadgeTooltip(): ?string
+    {
+        return 'Incidencias activas pendientes de atención o resolución';
     }
 
     public static function form(Form $form): Form
@@ -161,12 +174,11 @@ class IncidenciaResource extends Resource
                             ->native(false)
                             ->live()
                             ->afterStateUpdated(function (Set $set, $state) {
-                                // Sugerir y autocalcular fecha límite según el SLA
                                 $horas = match ($state) {
                                     'Critica' => 8,
                                     'Alta'    => 24,
                                     'Media'   => 48,
-                                    'Baja'    => 168, // 7 días
+                                    'Baja'    => 168,
                                     default   => 48,
                                 };
                                 $set('fecha_limite', now()->addHours($horas)->format('Y-m-d H:i'));
@@ -211,7 +223,7 @@ class IncidenciaResource extends Resource
                     ]),
 
                 // ─── SECCIÓN 4: Contacto en Sitio y Asignación Operativa ───
-                Forms\Components\Section::make('Contacto en Sitio y Asignación Operativa')
+                Forms\Components\Section::make('Contacto en Sitio y Asignación')
                     ->columns(3)
                     ->schema([
                         Forms\Components\TextInput::make('contacto_local')
@@ -250,8 +262,51 @@ class IncidenciaResource extends Resource
                             ->native(false),
                     ]),
 
-                // ─── SECCIÓN 5: Resolución y Cierre (visible en edición) ───
-                Forms\Components\Section::make('Resolución Técnica y Costos')
+                // ─── SECCIÓN 5: Tiempos de Resolución y Métricas ───
+                Forms\Components\Section::make('Tiempos de Atención y Resolución')
+                    ->visible(fn (string $context): bool => $context === 'edit')
+                    ->columns(3)
+                    ->schema([
+                        Forms\Components\Placeholder::make('metrica_resolucion')
+                            ->label('Tiempo Total de Resolución')
+                            ->content(function (?Incidencia $record): string {
+                                if (!$record || !$record->fecha_resolucion) {
+                                    return 'En curso (Abierta hace ' . ($record?->tiempo_transcurrido_texto ?? '-') . ')';
+                                }
+                                return '⏱ ' . $record->tiempo_resolucion_texto . ' (desde el reporte)';
+                            }),
+
+                        Forms\Components\Placeholder::make('metrica_intervencion')
+                            ->label('Tiempo de Trabajo en Sitio')
+                            ->content(function (?Incidencia $record): string {
+                                if (!$record || !$record->fecha_resolucion) {
+                                    return $record?->fecha_inicio_trabajo ? 'En intervención ahora' : 'No iniciado';
+                                }
+                                return $record->tiempo_intervencion_texto 
+                                    ? '🛠 ' . $record->tiempo_intervencion_texto . ' en sitio'
+                                    : 'Sin registro de inicio';
+                            }),
+
+                        Forms\Components\Placeholder::make('metrica_sla')
+                            ->label('Evaluación de SLA')
+                            ->content(function (?Incidencia $record): string {
+                                if (!$record) return '-';
+                                if ($record->fecha_resolucion) {
+                                    return $record->cumplio_sla === true
+                                        ? '✅ Resuelto DENTRO del SLA'
+                                        : ($record->cumplio_sla === false ? '❌ Superó el plazo del SLA' : 'Sin SLA fijado');
+                                }
+                                if ($record->esta_vencida) {
+                                    return '⚠️ SLA Vencido hace ' . $record->horas_vencida . ' horas';
+                                }
+                                return $record->horas_restantes !== null 
+                                    ? '⏳ Quedan ' . $record->horas_restantes . ' horas para el límite'
+                                    : 'Sin fecha límite';
+                            }),
+                    ]),
+
+                // ─── SECCIÓN 6: Resolución y Cierre (visible en edición) ───
+                Forms\Components\Section::make('Detalle de Cierre y Costos')
                     ->visible(fn (string $context): bool => $context === 'edit')
                     ->columns(2)
                     ->schema([
@@ -354,12 +409,24 @@ class IncidenciaResource extends Resource
                     })
                     ->searchable(),
 
-                Tables\Columns\TextColumn::make('fecha_limite')
-                    ->label('Límite SLA')
-                    ->dateTime('d/m H:i')
+                // ─── Columna de Tiempos y Resolución ───
+                Tables\Columns\TextColumn::make('fecha_resolucion')
+                    ->label('Resolución / SLA')
                     ->sortable()
-                    ->placeholder('Sin SLA')
-                    ->color(function ($record) {
+                    ->formatStateUsing(function ($state, Incidencia $record) {
+                        if ($record->fecha_resolucion) {
+                            return "⏱ {$record->tiempo_resolucion_texto}";
+                        }
+                        if ($record->fecha_limite) {
+                            return $record->fecha_limite->format('d/m H:i');
+                        }
+                        return 'Sin SLA';
+                    })
+                    ->badge(fn (Incidencia $record) => !empty($record->fecha_resolucion))
+                    ->color(function (Incidencia $record) {
+                        if ($record->fecha_resolucion) {
+                            return $record->cumplio_sla === false ? 'danger' : 'success';
+                        }
                         if ($record->esta_vencida) {
                             return 'danger';
                         }
@@ -368,17 +435,26 @@ class IncidenciaResource extends Resource
                         }
                         return null;
                     })
-                    ->description(function ($record) {
-                        if (in_array($record->estado, ['Resuelta', 'Cerrada', 'Cancelada'])) {
-                            return null;
+                    ->description(function (Incidencia $record) {
+                        if ($record->fecha_resolucion) {
+                            if ($record->cumplio_sla === true) {
+                                return '✓ Dentro de SLA';
+                            }
+                            if ($record->cumplio_sla === false) {
+                                return '⚠ Excedió SLA';
+                            }
+                            return 'Resuelta: ' . $record->fecha_resolucion->format('d/m H:i');
                         }
+
                         if ($record->esta_vencida) {
-                            return '¡Vencida!';
+                            return "¡Vencida hace {$record->horas_vencida}h!";
                         }
+
                         if ($record->horas_restantes !== null) {
-                            return "{$record->horas_restantes}h restantes";
+                            return "Abierta {$record->tiempo_transcurrido_texto} (Quedan {$record->horas_restantes}h)";
                         }
-                        return null;
+
+                        return "Abierta hace {$record->tiempo_transcurrido_texto}";
                     }),
             ])
             ->defaultSort('created_at', 'desc')
