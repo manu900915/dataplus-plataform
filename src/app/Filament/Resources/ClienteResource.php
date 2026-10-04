@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ClienteResource\Pages;
+use App\Filament\Resources\ServicioResource;
 
 use App\Helpers\CubanLocations;
 use App\Models\Brigada;
@@ -336,131 +337,7 @@ class ClienteResource extends Resource
                                                             ->itemLabel(fn (array $state): ?string =>
                                                                 '🔧 ' . ($state['tipo'] ?? 'Servicio') . ' — Estado: ' . ($state['estado'] ?? 'Activo')
                                                             )
-                                                            ->schema([
-                                                                Forms\Components\Grid::make(3)
-                                                                    ->schema([
-                                                                        Forms\Components\Select::make('tipo')
-                                                                            ->label('Tipo de servicio')
-                                                                            ->options([
-                                                                                'CCTV'           => 'CCTV (Videovigilancia)',
-                                                                                'SACI'           => 'SACI (Alarma contra intrusión)',
-                                                                                'Gestion_Remota' => 'Gestión Remota / Redes',
-                                                                            ])
-                                                                            ->required()
-                                                                            ->live(),
-
-                                                                        Forms\Components\Select::make('estado')
-                                                                            ->label('Estado')
-                                                                            ->options([
-                                                                                'Activo'        => '🟢 Activo',
-                                                                                'Inactivo'      => '⚪ Inactivo',
-                                                                                'En_Reparacion' => '🟡 En Reparación',
-                                                                                'Suspendido'    => '🔴 Suspendido',
-                                                                            ])
-                                                                            ->default('Activo')
-                                                                            ->required(),
-
-                                                                        Forms\Components\DatePicker::make('fecha_instalacion')
-                                                                            ->label('Fecha instalación')
-                                                                            ->native(false),
-                                                                    ]),
-
-                                                                Forms\Components\Grid::make(2)
-                                                                    ->schema([
-                                                                        Forms\Components\Select::make('brigada_id')
-                                                                            ->label('Brigada Responsable')
-                                                                            ->options(fn () =>
-                                                                                Brigada::where('activa', true)
-                                                                                    ->orderBy('nombre')
-                                                                                    ->pluck('nombre', 'id')
-                                                                                    ->map(fn ($nombre) => '👥 ' . $nombre)
-                                                                                    ->toArray()
-                                                                            )
-                                                                            ->searchable()
-                                                                            ->preload()
-                                                                            ->placeholder('Seleccione una brigada...'),
-
-                                                                        Forms\Components\Select::make('tecnico_id')
-                                                                            ->label('Técnico Asignado')
-                                                                            ->options(fn () =>
-                                                                                User::where('activo', true)
-                                                                                    ->orderBy('name')
-                                                                                    ->pluck('name', 'id')
-                                                                                    ->map(fn ($nombre) => '👤 ' . $nombre)
-                                                                                    ->toArray()
-                                                                            )
-                                                                            ->searchable()
-                                                                            ->preload()
-                                                                            ->placeholder('Seleccione un técnico...'),
-                                                                    ]),
-
-                                                                // Campos específicos de Gestión Remota
-                                                                Forms\Components\Section::make('Parámetros de Gestión Remota y Conectividad')
-                                                                    ->schema([
-                                                                        Forms\Components\Grid::make(2)
-                                                                            ->schema([
-                                                                                Forms\Components\Select::make('gr_tipo_solucion')
-                                                                                    ->label('Tipo de solución')
-                                                                                    ->options([
-                                                                                        'Router4g'     => 'Router 4G',
-                                                                                        'Router+Modem' => 'Router + Módem',
-                                                                                        'Router+ADSL'  => 'Router + ADSL',
-                                                                                        'Otros'        => 'Otros',
-                                                                                    ])
-                                                                                    ->required()
-                                                                                    ->live(),
-
-                                                                                Forms\Components\TextInput::make('gr_marca_modelo')
-                                                                                    ->label('Marca / Modelo')
-                                                                                    ->placeholder('Ej: Huawei B535, TP-Link Archer...'),
-                                                                            ]),
-
-                                                                        Forms\Components\Grid::make(2)
-                                                                            ->schema([
-                                                                                Forms\Components\TextInput::make('gr_sim_numero')
-                                                                                    ->label('Número de Línea SIM')
-                                                                                    ->maxLength(20)
-                                                                                    ->placeholder('Ej: 05 1234 5678')
-                                                                                    ->visible(fn (Get $get) => $get('gr_tipo_solucion') !== 'Router+ADSL'),
-
-                                                                                Forms\Components\Select::make('gr_sim_tipo')
-                                                                                    ->label('Tipo de SIM')
-                                                                                    ->options([
-                                                                                        'Particular'  => 'Particular (recarga por nuestra parte)',
-                                                                                        'Corporativa' => 'Corporativa (contrato ETECSA del cliente)',
-                                                                                    ])
-                                                                                    ->live()
-                                                                                    ->visible(fn (Get $get) =>
-                                                                                        in_array($get('gr_tipo_solucion'), ['Router4g', 'Router+Modem'])
-                                                                                    ),
-                                                                            ]),
-
-                                                                        Forms\Components\Grid::make(2)
-                                                                            ->schema([
-                                                                                Forms\Components\Select::make('gr_recarga_por')
-                                                                                    ->label('Recarga efectuada por')
-                                                                                    ->options([
-                                                                                        'Nosotros' => 'Nosotros (DataPlus)',
-                                                                                        'Cliente'  => 'El Cliente',
-                                                                                    ])
-                                                                                    ->default('Cliente')
-                                                                                    ->visible(fn (Get $get) => $get('gr_sim_tipo') === 'Particular'),
-
-                                                                                Forms\Components\TextInput::make('gr_recarga_monto')
-                                                                                    ->label('Monto de recarga mensual')
-                                                                                    ->numeric()
-                                                                                    ->default(360.00)
-                                                                                    ->prefix('$')
-                                                                                    ->visible(fn (Get $get) => $get('gr_sim_tipo') === 'Particular'),
-                                                                            ]),
-                                                                    ])
-                                                                    ->visible(fn (Get $get) => $get('tipo') === 'Gestion_Remota'),
-
-                                                                Forms\Components\Textarea::make('notas')
-                                                                    ->label('Notas técnicas del servicio')
-                                                                    ->placeholder('Observaciones de instalación, contraseñas o detalles...')
-                                                                    ->rows(2),
-                                                            ]),
+                                                            ->schema(ServicioResource::getTechnicalServiceSchema()),
                                                     ]),
                                             ]),
                                     ]),
