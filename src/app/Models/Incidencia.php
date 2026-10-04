@@ -11,13 +11,32 @@ class Incidencia extends Model
     use HasFactory;
 
     protected $fillable = [
-        'codigo', 'tipo', 'cliente_id', 'cliente_ubicacion_id',
-        'direccion_incidencia', 'contacto_local', 'telefono_local',
-        'titulo', 'descripcion', 'diagnostico', 'tecnico_id',
-        'estado', 'prioridad', 'fecha_reporte', 'fecha_asignacion',
-        'fecha_inicio_trabajo', 'fecha_limite', 'fecha_resolucion',
-        'fecha_cierre', 'solucion', 'notas_internas', 'requiere_repuestos',
-        'costo_estimado', 'creado_por'
+        'codigo',
+        'tipo',
+        'cliente_id',
+        'cliente_ubicacion_id',
+        'servicio_id',
+        'direccion_incidencia',
+        'contacto_local',
+        'telefono_local',
+        'titulo',
+        'descripcion',
+        'diagnostico',
+        'tecnico_id',
+        'brigada_id',
+        'estado',
+        'prioridad',
+        'fecha_reporte',
+        'fecha_asignacion',
+        'fecha_inicio_trabajo',
+        'fecha_limite',
+        'fecha_resolucion',
+        'fecha_cierre',
+        'solucion',
+        'notas_internas',
+        'requiere_repuestos',
+        'costo_estimado',
+        'creado_por'
     ];
 
     protected $casts = [
@@ -41,14 +60,43 @@ class Incidencia extends Model
         return $this->belongsTo(ClienteUbicacion::class, 'cliente_ubicacion_id');
     }
 
+    public function servicio(): BelongsTo
+    {
+        return $this->belongsTo(Servicio::class, 'servicio_id');
+    }
+
     public function tecnico(): BelongsTo
     {
         return $this->belongsTo(User::class, 'tecnico_id');
     }
 
+    public function brigada(): BelongsTo
+    {
+        return $this->belongsTo(Brigada::class, 'brigada_id');
+    }
+
     public function creador(): BelongsTo
     {
         return $this->belongsTo(User::class, 'creado_por');
+    }
+
+    /**
+     * Helpers de estado y SLA
+     */
+    public function getEstaVencidaAttribute(): bool
+    {
+        return $this->fecha_limite 
+            && $this->fecha_limite->isPast() 
+            && !in_array($this->estado, ['Resuelta', 'Cerrada', 'Cancelada']);
+    }
+
+    public function getHorasRestantesAttribute(): ?int
+    {
+        if (!$this->fecha_limite || in_array($this->estado, ['Resuelta', 'Cerrada', 'Cancelada'])) {
+            return null;
+        }
+
+        return (int) now()->diffInHours($this->fecha_limite, false);
     }
 
     protected static function boot(): void
@@ -62,18 +110,32 @@ class Incidencia extends Model
                 $incidencia->codigo = "INC-{$year}-" . str_pad($count, 4, '0', STR_PAD_LEFT);
             }
             $incidencia->creado_por = auth()->id() ?? 1;
+
+            // Auto-cálculo de SLA si no se especificó fecha límite
+            if (empty($incidencia->fecha_limite)) {
+                $incidencia->fecha_limite = match ($incidencia->prioridad) {
+                    'Critica' => now()->addHours(8),
+                    'Alta'    => now()->addHours(24),
+                    'Media'   => now()->addHours(48),
+                    'Baja'    => now()->addDays(7),
+                    default   => now()->addHours(48),
+                };
+            }
         });
 
         static::updating(function ($incidencia) {
             if ($incidencia->isDirty('tecnico_id') && $incidencia->tecnico_id && !$incidencia->fecha_asignacion) {
                 $incidencia->fecha_asignacion = now();
             }
+
             if ($incidencia->isDirty('estado') && $incidencia->estado === 'En_Progreso' && !$incidencia->fecha_inicio_trabajo) {
                 $incidencia->fecha_inicio_trabajo = now();
             }
+
             if ($incidencia->isDirty('estado') && $incidencia->estado === 'Resuelta' && !$incidencia->fecha_resolucion) {
                 $incidencia->fecha_resolucion = now();
             }
+
             if ($incidencia->isDirty('estado') && $incidencia->estado === 'Cerrada' && !$incidencia->fecha_cierre) {
                 $incidencia->fecha_cierre = now();
             }
