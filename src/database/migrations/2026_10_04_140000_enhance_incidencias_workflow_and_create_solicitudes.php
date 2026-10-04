@@ -43,14 +43,16 @@ return new class extends Migration
                 ->after('notas_supervisor');
         });
 
-        // Modificar columna estado en MySQL para permitir Revisada_Supervisor
-        try {
+        // 2. Modificar constraint del estado según el motor de base de datos (PostgreSQL / MySQL)
+        $driver = Schema::getConnection()->getDriverName();
+        if ($driver === 'pgsql') {
+            DB::statement("ALTER TABLE incidencias DROP CONSTRAINT IF EXISTS incidencias_estado_check");
+            DB::statement("ALTER TABLE incidencias ADD CONSTRAINT incidencias_estado_check CHECK (estado::text IN ('Pendiente', 'Asignada', 'En_Progreso', 'En_Espera', 'Resuelta', 'Revisada_Supervisor', 'Cerrada', 'Cancelada'))");
+        } elseif ($driver === 'mysql') {
             DB::statement("ALTER TABLE incidencias MODIFY COLUMN estado ENUM('Pendiente', 'Asignada', 'En_Progreso', 'En_Espera', 'Resuelta', 'Revisada_Supervisor', 'Cerrada', 'Cancelada') NOT NULL DEFAULT 'Pendiente'");
-        } catch (\Throwable $e) {
-            // SQLite o fallback de pruebas
         }
 
-        // 2. Crear tabla de Solicitudes Comerciales (Mesa de Entrada para Nuevos Proyectos)
+        // 3. Crear tabla de Solicitudes Comerciales (Mesa de Entrada para Nuevos Proyectos)
         Schema::create('solicitudes_servicio', function (Blueprint $table) {
             $table->id();
             $table->string('codigo')->unique();
@@ -60,9 +62,9 @@ return new class extends Migration
             $table->string('titulo');
             $table->text('descripcion');
             $table->foreignId('tipo_proyecto_id')->nullable()->constrained('tipos_proyecto')->nullOnDelete();
-            $table->enum('prioridad', ['Baja', 'Media', 'Alta', 'Urgente'])->default('Media');
+            $table->string('prioridad')->default('Media');
             $table->decimal('presupuesto_estimado', 12, 2)->nullable();
-            $table->enum('estado', ['Pendiente_Aprobacion', 'Aprobada', 'Rechazada', 'Convertida_Proyecto'])->default('Pendiente_Aprobacion');
+            $table->string('estado')->default('Pendiente_Aprobacion');
             $table->foreignId('supervisor_id')->nullable()->constrained('users')->nullOnDelete();
             $table->dateTime('fecha_aprobacion')->nullable();
             $table->text('notas_supervisor')->nullable();
@@ -71,6 +73,11 @@ return new class extends Migration
 
             $table->index(['cliente_id', 'estado']);
         });
+
+        if ($driver === 'pgsql') {
+            DB::statement("ALTER TABLE solicitudes_servicio ADD CONSTRAINT solicitudes_prioridad_check CHECK (prioridad IN ('Baja', 'Media', 'Alta', 'Urgente'))");
+            DB::statement("ALTER TABLE solicitudes_servicio ADD CONSTRAINT solicitudes_estado_check CHECK (estado IN ('Pendiente_Aprobacion', 'Aprobada', 'Rechazada', 'Convertida_Proyecto'))");
+        }
     }
 
     /**
