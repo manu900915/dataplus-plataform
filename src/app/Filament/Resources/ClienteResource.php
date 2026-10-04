@@ -13,457 +13,458 @@ use Filament\Forms\Set;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use App\Filament\Resources\ClienteResource\RelationManagers;
 
 class ClienteResource extends Resource
 {
     protected static ?string $model = Cliente::class;
+
     protected static ?string $navigationIcon = 'heroicon-o-building-office-2';
+
     protected static ?string $navigationGroup = 'Administración';
+
     protected static ?string $modelLabel = 'Cliente';
+
     protected static ?string $pluralModelLabel = 'Clientes';
+
     protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
-                // ─── Identificación ───
-                Forms\Components\Section::make('Identificación')
-                    ->columns(3)
-                    ->schema([
-                        Forms\Components\TextInput::make('codigo')
-                            ->label('ID Cliente')
-                            ->required()
-                            ->unique(ignoreRecord: true)
-                            ->maxLength(25)
-                            ->prefix('CLI-')
-                            ->default(function () {
-                                $year = now()->year;
-                                $maxId = Cliente::where('codigo', 'like', "CLI-{$year}-%")
-                                    ->get()
-                                    ->map(function ($c) use ($year) {
-                                        if (preg_match("/^CLI-{$year}-(\d+)$/", $c->codigo, $matches)) {
-                                            return (int) $matches[1];
-                                        }
-                                        return 0;
-                                    })
-                                    ->max();
-
-                                $next = ($maxId ?? 0) + 1;
-                                return "{$year}-{$next}";
-                            })
-                            ->afterStateHydrated(function (Forms\Components\TextInput $component, $state) {
-                                if (is_string($state) && str_starts_with($state, 'CLI-')) {
-                                    $component->state(substr($state, 4));
-                                }
-                            })
-                            ->dehydrateStateUsing(function ($state) {
-                                if (is_string($state) && !str_starts_with($state, 'CLI-')) {
-                                    return 'CLI-' . $state;
-                                }
-                                return $state;
-                            })
-                            ->regex('/^[a-zA-Z0-9\-]+$/')
-                            ->validationMessages([
-                                'regex' => 'El ID solo puede contener letras, números y guiones.',
-                            ])
-                            ->helperText('Formato automático CLI-año-ID (ej: CLI-2026-247).'),
-
-                        Forms\Components\Select::make('tipo_persona')
-                            ->label('Tipo de persona')
-                            ->options([
-                                'natural' => 'Natural',
-                                'juridica' => 'Jurídica',
-                            ])
-                            ->required()
-                            ->default('natural')
-                            ->live(),
-
-                        Forms\Components\TextInput::make('documento')
-                            ->label(fn (Get $get) => $get('tipo_persona') === 'juridica' ? 'RUC' : 'Carnet de Identidad')
-                            ->required()
-                            ->maxLength(20),
-                    ]),
-
-                // ─── Nombre / Razón Social ───
-                Forms\Components\Section::make('Nombre / Razón Social')
-                    ->columns(2)
-                    ->schema([
-                        Forms\Components\TextInput::make('nombre')
-                            ->label('Nombre completo / Razón Social')
-                            ->required()
-                            ->maxLength(255),
-
-                        Forms\Components\TextInput::make('nombre_comercial')
-                            ->label('Nombre comercial')
-                            ->placeholder('Si aplica')
-                            ->maxLength(255)
-                            ->visible(fn (Get $get) => $get('tipo_persona') === 'juridica'),
-                    ]),
-
-                // ─── Contacto Principal ───
-                Forms\Components\Section::make('Contacto principal')
-                    ->columns(2)
-                    ->schema([
-                        Forms\Components\TextInput::make('email')
-                            ->label('Correo electrónico')
-                            ->email()
-                            ->maxLength(255),
-
-                        Forms\Components\Fieldset::make('Teléfono principal')
-                            ->columns(2)
+                Forms\Components\Tabs::make('ClienteTabs')
+                    ->tabs([
+                        // ══════════════════════════════════════════════
+                        // PESTAÑA 1: DATOS GENERALES DEL CLIENTE
+                        // ══════════════════════════════════════════════
+                        Forms\Components\Tabs\Tab::make('Datos del Cliente')
+                            ->icon('heroicon-o-identification')
                             ->schema([
-                                Forms\Components\Select::make('country_code')
-                                    ->label('Código país')
-                                    ->options([
-                                        '+53' => '🇨🇺 Cuba (+53)',
-                                        '+52' => '🇲🇽 México (+52)',
-                                        '+34' => '🇪 España (+34)',
-                                        '+1'  => '🇺🇸 EE.UU./Canadá (+1)',
-                                        '+54' => '🇦🇷 Argentina (+54)',
-                                        '+56' => '🇨 Chile (+56)',
-                                        '+57' => '🇨🇴 Colombia (+57)',
-                                        '+51' => '🇵🇪 Perú (+51)',
-                                        '+58' => '🇻🇪 Venezuela (+58)',
-                                    ])
-                                    ->default('+53')
-                                    ->required()
-                                    ->searchable()
-                                    ->native(false),
-
-                                Forms\Components\TextInput::make('telefono')
-                                    ->label('Número')
-                                    ->tel()
-                                    ->maxLength(20)
-                                    ->required(),
-                            ]),
-                    ]),
-
-                // ─── Contactos Adicionales ───
-                Forms\Components\Section::make('Contactos adicionales')
-                    ->description('Agregue personas de contacto con sus responsabilidades')
-                    ->schema([
-                        Forms\Components\Repeater::make('contactos')
-                            ->relationship('contactos')
-                            ->label(false)
-                            ->addActionLabel('Agregar contacto')
-                            ->collapsible()
-                            ->itemLabel(fn (array $state): ?string =>
-                                ($state['nombre'] ?? 'Nuevo contacto') . ' - ' . ($state['responsabilidad'] ?? 'Sin responsabilidad')
-                            )
-                            ->schema([
-                                Forms\Components\Grid::make(2)
+                                // ─── Identificación y Tipo de Persona ───
+                                Forms\Components\Section::make('Identificación Fiscal y Registro')
+                                    ->description('Parámetros de código, tipo de personería y documento de identidad.')
+                                    ->columns(3)
                                     ->schema([
-                                        Forms\Components\TextInput::make('nombre')
-                                            ->label('Nombre del contacto')
+                                        Forms\Components\TextInput::make('codigo')
+                                            ->label('ID Cliente (Año - Número)')
                                             ->required()
-                                            ->maxLength(255),
+                                            ->unique(ignoreRecord: true)
+                                            ->maxLength(30)
+                                            ->prefix('CLI-')
+                                            ->placeholder('2026-44')
+                                            ->default(function () {
+                                                $year = now()->year;
+                                                $maxId = Cliente::where('codigo', 'like', "CLI-{$year}-%")
+                                                    ->get()
+                                                    ->map(function ($c) use ($year) {
+                                                        if (preg_match("/^CLI-{$year}-(\d+)$/", $c->codigo, $matches)) {
+                                                            return (int) $matches[1];
+                                                        }
+                                                        return 0;
+                                                    })
+                                                    ->max();
 
-                                        Forms\Components\TextInput::make('cargo')
-                                            ->label('Cargo')
-                                            ->maxLength(255),
-                                    ]),
-
-                                Forms\Components\TextInput::make('responsabilidad')
-                                    ->label('Responsabilidad')
-                                    ->placeholder('Ej: Responsable de compras, Contacto técnico, Facturación...')
-                                    ->required()
-                                    ->maxLength(255),
-
-                                Forms\Components\Grid::make(2)
-                                    ->schema([
-                                        Forms\Components\Select::make('country_code')
-                                            ->label('Código país')
-                                            ->options([
-                                                '+53' => '🇨 Cuba (+53)',
-                                                '+52' => '🇲🇽 México (+52)',
-                                                '+34' => '🇸 España (+34)',
-                                                '+1'  => '🇺🇸 EE.UU./Canadá (+1)',
-                                                '+54' => '🇦🇷 Argentina (+54)',
-                                                '+56' => '🇨🇱 Chile (+56)',
-                                                '+57' => '🇨 Colombia (+57)',
-                                                '+51' => '🇵🇪 Perú (+51)',
-                                                '+58' => '🇻🇪 Venezuela (+58)',
+                                                $next = ($maxId ?? 0) + 1;
+                                                return "{$year}-{$next}";
+                                            })
+                                            ->afterStateHydrated(function (Forms\Components\TextInput $component, $state) {
+                                                if (is_string($state) && str_starts_with($state, 'CLI-')) {
+                                                    $component->state(substr($state, 4));
+                                                }
+                                            })
+                                            ->dehydrateStateUsing(function ($state) {
+                                                if (empty($state)) return $state;
+                                                if (str_starts_with($state, 'CLI-')) {
+                                                    return $state;
+                                                }
+                                                // Si solo escribió el número, le asignamos el año actual
+                                                if (is_numeric($state)) {
+                                                    $year = now()->year;
+                                                    return "CLI-{$year}-{$state}";
+                                                }
+                                                return 'CLI-' . $state;
+                                            })
+                                            ->regex('/^[a-zA-Z0-9\-]+$/')
+                                            ->validationMessages([
+                                                'regex' => 'El código solo puede contener letras, números y guiones.',
                                             ])
-                                            ->default('+53')
-                                            ->searchable()
-                                            ->native(false),
+                                            ->helperText('Puedes editar libremente el año y el ID (ej: 2026-44 o 2025-10).'),
 
-                                        Forms\Components\TextInput::make('telefono')
-                                            ->label('Teléfono')
-                                            ->tel()
-                                            ->maxLength(20),
-                                    ]),
-
-                                Forms\Components\TextInput::make('email')
-                                    ->label('Correo electrónico')
-                                    ->email()
-                                    ->maxLength(255),
-                            ]),
-                    ]),
-
-                // ─── Ubicaciones con Servicios Anidados ───
-                Forms\Components\Section::make('Ubicaciones y Servicios')
-                    ->description('Agregue ubicaciones y los servicios asociados a cada una.')
-                    ->schema([
-                        Forms\Components\Repeater::make('ubicaciones')
-                            ->relationship('ubicaciones')
-                            ->label(false)
-                            ->addActionLabel('Agregar ubicación')
-                            ->collapsible()
-                            ->itemLabel(fn (array $state): ?string =>
-                                ($state['nombre'] ?? 'Nueva ubicación') . ' (' . ($state['tipo'] ?? '-') . ')'
-                            )
-                            ->schema([
-                                Forms\Components\Grid::make(3)
-                                    ->schema([
-                                        Forms\Components\TextInput::make('nombre')
-                                            ->label('Nombre de la ubicación')
-                                            ->placeholder('Ej: Casa principal, Sucursal Centro, Local 5...')
-                                            ->required(),
-
-                                        Forms\Components\Select::make('tipo')
-                                            ->label('Tipo')
+                                        Forms\Components\Select::make('tipo_persona')
+                                            ->label('Tipo de persona')
                                             ->options([
-                                                'residencial' => 'Residencial',
-                                                'negocio' => 'Negocio',
+                                                'juridica' => '🏢 Persona Jurídica (Empresa / Negocio)',
+                                                'natural'  => '👤 Persona Natural (Particular)',
                                             ])
                                             ->required()
-                                            ->default('residencial')
+                                            ->default('juridica')
                                             ->live(),
 
-                                        Forms\Components\Select::make('tipo_negocio_id')
-                                            ->label('Giro del negocio')
-                                            ->relationship('tipoNegocio', 'nombre')
-                                            ->searchable()
-                                            ->preload()
-                                            ->placeholder('Seleccione...')
-                                            ->visible(fn (Get $get) => $get('tipo') === 'negocio')
-                                            ->required(fn (Get $get) => $get('tipo') === 'negocio'),
+                                        Forms\Components\TextInput::make('documento')
+                                            ->label(fn (Get $get) => $get('tipo_persona') === 'juridica' ? 'NIT' : 'Carnet de Identidad')
+                                            ->placeholder(fn (Get $get) => $get('tipo_persona') === 'juridica' ? 'Ej: 50001234567' : 'Ej: 85010112345')
+                                            ->helperText(fn (Get $get) => $get('tipo_persona') === 'juridica' ? 'Número de Identificación Tributaria (NIT)' : 'Carnet de Identidad personal')
+                                            ->nullable()
+                                            ->maxLength(25),
                                     ]),
 
-                                Forms\Components\Grid::make(2)
+                                // ─── Nombre / Razón Social ───
+                                Forms\Components\Section::make('Denominación Comercial y Razón Social')
+                                    ->columns(2)
                                     ->schema([
-                                        Forms\Components\Select::make('provincia')
-                                            ->label('Provincia')
-                                            ->options(CubanLocations::provincias())
-                                            ->searchable()
-                                            ->live()
-                                            ->placeholder('Seleccione...'),
+                                        Forms\Components\TextInput::make('nombre')
+                                            ->label(fn (Get $get) => $get('tipo_persona') === 'juridica' ? 'Razón Social / Denominación' : 'Nombre Completo')
+                                            ->placeholder(fn (Get $get) => $get('tipo_persona') === 'juridica' ? 'Ej: Yoandry DluceSalon SRL' : 'Ej: Juan Pérez González')
+                                            ->required()
+                                            ->maxLength(255),
 
-                                        Forms\Components\Select::make('municipio')
-                                            ->label('Municipio')
-                                            ->options(fn (Get $get): array =>
-                                                CubanLocations::municipios($get('provincia') ?? '')
-                                            )
-                                            ->searchable()
-                                            ->placeholder('Primero seleccione provincia')
-                                            ->disabled(fn (Get $get): bool => blank($get('provincia'))),
+                                        Forms\Components\TextInput::make('nombre_comercial')
+                                            ->label('Nombre comercial / Marca')
+                                            ->placeholder('Ej: Dluce Salón')
+                                            ->maxLength(255)
+                                            ->visible(fn (Get $get) => $get('tipo_persona') === 'juridica'),
                                     ]),
 
-                                Forms\Components\TextInput::make('direccion')
-                                    ->label('Dirección completa')
-                                    ->maxLength(255),
-
-                                Forms\Components\Grid::make(2)
+                                // ─── Contacto Principal ───
+                                Forms\Components\Section::make('Contacto Principal')
+                                    ->columns(2)
                                     ->schema([
-                                        Forms\Components\TextInput::make('contacto_nombre')
-                                            ->label('Contacto en sitio')
-                                            ->placeholder('Nombre de quien está en el lugar'),
+                                        Forms\Components\TextInput::make('email')
+                                            ->label('Correo electrónico')
+                                            ->email()
+                                            ->placeholder('contacto@empresa.cu')
+                                            ->maxLength(255),
 
-                                        Forms\Components\TextInput::make('contacto_telefono')
-                                            ->label('Teléfono del sitio')
-                                            ->tel(),
+                                        Forms\Components\Fieldset::make('Teléfono principal')
+                                            ->columns(2)
+                                            ->schema([
+                                                Forms\Components\Select::make('country_code')
+                                                    ->label('Código país')
+                                                    ->options([
+                                                        '+53' => '🇨🇺 Cuba (+53)',
+                                                        '+52' => '🇲🇽 México (+52)',
+                                                        '+34' => '🇪🇸 España (+34)',
+                                                        '+1'  => '🇺🇸 EE.UU./Canadá (+1)',
+                                                        '+54' => '🇦🇷 Argentina (+54)',
+                                                        '+56' => '🇨🇱 Chile (+56)',
+                                                        '+57' => '🇨🇴 Colombia (+57)',
+                                                        '+51' => '🇵🇪 Perú (+51)',
+                                                        '+58' => '🇻🇪 Venezuela (+58)',
+                                                    ])
+                                                    ->default('+53')
+                                                    ->searchable()
+                                                    ->native(false),
+
+                                                Forms\Components\TextInput::make('telefono')
+                                                    ->label('Número')
+                                                    ->tel()
+                                                    ->placeholder('Ej: 52345678')
+                                                    ->maxLength(20),
+                                            ]),
                                     ]),
 
-                                Forms\Components\Textarea::make('notas')
-                                    ->label('Notas de la ubicación')
-                                    ->rows(2),
-
-                                // 🔥 Servicios asociados a esta ubicación
-                                Forms\Components\Section::make('Servicios asociados a esta ubicación')
-                                    ->description('Agregue o quite servicios de esta ubicación específica.')
+                                // ─── Contactos Adicionales ───
+                                Forms\Components\Section::make('Contactos Adicionales')
+                                    ->description('Personas de contacto secundarias, gerentes o administradores')
+                                    ->collapsible()
+                                    ->collapsed()
                                     ->schema([
-                                        Forms\Components\Repeater::make('servicios')
-                                            ->relationship('servicios')
+                                        Forms\Components\Repeater::make('contactos')
+                                            ->relationship('contactos')
                                             ->label(false)
-                                            ->addActionLabel('Agregar servicio')
+                                            ->addActionLabel('➕ Agregar otro contacto')
                                             ->collapsible()
                                             ->itemLabel(fn (array $state): ?string =>
-                                                ($state['tipo'] ?? 'Servicio') . ' - ' . ($state['estado'] ?? 'Pendiente')
+                                                ($state['nombre'] ?? 'Nuevo contacto') . ' - ' . ($state['responsabilidad'] ?? 'Sin responsabilidad')
                                             )
                                             ->schema([
                                                 Forms\Components\Grid::make(3)
                                                     ->schema([
-                                                        Forms\Components\Select::make('tipo')
-                                                            ->label('Tipo de servicio')
-                                                            ->options([
-                                                                'CCTV' => 'CCTV',
-                                                                'SACI' => 'SACI',
-                                                                'Gestion_Remota' => 'Gestión Remota',
-                                                            ])
+                                                        Forms\Components\TextInput::make('nombre')
+                                                            ->label('Nombre del contacto')
                                                             ->required()
-                                                            ->live(),
+                                                            ->maxLength(255),
 
-                                                        Forms\Components\Select::make('estado')
-                                                            ->label('Estado')
-                                                            ->options([
-                                                                'Activo' => 'Activo',
-                                                                'Inactivo' => 'Inactivo',
-                                                                'En_Reparacion' => 'En Reparación',
-                                                                'Suspendido' => 'Suspendido',
-                                                            ])
-                                                            ->default('Activo')
-                                                            ->required(),
+                                                        Forms\Components\TextInput::make('cargo')
+                                                            ->label('Cargo')
+                                                            ->placeholder('Ej: Administrador, Encargado...')
+                                                            ->maxLength(255),
 
-                                                        Forms\Components\DatePicker::make('fecha_instalacion')
-                                                            ->label('Fecha instalación')
-                                                            ->native(false),
+                                                        Forms\Components\TextInput::make('responsabilidad')
+                                                            ->label('Responsabilidad')
+                                                            ->placeholder('Ej: Pagos, Soporte...')
+                                                            ->required()
+                                                            ->maxLength(255),
                                                     ]),
 
-                                                // Brigada y Técnico (siempre visibles para todos los tipos de servicio)
                                                 Forms\Components\Grid::make(2)
                                                     ->schema([
-                                                        Forms\Components\Select::make('brigada_id')
-                                                            ->label('Brigada')
-                                                            ->options(fn () =>
-                                                                Brigada::where('activa', true)
-                                                                    ->orderBy('nombre')
-                                                                    ->pluck('nombre', 'id')
-                                                                    ->map(fn ($nombre) => '👥 ' . $nombre)
-                                                                    ->toArray()
-                                                            )
-                                                            ->searchable()
-                                                            ->preload()
-                                                            ->placeholder('Seleccione una brigada...')
-                                                            ->createOptionForm([
-                                                                Forms\Components\TextInput::make('nombre')
-                                                                    ->label('Nombre de la brigada')
-                                                                    ->required()
-                                                                    ->unique(),
-                                                                Forms\Components\Select::make('jefe_id')
-                                                                    ->label('Jefe de brigada')
-                                                                    ->relationship('jefe', 'name')
-                                                                    ->required(),
-                                                                Forms\Components\Textarea::make('notas')
-                                                                    ->label('Notas')
-                                                                    ->rows(2),
-                                                            ])
-                                                            ->createOptionAction(fn (Forms\Components\Actions\Action $action) =>
-                                                                $action->label('Crear nueva brigada')
-                                                            ),
+                                                        Forms\Components\TextInput::make('telefono')
+                                                            ->label('Teléfono')
+                                                            ->tel()
+                                                            ->placeholder('Ej: +53 52345678')
+                                                            ->maxLength(30),
 
-                                                        Forms\Components\Select::make('tecnico_id')
-                                                            ->label('Técnico responsable')
-                                                            ->options(fn () =>
-                                                                User::role('Técnico')
-                                                                    ->orderBy('name')
-                                                                    ->pluck('name', 'id')
-                                                                    ->map(fn ($nombre) => '👤 ' . $nombre)
-                                                                    ->toArray()
-                                                            )
+                                                        Forms\Components\TextInput::make('email')
+                                                            ->label('Correo electrónico')
+                                                            ->email()
+                                                            ->placeholder('persona@empresa.cu')
+                                                            ->maxLength(255),
+                                                    ]),
+                                            ]),
+                                    ]),
+
+                                // ─── Notas y Estado ───
+                                Forms\Components\Section::make('Información Adicional')
+                                    ->columns(2)
+                                    ->schema([
+                                        Forms\Components\Textarea::make('notas')
+                                            ->label('Notas generales del cliente')
+                                            ->placeholder('Observaciones internas sobre este cliente...')
+                                            ->rows(3),
+
+                                        Forms\Components\Toggle::make('activo')
+                                            ->label('Cliente activo en la plataforma')
+                                            ->default(true)
+                                            ->inline(false),
+                                    ]),
+                            ]),
+
+                        // ══════════════════════════════════════════════
+                        // PESTAÑA 2: LOCACIONES Y SERVICIOS ASOCIADOS
+                        // ══════════════════════════════════════════════
+                        Forms\Components\Tabs\Tab::make('Locaciones y Servicios')
+                            ->icon('heroicon-o-map-pin')
+                            ->badge(fn ($record) => $record ? $record->ubicaciones()->count() : null)
+                            ->badgeColor('primary')
+                            ->schema([
+                                Forms\Components\Section::make('Locaciones del Cliente')
+                                    ->description('Un cliente puede tener varias locaciones (casas o negocios), y cada una puede contar con múltiples servicios técnicos.')
+                                    ->schema([
+                                        Forms\Components\Repeater::make('ubicaciones')
+                                            ->relationship('ubicaciones')
+                                            ->label(false)
+                                            ->addActionLabel('➕ Agregar Nueva Locación (Casa o Negocio)')
+                                            ->collapsible()
+                                            ->cloneable()
+                                            ->itemLabel(fn (array $state): ?string =>
+                                                (($state['tipo'] ?? '') === 'negocio' ? '🏢 Negocio: ' : '🏠 Casa: ') .
+                                                ($state['nombre'] ?? 'Nueva Locación')
+                                            )
+                                            ->schema([
+                                                // 1. Datos básicos de la locación
+                                                Forms\Components\Grid::make(3)
+                                                    ->schema([
+                                                        Forms\Components\TextInput::make('nombre')
+                                                            ->label('Nombre de la locación')
+                                                            ->placeholder('Ej: Sede Principal, Casa Playa, Almacén...')
+                                                            ->required(),
+
+                                                        Forms\Components\Select::make('tipo')
+                                                            ->label('Tipo de locación')
+                                                            ->options([
+                                                                'negocio'     => '🏢 Negocio / Local Comercial',
+                                                                'residencial' => '🏠 Casa / Residencia Particular',
+                                                            ])
+                                                            ->required()
+                                                            ->default('negocio')
+                                                            ->live(),
+
+                                                        Forms\Components\Select::make('tipo_negocio_id')
+                                                            ->label('Giro del negocio')
+                                                            ->relationship('tipoNegocio', 'nombre')
                                                             ->searchable()
                                                             ->preload()
-                                                            ->placeholder('Seleccione un técnico...'),
+                                                            ->placeholder('Seleccione giro...')
+                                                            ->visible(fn (Get $get) => $get('tipo') === 'negocio'),
                                                     ]),
 
-                                                // Campos específicos de Gestión Remota
-                                                Forms\Components\Section::make('Detalles de Gestión Remota')
+                                                // 2. Ubicación física
+                                                Forms\Components\Grid::make(3)
                                                     ->schema([
-                                                        Forms\Components\Grid::make(2)
-                                                            ->schema([
-                                                                Forms\Components\Select::make('gr_tipo_solucion')
-                                                                    ->label('Tipo de solución')
-                                                                    ->options([
-                                                                        'Router4g' => 'Router 4G',
-                                                                        'Router+Modem' => 'Router + Modem',
-                                                                        'Router+ADSL' => 'Router + ADSL',
-                                                                        'Otros' => 'Otros',
-                                                                    ])
-                                                                    ->required()
-                                                                    ->live()
-                                                                    ->placeholder('Seleccione el tipo de solución...'),
+                                                        Forms\Components\Select::make('provincia')
+                                                            ->label('Provincia')
+                                                            ->options(CubanLocations::provincias())
+                                                            ->searchable()
+                                                            ->live()
+                                                            ->placeholder('Seleccione provincia...'),
 
-                                                                Forms\Components\TextInput::make('gr_marca_modelo')
-                                                                    ->label('Marca/Modelo')
-                                                                    ->placeholder('Ej: Huawei B535, TP-Link Archer...'),
-                                                            ]),
+                                                        Forms\Components\Select::make('municipio')
+                                                            ->label('Municipio')
+                                                            ->options(fn (Get $get): array =>
+                                                                CubanLocations::municipios($get('provincia') ?? '')
+                                                            )
+                                                            ->searchable()
+                                                            ->placeholder('Primero seleccione provincia')
+                                                            ->disabled(fn (Get $get): bool => blank($get('provincia'))),
 
-                                                        // SIM: solo visible si NO es Router+ADSL
-                                                        Forms\Components\Grid::make(2)
-                                                            ->schema([
-                                                                Forms\Components\TextInput::make('gr_sim_numero')
-                                                                    ->label('Número SIM')
-                                                                    ->maxLength(20)
-                                                                    ->placeholder('Ej: 05 1234 5678')
-                                                                    ->visible(fn (Get $get) => $get('gr_tipo_solucion') !== 'Router+ADSL'),
+                                                        Forms\Components\TextInput::make('direccion')
+                                                            ->label('Dirección completa')
+                                                            ->placeholder('Calle, número, entre calles...')
+                                                            ->maxLength(255),
+                                                    ]),
 
-                                                                Forms\Components\Select::make('gr_sim_tipo')
-                                                                    ->label('Tipo de SIM')
-                                                                    ->options([
-                                                                        'Particular' => 'Particular (recarga por nuestra parte)',
-                                                                        'Corporativa' => 'Corporativa (contrato ETECSA del cliente)',
-                                                                    ])
-                                                                    ->live()
-                                                                    ->placeholder('Seleccione el tipo de SIM...')
-                                                                    ->visible(fn (Get $get) =>
-                                                                        in_array($get('gr_tipo_solucion'), ['Router4g', 'Router+Modem'])
-                                                                    ),
-                                                            ]),
+                                                // 3. Contacto en sitio
+                                                Forms\Components\Grid::make(2)
+                                                    ->schema([
+                                                        Forms\Components\TextInput::make('contacto_nombre')
+                                                            ->label('Contacto en sitio')
+                                                            ->placeholder('Nombre de quien atiende en el lugar'),
 
-                                                        Forms\Components\Select::make('gr_tipo_internet')
-                                                            ->label('Tipo de internet')
-                                                            ->options([
-                                                                'Abierto' => 'Abierto',
-                                                                'Filtrado' => 'Filtrado',
-                                                                'Cerrado' => 'Cerrado',
-                                                            ])
-                                                            ->placeholder('Seleccione el tipo de internet...')
-                                                            ->visible(fn (Get $get) => $get('gr_tipo_solucion') !== 'Router+ADSL'),
-
-                                                        // Recarga: solo visible si SIM es Particular
-                                                        Forms\Components\Grid::make(2)
-                                                            ->schema([
-                                                                Forms\Components\Select::make('gr_recarga_por')
-                                                                    ->label('Recarga por')
-                                                                    ->options([
-                                                                        'Nosotros' => 'Nosotros',
-                                                                        'Cliente' => 'Cliente',
-                                                                    ])
-                                                                    ->default('Cliente')
-                                                                    ->placeholder('Seleccione quién recarga...')
-                                                                    ->visible(fn (Get $get) => $get('gr_sim_tipo') === 'Particular'),
-
-                                                                Forms\Components\TextInput::make('gr_recarga_monto')
-                                                                    ->label('Monto recarga')
-                                                                    ->numeric()
-                                                                    ->default(360.00)
-                                                                    ->prefix('$')
-                                                                    ->visible(fn (Get $get) => $get('gr_sim_tipo') === 'Particular'),
-                                                            ]),
-                                                    ])
-                                                    ->visible(fn (Get $get) => $get('tipo') === 'Gestion_Remota'),
+                                                        Forms\Components\TextInput::make('contacto_telefono')
+                                                            ->label('Teléfono del sitio')
+                                                            ->placeholder('Ej: 52345678')
+                                                            ->tel(),
+                                                    ]),
 
                                                 Forms\Components\Textarea::make('notas')
-                                                    ->label('Notas del servicio')
+                                                    ->label('Notas de la locación')
+                                                    ->placeholder('Detalles de acceso, puntos de referencia...')
                                                     ->rows(2),
+
+                                                // 4. SERVICIOS ASOCIADOS A ESTA LOCACIÓN ESPECÍFICA
+                                                Forms\Components\Section::make('Servicios Técnicos en esta Locación')
+                                                    ->description('Administre los sistemas (CCTV, SACI, Gestión Remota) instalados en esta locación.')
+                                                    ->schema([
+                                                        Forms\Components\Repeater::make('servicios')
+                                                            ->relationship('servicios')
+                                                            ->label(false)
+                                                            ->addActionLabel('➕ Agregar Servicio a esta Locación')
+                                                            ->collapsible()
+                                                            ->itemLabel(fn (array $state): ?string =>
+                                                                '🔧 ' . ($state['tipo'] ?? 'Servicio') . ' — Estado: ' . ($state['estado'] ?? 'Activo')
+                                                            )
+                                                            ->schema([
+                                                                Forms\Components\Grid::make(3)
+                                                                    ->schema([
+                                                                        Forms\Components\Select::make('tipo')
+                                                                            ->label('Tipo de servicio')
+                                                                            ->options([
+                                                                                'CCTV'           => 'CCTV (Videovigilancia)',
+                                                                                'SACI'           => 'SACI (Alarma contra intrusión)',
+                                                                                'Gestion_Remota' => 'Gestión Remota / Redes',
+                                                                            ])
+                                                                            ->required()
+                                                                            ->live(),
+
+                                                                        Forms\Components\Select::make('estado')
+                                                                            ->label('Estado')
+                                                                            ->options([
+                                                                                'Activo'        => '🟢 Activo',
+                                                                                'Inactivo'      => '⚪ Inactivo',
+                                                                                'En_Reparacion' => '🟡 En Reparación',
+                                                                                'Suspendido'    => '🔴 Suspendido',
+                                                                            ])
+                                                                            ->default('Activo')
+                                                                            ->required(),
+
+                                                                        Forms\Components\DatePicker::make('fecha_instalacion')
+                                                                            ->label('Fecha instalación')
+                                                                            ->native(false),
+                                                                    ]),
+
+                                                                Forms\Components\Grid::make(2)
+                                                                    ->schema([
+                                                                        Forms\Components\Select::make('brigada_id')
+                                                                            ->label('Brigada Responsable')
+                                                                            ->options(fn () =>
+                                                                                Brigada::where('activa', true)
+                                                                                    ->orderBy('nombre')
+                                                                                    ->pluck('nombre', 'id')
+                                                                                    ->map(fn ($nombre) => '👥 ' . $nombre)
+                                                                                    ->toArray()
+                                                                            )
+                                                                            ->searchable()
+                                                                            ->preload()
+                                                                            ->placeholder('Seleccione una brigada...'),
+
+                                                                        Forms\Components\Select::make('tecnico_id')
+                                                                            ->label('Técnico Asignado')
+                                                                            ->options(fn () =>
+                                                                                User::where('activo', true)
+                                                                                    ->orderBy('name')
+                                                                                    ->pluck('name', 'id')
+                                                                                    ->map(fn ($nombre) => '👤 ' . $nombre)
+                                                                                    ->toArray()
+                                                                            )
+                                                                            ->searchable()
+                                                                            ->preload()
+                                                                            ->placeholder('Seleccione un técnico...'),
+                                                                    ]),
+
+                                                                // Campos específicos de Gestión Remota
+                                                                Forms\Components\Section::make('Parámetros de Gestión Remota y Conectividad')
+                                                                    ->schema([
+                                                                        Forms\Components\Grid::make(2)
+                                                                            ->schema([
+                                                                                Forms\Components\Select::make('gr_tipo_solucion')
+                                                                                    ->label('Tipo de solución')
+                                                                                    ->options([
+                                                                                        'Router4g'     => 'Router 4G',
+                                                                                        'Router+Modem' => 'Router + Módem',
+                                                                                        'Router+ADSL'  => 'Router + ADSL',
+                                                                                        'Otros'        => 'Otros',
+                                                                                    ])
+                                                                                    ->required()
+                                                                                    ->live(),
+
+                                                                                Forms\Components\TextInput::make('gr_marca_modelo')
+                                                                                    ->label('Marca / Modelo')
+                                                                                    ->placeholder('Ej: Huawei B535, TP-Link Archer...'),
+                                                                            ]),
+
+                                                                        Forms\Components\Grid::make(2)
+                                                                            ->schema([
+                                                                                Forms\Components\TextInput::make('gr_sim_numero')
+                                                                                    ->label('Número de Línea SIM')
+                                                                                    ->maxLength(20)
+                                                                                    ->placeholder('Ej: 05 1234 5678')
+                                                                                    ->visible(fn (Get $get) => $get('gr_tipo_solucion') !== 'Router+ADSL'),
+
+                                                                                Forms\Components\Select::make('gr_sim_tipo')
+                                                                                    ->label('Tipo de SIM')
+                                                                                    ->options([
+                                                                                        'Particular'  => 'Particular (recarga por nuestra parte)',
+                                                                                        'Corporativa' => 'Corporativa (contrato ETECSA del cliente)',
+                                                                                    ])
+                                                                                    ->live()
+                                                                                    ->visible(fn (Get $get) =>
+                                                                                        in_array($get('gr_tipo_solucion'), ['Router4g', 'Router+Modem'])
+                                                                                    ),
+                                                                            ]),
+
+                                                                        Forms\Components\Grid::make(2)
+                                                                            ->schema([
+                                                                                Forms\Components\Select::make('gr_recarga_por')
+                                                                                    ->label('Recarga efectuada por')
+                                                                                    ->options([
+                                                                                        'Nosotros' => 'Nosotros (DataPlus)',
+                                                                                        'Cliente'  => 'El Cliente',
+                                                                                    ])
+                                                                                    ->default('Cliente')
+                                                                                    ->visible(fn (Get $get) => $get('gr_sim_tipo') === 'Particular'),
+
+                                                                                Forms\Components\TextInput::make('gr_recarga_monto')
+                                                                                    ->label('Monto de recarga mensual')
+                                                                                    ->numeric()
+                                                                                    ->default(360.00)
+                                                                                    ->prefix('$')
+                                                                                    ->visible(fn (Get $get) => $get('gr_sim_tipo') === 'Particular'),
+                                                                            ]),
+                                                                    ])
+                                                                    ->visible(fn (Get $get) => $get('tipo') === 'Gestion_Remota'),
+
+                                                                Forms\Components\Textarea::make('notas')
+                                                                    ->label('Notas técnicas del servicio')
+                                                                    ->placeholder('Observaciones de instalación, contraseñas o detalles...')
+                                                                    ->rows(2),
+                                                            ]),
+                                                    ]),
                                             ]),
                                     ]),
                             ]),
-                    ]),
-
-                // ─── Notas generales ───
-                Forms\Components\Section::make('Información adicional')
-                    ->schema([
-                        Forms\Components\Textarea::make('notas')
-                            ->label('Notas generales del cliente')
-                            ->rows(3),
-
-                        Forms\Components\Toggle::make('activo')
-                            ->label('Cliente activo')
-                            ->default(true),
-                    ]),
+                    ])
+                    ->columnSpanFull(),
             ]);
     }
 
@@ -476,21 +477,35 @@ class ClienteResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->weight('font-bold')
+                    ->color('primary')
                     ->copyable(),
 
                 Tables\Columns\TextColumn::make('nombre')
+                    ->label('Nombre / Razón Social')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->weight('font-medium'),
 
-                Tables\Columns\BadgeColumn::make('tipo_persona')
+                Tables\Columns\TextColumn::make('documento')
+                    ->label('NIT / CI')
+                    ->searchable()
+                    ->placeholder('—')
+                    ->badge()
+                    ->color('gray'),
+
+                Tables\Columns\TextColumn::make('tipo_persona')
+                    ->label('Tipo Persona')
+                    ->badge()
                     ->colors([
-                        'primary' => 'natural',
+                        'info'    => 'natural',
                         'success' => 'juridica',
                     ])
-                    ->formatStateUsing(fn (string $state): string => $state === 'juridica' ? 'Jurídica' : 'Natural'),
+                    ->formatStateUsing(fn (?string $state): string => $state === 'juridica' ? 'Jurídica' : 'Natural'),
 
                 Tables\Columns\TextColumn::make('telefono')
-                    ->searchable(),
+                    ->label('Teléfono')
+                    ->searchable()
+                    ->placeholder('—'),
 
                 Tables\Columns\TextColumn::make('negocios_count')
                     ->label('Negocios')
@@ -515,50 +530,44 @@ class ClienteResource extends Resource
                     ->color('gray'),
 
                 Tables\Columns\IconColumn::make('activo')
+                    ->label('Activo')
                     ->boolean(),
-
-                Tables\Columns\TextColumn::make('created_at')
-                    ->label('Registrado')
-                    ->dateTime('d/m/Y')
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
             ])
+            ->defaultSort('id', 'asc')
             ->filters([
                 Tables\Filters\SelectFilter::make('tipo_persona')
+                    ->label('Tipo de persona')
                     ->options([
-                        'natural' => 'Natural',
                         'juridica' => 'Jurídica',
+                        'natural'  => 'Natural',
                     ]),
-
                 Tables\Filters\TernaryFilter::make('activo')
-                    ->label('Activo'),
+                    ->label('Solo activos'),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\EditAction::make()
+                    ->label('Editar'),
+                Tables\Actions\DeleteAction::make()
+                    ->label('Borrar'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
-            ])
-            ->defaultSort('created_at', 'desc');
+            ]);
     }
 
     public static function getRelations(): array
     {
-        return [
-            // Si usas el Repeater de ubicaciones en el form, es mejor no usar también el RelationManager
-            // RelationManagers\UbicacionesRelationManager::class,
-        ];
+        return [];
     }
 
     public static function getPages(): array
     {
         return [
-            'index' => \App\Filament\Resources\ClienteResource\Pages\ListClientes::route('/'),
-            'create' => \App\Filament\Resources\ClienteResource\Pages\CreateCliente::route('/create'),
-            'edit' => \App\Filament\Resources\ClienteResource\Pages\EditCliente::route('/{record}/edit'),
+            'index'  => Pages\ListClientes::route('/'),
+            'create' => Pages\CreateCliente::route('/create'),
+            'edit'   => Pages\EditCliente::route('/{record}/edit'),
         ];
     }
 }
