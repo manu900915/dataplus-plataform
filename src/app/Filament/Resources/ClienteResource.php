@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Resources\ClienteResource\Pages;
+
 use App\Helpers\CubanLocations;
 use App\Models\Brigada;
 use App\Models\Cliente;

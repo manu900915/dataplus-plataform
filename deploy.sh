@@ -33,8 +33,9 @@ fi
 
 # 2) Actualizar código desde GitHub (no fatal si falla por red)
 log "Actualizando código desde GitHub..."
-if git pull --ff-only origin main; then
-  log "Código actualizado correctamente desde GitHub."
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
+if git pull --ff-only origin "$CURRENT_BRANCH"; then
+  log "Código actualizado correctamente desde GitHub (rama: $CURRENT_BRANCH)."
 else
   log "⚠️ Aviso: No se pudo conectar a GitHub en este instante (usando código local del servidor)."
 fi
