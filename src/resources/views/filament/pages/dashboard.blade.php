@@ -396,7 +396,7 @@
                             <div>
                                 <p class="font-semibold text-xs text-white">{{ $item['nombre'] }}</p>
                                 <p class="text-[11px] text-slate-400 font-mono mt-0.5">
-                                    Código: {{ $item['codigo'] }} · Almacén: {{ $item['almacen_nombre'] }}
+                                    Código: {{ $item['codigo'] }} · Categoría: {{ $item['categoria_nombre'] }}
                                 </p>
                             </div>
                             <div class="flex items-center gap-3">

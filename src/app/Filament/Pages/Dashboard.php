@@ -25,7 +25,7 @@ class Dashboard extends Page
      */
     public function getData(): array
     {
-        return Cache::remember('dashboard:preview_match:v1', now()->addMinutes(1), function () {
+        return Cache::remember('dashboard:preview_match:v3', now()->addMinutes(1), function () {
             // Proyectos
             $proyectosActivos = Proyecto::whereIn('estado', ['borrador', 'en_progreso'])->count();
             $proyectosCompletados = Proyecto::where('estado', 'completado')->count();
@@ -95,25 +95,25 @@ class Dashboard extends Page
                     'estado'         => $i->estado,
                 ])->all();
 
-            // Inventario
+            // Inventario (usando relación 'categoria', ya que Item pertenece a CategoriaItem)
             $itemsTotal = Item::count();
             $stockBajoCount = Item::whereColumn('stock_actual', '<=', 'stock_minimo')->count();
             $equipamientoStock = (int) Item::where('es_equipamiento', true)->sum('stock_actual');
             $materialesStock = (int) Item::where('es_equipamiento', false)->sum('stock_actual');
 
-            $alertasStock = Item::with('almacen')
+            $alertasStock = Item::with('categoria')
                 ->whereColumn('stock_actual', '<=', 'stock_minimo')
                 ->orderBy('stock_actual')
                 ->take(6)
                 ->get()
                 ->map(fn (Item $item) => [
-                    'id'             => $item->id,
-                    'nombre'         => $item->nombre,
-                    'codigo'         => $item->codigo,
-                    'almacen_nombre' => $item->almacen?->nombre ?? 'Almacén Principal',
-                    'stock_actual'   => $item->stock_actual,
-                    'unidad_medida'  => $item->unidad_medida,
-                    'stock_minimo'   => $item->stock_minimo,
+                    'id'               => $item->id,
+                    'nombre'           => $item->nombre,
+                    'codigo'           => $item->codigo,
+                    'categoria_nombre' => $item->categoria?->nombre ?? 'General',
+                    'stock_actual'     => $item->stock_actual,
+                    'unidad_medida'    => $item->unidad_medida,
+                    'stock_minimo'     => $item->stock_minimo,
                 ])->all();
 
             // Finanzas
