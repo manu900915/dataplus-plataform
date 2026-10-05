@@ -14,20 +14,15 @@ class CreateCliente extends CreateRecord
     protected function getFormActions(): array
     {
         return [
-            Action::make('save')
+            $this->getCreateFormAction()
                 ->label('Guardar')
-                ->action('save')
-                ->after(fn () => $this->redirect(ListClientes::getUrl()))
                 ->color('primary'),
-
-            Action::make('saveAndCreateAnother')
+            $this->getCreateAnotherFormAction()
                 ->label('Guardar y crear otro')
-                ->action('saveAndCreateAnother')
                 ->color('gray'),
-
             Action::make('cancel')
                 ->label('Cancelar')
-                ->action(fn () => $this->redirect(ListClientes::getUrl()))
+                ->url(fn () => ListClientes::getUrl())
                 ->color('danger')
                 ->outlined(),
         ];
@@ -36,5 +31,10 @@ class CreateCliente extends CreateRecord
     public function getFormActionsAlignment(): string
     {
         return 'start';
+    }
+
+    protected function getRedirectUrl(): string
+    {
+        return ListClientes::getUrl();
     }
 }

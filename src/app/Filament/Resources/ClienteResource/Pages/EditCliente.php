@@ -23,15 +23,12 @@ class EditCliente extends EditRecord
     protected function getFormActions(): array
     {
         return [
-            Action::make('save')
+            $this->getSaveFormAction()
                 ->label('Guardar')
-                ->action('save')
-                ->after(fn () => $this->redirect(ListClientes::getUrl()))
                 ->color('primary'),
-
             Action::make('cancel')
                 ->label('Cancelar')
-                ->action(fn () => $this->redirect(ListClientes::getUrl()))
+                ->url(fn () => ListClientes::getUrl())
                 ->color('danger')
                 ->outlined(),
         ];
