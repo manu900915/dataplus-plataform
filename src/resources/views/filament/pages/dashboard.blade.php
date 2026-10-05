@@ -12,11 +12,360 @@
         ];
     @endphp
 
+    {{-- ============================================================
+         ESTILOS AUTO-CONTENIDOS EXACTOS DEL PREVIEW REACT
+         (Garantiza renderizado 100% idéntico sin depender de build de Tailwind)
+         ============================================================ --}}
     <style>
         [x-cloak] { display: none !important; }
+
+        .dp-dash-wrap {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            color: #f1f5f9;
+            user-select: none;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        /* Hero oficial con gradiente idéntico al preview */
+        .dp-hero {
+            position: relative;
+            overflow: hidden;
+            border-radius: 1rem;
+            background: linear-gradient(90deg, #0284c7 0%, #0369a1 50%, #075985 100%);
+            padding: 1.75rem 2rem;
+            color: #ffffff;
+            box-shadow: 0 20px 25px -5px rgba(8, 47, 73, 0.3), 0 8px 10px -6px rgba(8, 47, 73, 0.3);
+        }
+        .dp-hero-content {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            justify-content: space-between;
+        }
+        @media (min-width: 640px) {
+            .dp-hero-content {
+                flex-direction: row;
+                align-items: center;
+            }
+        }
+        .dp-hero-glow {
+            position: absolute;
+            right: -3rem;
+            bottom: -3rem;
+            width: 14rem;
+            height: 14rem;
+            border-radius: 9999px;
+            background: rgba(255, 255, 255, 0.12);
+            filter: blur(40px);
+            pointer-events: none;
+        }
+        .dp-hero-tag {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: rgba(224, 242, 254, 0.85);
+        }
+        .dp-hero-title {
+            margin-top: 0.25rem;
+            font-size: 1.75rem;
+            font-weight: 800;
+            letter-spacing: -0.025em;
+            color: #ffffff;
+            line-height: 1.2;
+        }
+        .dp-hero-sub {
+            margin-top: 0.5rem;
+            font-size: 0.875rem;
+            color: rgba(224, 242, 254, 0.85);
+            font-weight: 500;
+        }
+        .dp-hero-pills {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex-shrink: 0;
+        }
+        .dp-hero-pill {
+            border-radius: 0.75rem;
+            background: rgba(255, 255, 255, 0.12);
+            padding: 0.65rem 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(8px);
+        }
+
+        /* Tabs bar */
+        .dp-tabs-box {
+            border-radius: 0.75rem;
+            border: 1px solid #1e293b;
+            background: rgba(15, 23, 42, 0.85);
+            padding: 0.375rem;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+        .dp-tabs-nav {
+            display: flex;
+            gap: 0.375rem;
+            overflow-x: auto;
+        }
+        .dp-tab-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            white-space: nowrap;
+            border-radius: 0.5rem;
+            padding: 0.5rem 1rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            color: #94a3b8;
+        }
+        .dp-tab-item:hover {
+            background: rgba(30, 41, 59, 0.8);
+            color: #e2e8f0;
+        }
+        .dp-tab-item.dp-tab-active {
+            background: linear-gradient(90deg, #0ea5e9 0%, #0284c7 100%) !important;
+            color: #ffffff !important;
+            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.35);
+        }
+
+        /* Tarjetas de estadísticas */
+        .dp-stat-grid-4 {
+            display: grid;
+            grid-template-columns: repeat(1, minmax(0, 1fr));
+            gap: 1rem;
+        }
+        @media (min-width: 640px) {
+            .dp-stat-grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        @media (min-width: 1280px) {
+            .dp-stat-grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        }
+
+        .dp-stat-grid-3 {
+            display: grid;
+            grid-template-columns: repeat(1, minmax(0, 1fr));
+            gap: 1rem;
+        }
+        @media (min-width: 640px) {
+            .dp-stat-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        }
+
+        .dp-stat-card {
+            border-radius: 1rem;
+            border: 1px solid #1e293b;
+            background: rgba(15, 23, 42, 0.75);
+            padding: 1.25rem;
+            transition: border-color 0.2s ease, transform 0.2s ease;
+        }
+        .dp-stat-card:hover {
+            border-color: rgba(56, 189, 248, 0.4);
+            transform: translateY(-2px);
+        }
+        .dp-stat-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .dp-stat-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #94a3b8;
+        }
+        .dp-stat-icon-box {
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .dp-stat-icon-box.sky {
+            background: rgba(14, 165, 233, 0.12);
+            color: #38bdf8;
+            border: 1px solid rgba(56, 189, 248, 0.2);
+        }
+        .dp-stat-icon-box.emerald {
+            background: rgba(16, 185, 129, 0.12);
+            color: #34d399;
+            border: 1px solid rgba(52, 211, 153, 0.2);
+        }
+        .dp-stat-icon-box.rose {
+            background: rgba(244, 63, 94, 0.12);
+            color: #fb7185;
+            border: 1px solid rgba(251, 113, 133, 0.2);
+        }
+        .dp-stat-icon-box.amber {
+            background: rgba(245, 158, 11, 0.12);
+            color: #fbbf24;
+            border: 1px solid rgba(251, 191, 36, 0.2);
+        }
+        .dp-stat-icon-box.purple {
+            background: rgba(168, 85, 247, 0.12);
+            color: #c084fc;
+            border: 1px solid rgba(192, 132, 252, 0.2);
+        }
+        .dp-stat-num {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #ffffff;
+            margin-top: 0.5rem;
+            line-height: 1.2;
+        }
+        .dp-stat-hint {
+            font-size: 0.6875rem;
+            color: #94a3b8;
+            margin-top: 0.25rem;
+        }
+
+        /* Paneles de dos columnas */
+        .dp-panel-grid-2 {
+            display: grid;
+            grid-template-columns: repeat(1, minmax(0, 1fr));
+            gap: 1.5rem;
+        }
+        @media (min-width: 1024px) {
+            .dp-panel-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+
+        .dp-panel {
+            border-radius: 1rem;
+            border: 1px solid #1e293b;
+            background: rgba(15, 23, 42, 0.75);
+            padding: 1.5rem;
+        }
+        .dp-panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+        .dp-panel-title {
+            font-size: 0.875rem;
+            font-weight: 700;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .dp-panel-link {
+            font-size: 0.75rem;
+            color: #38bdf8;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .dp-panel-link:hover {
+            color: #7dd3fc;
+            text-decoration: underline;
+        }
+
+        /* Filas de listas */
+        .dp-list-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.65rem 0.85rem;
+            border-radius: 0.75rem;
+            background: rgba(2, 6, 23, 0.6);
+            border: 1px solid rgba(30, 41, 59, 0.8);
+            transition: all 0.2s ease;
+            margin-bottom: 0.625rem;
+        }
+        .dp-list-row:hover {
+            border-color: rgba(56, 189, 248, 0.35);
+            transform: translateX(2px);
+        }
+
+        /* Barras de progreso */
+        .dp-progress-bg {
+            height: 0.5rem;
+            width: 100%;
+            border-radius: 9999px;
+            background: #1e293b;
+            overflow: hidden;
+            margin-top: 0.375rem;
+        }
+        .dp-progress-bar {
+            height: 100%;
+            border-radius: 9999px;
+            background: linear-gradient(90deg, #38bdf8 0%, #2563eb 100%);
+            transition: width 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Alertas stock */
+        .dp-alert-card {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 0.75rem 1rem;
+            border-radius: 0.75rem;
+            border: 1px solid rgba(244, 63, 94, 0.3);
+            background: rgba(136, 19, 55, 0.15);
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+        @media (min-width: 640px) {
+            .dp-alert-card {
+                flex-direction: row;
+                align-items: center;
+            }
+        }
+        .dp-btn-reponer {
+            border-radius: 0.5rem;
+            background: #f43f5e;
+            color: #020617;
+            padding: 0.375rem 0.75rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-decoration: none;
+            transition: background-color 0.2s ease;
+            display: inline-block;
+        }
+        .dp-btn-reponer:hover {
+            background: #fb7185;
+            color: #020617;
+        }
+
+        /* Micro-boxes de servicios */
+        .dp-service-box {
+            border-radius: 0.75rem;
+            border: 1px solid #1e293b;
+            background: #020617;
+            padding: 0.75rem;
+            text-align: center;
+        }
+        .dp-service-icon {
+            margin: 0 auto 0.25rem;
+            width: 1.25rem;
+            height: 1.25rem;
+        }
+
+        /* Quick link cards administración */
+        .dp-quick-link {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.875rem 1rem;
+            border-radius: 0.75rem;
+            border: 1px solid #1e293b;
+            background: rgba(2, 6, 23, 0.7);
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+        .dp-quick-link:hover {
+            border-color: rgba(56, 189, 248, 0.4);
+            transform: translateX(3px);
+        }
     </style>
 
-    <div class="space-y-6 select-none font-sans text-slate-100"
+    <div class="dp-dash-wrap"
          x-data="{
             activeTab: localStorage.getItem('dp-dash-tab') || 'proyectos',
             setTab(t) { this.activeTab = t; localStorage.setItem('dp-dash-tab', t); },
@@ -29,49 +378,48 @@
          }"
          x-init="$watch('activeTab', v => localStorage.setItem('dp-dash-tab', v))">
 
-        {{-- ================= HERO / ENCABEZADO OFICIAL (ESTILO PREVIEW) ================= --}}
-        <div class="relative overflow-hidden rounded-2xl bg-gradient-to-r from-sky-500 via-sky-600 to-sky-800 p-6 sm:p-8 text-white shadow-xl shadow-sky-950/20">
-            <div class="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        {{-- ================= HERO / ENCABEZADO OFICIAL PREVIEW ================= --}}
+        <div class="dp-hero">
+            <div class="dp-hero-content">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-wider text-sky-100/80">
+                    <p class="dp-hero-tag">
                         <span x-text="greeting()"></span>,
                     </p>
-                    <h1 class="mt-1 text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+                    <h1 class="dp-hero-title">
                         {{ auth()->user()->name ?? 'Enmanuel Caraballo' }}
                     </h1>
-                    <p class="mt-2 text-xs sm:text-sm text-sky-100/80 font-medium">
+                    <p class="dp-hero-sub">
                         DataPlus Platform · {{ $data['proyectos_activos'] }} proyectos activos · 
                         {{ $data['stock_bajo_count'] > 0 ? $data['stock_bajo_count'] . ' alertas de stock bajo' : 'sin alertas de stock' }} · 
                         {{ $data['servicios_total'] }} servicios en campo
                     </p>
                 </div>
-                <div class="flex items-center gap-3">
+                <div class="dp-hero-pills">
                     @if($data['retrasados'] > 0)
-                        <div class="rounded-xl bg-white/10 px-4 py-2.5 ring-1 ring-white/20 backdrop-blur-sm">
-                            <p class="text-[10px] uppercase font-bold tracking-wider text-amber-200">Con retraso</p>
-                            <p class="text-xl font-extrabold text-amber-300">{{ $data['retrasados'] }}</p>
+                        <div class="dp-hero-pill">
+                            <p style="font-size: 0.625rem; text-transform: uppercase; font-weight: 700; color: #fde68a;">Con retraso</p>
+                            <p style="font-size: 1.25rem; font-weight: 800; color: #fcd34d; line-height: 1;">{{ $data['retrasados'] }}</p>
                         </div>
                     @endif
-                    <div class="rounded-xl bg-white/10 px-4 py-2.5 ring-1 ring-white/20 backdrop-blur-sm">
-                        <p class="text-[10px] uppercase font-bold tracking-wider text-sky-100">Presupuesto total</p>
-                        <p class="text-xl font-extrabold text-white">${{ number_format($data['presupuesto_total'], 2) }} CUP</p>
+                    <div class="dp-hero-pill">
+                        <p style="font-size: 0.625rem; text-transform: uppercase; font-weight: 700; color: #e0f2fe;">Presupuesto total</p>
+                        <p style="font-size: 1.25rem; font-weight: 800; color: #ffffff; line-height: 1;">${{ number_format($data['presupuesto_total'], 2) }} CUP</p>
                     </div>
                 </div>
             </div>
-            {{-- Ambient glow decoration --}}
-            <div class="absolute -right-12 -bottom-12 h-48 w-48 rounded-full bg-white/10 blur-2xl pointer-events-none"></div>
+            <div class="dp-hero-glow"></div>
         </div>
 
-        {{-- ================= TABS DE SECCIONES (ESTILO PREVIEW) ================= --}}
-        <div class="rounded-xl border border-slate-800 bg-slate-900/80 p-1.5 shadow-sm">
-            <nav class="flex snap-x gap-1.5 overflow-x-auto" role="tablist">
+        {{-- ================= TABS DE SECCIONES (IDÉNTICAS AL PREVIEW) ================= --}}
+        <div class="dp-tabs-box">
+            <nav class="dp-tabs-nav" role="tablist">
                 @foreach($tabs as $key => $tab)
                     <button type="button"
                             role="tab"
                             @click="setTab('{{ $key }}')"
-                            :class="activeTab === '{{ $key }}' ? 'bg-gradient-to-r from-sky-500 to-sky-600 text-white shadow-md shadow-sky-500/30' : 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-200'"
-                            class="flex items-center gap-2 whitespace-nowrap rounded-lg px-4 py-2 text-xs font-bold transition-all cursor-pointer">
-                        <x-dynamic-component :component="$tab['icon']" class="h-4 w-4" />
+                            :class="activeTab === '{{ $key }}' ? 'dp-tab-active' : ''"
+                            class="dp-tab-item">
+                        <x-dynamic-component :component="$tab['icon']" style="width: 1rem; height: 1rem;" />
                         <span>{{ $tab['label'] }}</span>
                     </button>
                 @endforeach
@@ -80,90 +428,87 @@
 
         {{-- ================= CONTENIDO DE CADA TAB ================= --}}
 
-        {{-- ---------- TAB: PROYECTOS ---------- --}}
-        <div x-show="activeTab === 'proyectos'" x-cloak class="space-y-6">
-            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-                <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-sm">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-semibold text-slate-400">Proyectos Activos</span>
-                        <div class="rounded-lg bg-sky-500/10 p-2 text-sky-400 border border-sky-500/20">
-                            <x-heroicon-o-briefcase class="h-4 w-4" />
+        {{-- ---------- TAB 1: PROYECTOS ---------- --}}
+        <div x-show="activeTab === 'proyectos'" x-cloak style="display: flex; flex-direction: column; gap: 1.5rem;">
+            <div class="dp-stat-grid-4">
+                <div class="dp-stat-card">
+                    <div class="dp-stat-top">
+                        <span class="dp-stat-label">Proyectos Activos</span>
+                        <div class="dp-stat-icon-box sky">
+                            <x-heroicon-o-briefcase style="width: 1rem; height: 1rem;" />
                         </div>
                     </div>
-                    <p class="text-2xl font-bold text-white mt-2">{{ $data['proyectos_activos'] }}</p>
-                    <p class="text-[11px] text-slate-400 mt-1">En borrador o ejecución activa</p>
+                    <p class="dp-stat-num">{{ $data['proyectos_activos'] }}</p>
+                    <p class="dp-stat-hint">En borrador o ejecución activa</p>
                 </div>
 
-                <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-sm">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-semibold text-slate-400">Completados este Mes</span>
-                        <div class="rounded-lg bg-emerald-500/10 p-2 text-emerald-400 border border-emerald-500/20">
-                            <x-heroicon-o-check-circle class="h-4 w-4" />
+                <div class="dp-stat-card">
+                    <div class="dp-stat-top">
+                        <span class="dp-stat-label">Completados este Mes</span>
+                        <div class="dp-stat-icon-box emerald">
+                            <x-heroicon-o-check-circle style="width: 1rem; height: 1rem;" />
                         </div>
                     </div>
-                    <p class="text-2xl font-bold text-emerald-400 mt-2">{{ $data['proyectos_completados'] }}</p>
-                    <p class="text-[11px] text-slate-400 mt-1">Cierre satisfactorio</p>
+                    <p class="dp-stat-num" style="color: #34d399;">{{ $data['proyectos_completados'] }}</p>
+                    <p class="dp-stat-hint">Cierre satisfactorio</p>
                 </div>
 
-                <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-sm">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-semibold text-slate-400">Con Retraso</span>
-                        <div class="rounded-lg bg-rose-500/10 p-2 text-rose-400 border border-rose-500/20">
-                            <x-heroicon-o-exclamation-triangle class="h-4 w-4" />
+                <div class="dp-stat-card">
+                    <div class="dp-stat-top">
+                        <span class="dp-stat-label">Con Retraso</span>
+                        <div class="dp-stat-icon-box rose">
+                            <x-heroicon-o-exclamation-triangle style="width: 1rem; height: 1rem;" />
                         </div>
                     </div>
-                    <p class="text-2xl font-bold text-rose-400 mt-2">{{ $data['retrasados'] }}</p>
-                    <p class="text-[11px] text-slate-400 mt-1">Pasaron su fecha comprometida</p>
+                    <p class="dp-stat-num" style="color: #fb7185;">{{ $data['retrasados'] }}</p>
+                    <p class="dp-stat-hint">Pasaron su fecha comprometida</p>
                 </div>
 
-                <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-sm">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-semibold text-slate-400">Presupuesto Total</span>
-                        <div class="rounded-lg bg-amber-500/10 p-2 text-amber-400 border border-amber-500/20">
-                            <x-heroicon-o-currency-dollar class="h-4 w-4" />
+                <div class="dp-stat-card">
+                    <div class="dp-stat-top">
+                        <span class="dp-stat-label">Presupuesto Total</span>
+                        <div class="dp-stat-icon-box amber">
+                            <x-heroicon-o-currency-dollar style="width: 1rem; height: 1rem;" />
                         </div>
                     </div>
-                    <p class="text-2xl font-bold text-amber-400 mt-2">${{ number_format($data['presupuesto_total'], 2) }} CUP</p>
-                    <p class="text-[11px] text-slate-400 mt-1">Suma de todas las obras y proyectos</p>
+                    <p class="dp-stat-num" style="color: #fbbf24;">${{ number_format($data['presupuesto_total'], 2) }} CUP</p>
+                    <p class="dp-stat-hint">Suma de todas las obras y proyectos</p>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="dp-panel-grid-2">
                 {{-- Top 5 Proyectos por Presupuesto --}}
-                <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-6 shadow-sm">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                            <x-heroicon-o-briefcase class="h-4 w-4 text-sky-400" />
+                <div class="dp-panel">
+                    <div class="dp-panel-header">
+                        <h3 class="dp-panel-title">
+                            <x-heroicon-o-briefcase style="width: 1rem; height: 1rem; color: #38bdf8;" />
                             Top 5 Proyectos por Presupuesto
                         </h3>
-                        <a href="/admin/proyectos" class="text-xs text-sky-400 hover:text-sky-300 font-semibold cursor-pointer">
-                            Ver todos →
-                        </a>
+                        <a href="/admin/proyectos" class="dp-panel-link">Ver todos →</a>
                     </div>
-                    <div class="space-y-4">
+                    <div>
                         @forelse($data['top_proyectos'] as $idx => $p)
                             @php
                                 $pct = round(($p['presupuesto_total'] / $data['max_presupuesto']) * 100);
                             @endphp
-                            <div class="space-y-1.5">
-                                <div class="flex items-center justify-between text-xs">
-                                    <span class="font-semibold text-white flex items-center gap-2 truncate max-w-xs">
-                                        <span class="flex h-5 w-5 items-center justify-center rounded bg-sky-500/20 text-[10px] font-bold text-sky-300">
+                            <div style="margin-bottom: 1rem;">
+                                <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.75rem;">
+                                    <span style="font-weight: 600; color: #ffffff; display: flex; align-items: center; gap: 0.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70%;">
+                                        <span style="display: flex; width: 1.25rem; height: 1.25rem; align-items: center; justify-content: center; border-radius: 0.25rem; background: rgba(14, 165, 233, 0.2); font-size: 0.625rem; font-weight: 700; color: #7dd3fc; flex-shrink: 0;">
                                             {{ $idx + 1 }}
                                         </span>
-                                        <span class="truncate">{{ $p['nombre'] }}</span>
+                                        <span style="overflow: hidden; text-overflow: ellipsis;">{{ $p['nombre'] }}</span>
                                     </span>
-                                    <span class="font-mono font-bold text-sky-400">
+                                    <span style="font-family: monospace; font-weight: 700; color: #38bdf8;">
                                         ${{ number_format($p['presupuesto_total'], 2) }} CUP
                                     </span>
                                 </div>
-                                <div class="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
-                                    <div class="h-full rounded-full bg-gradient-to-r from-sky-400 to-blue-600 transition-all duration-700"
-                                         style="width: {{ $pct }}%"></div>
+                                <div class="dp-progress-bg">
+                                    <div class="dp-progress-bar" style="width: {{ $pct }}%;"></div>
                                 </div>
                             </div>
                         @empty
-                            <div class="py-8 text-center text-xs text-slate-500">
+                            <div style="padding: 2rem 0; text-align: center; font-size: 0.75rem; color: #64748b;">
                                 No hay proyectos registrados aún en la plataforma.
                             </div>
                         @endforelse
@@ -171,37 +516,36 @@
                 </div>
 
                 {{-- Proyectos Recientes --}}
-                <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-6 shadow-sm">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                            <x-heroicon-o-clock class="h-4 w-4 text-sky-400" />
+                <div class="dp-panel">
+                    <div class="dp-panel-header">
+                        <h3 class="dp-panel-title">
+                            <x-heroicon-o-clock style="width: 1rem; height: 1rem; color: #38bdf8;" />
                             Proyectos Recientes
                         </h3>
-                        <span class="rounded-full bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-400 border border-sky-500/20">
+                        <span style="border-radius: 9999px; background: rgba(14, 165, 233, 0.1); padding: 0.15rem 0.5rem; font-size: 0.625rem; font-weight: 700; color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.2);">
                             en seguimiento
                         </span>
                     </div>
-                    <div class="space-y-2.5">
+                    <div>
                         @forelse($data['proyectos_recientes'] as $p)
-                            <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-sky-500/30 transition-colors">
-                                <div class="min-w-0 flex-1 pr-3">
-                                    <p class="font-semibold text-xs text-white truncate">{{ $p['nombre'] }}</p>
-                                    <p class="text-[10px] text-slate-400 flex items-center gap-2 mt-0.5">
-                                        <span class="font-mono">{{ $p['codigo'] }}</span>
+                            <div class="dp-list-row">
+                                <div style="min-width: 0; flex: 1; padding-right: 0.75rem;">
+                                    <p style="font-size: 0.75rem; font-weight: 600; color: #ffffff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0;">{{ $p['nombre'] }}</p>
+                                    <p style="font-size: 0.625rem; color: #94a3b8; display: flex; align-items: center; gap: 0.5rem; margin: 0.2rem 0 0;">
+                                        <span style="font-family: monospace;">{{ $p['codigo'] }}</span>
                                         <span>·</span>
                                         <span>{{ $p['cliente_nombre'] }}</span>
                                     </p>
                                 </div>
-                                <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase {{
-                                    $p['estado'] === 'completado' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                                    ($p['estado'] === 'en_progreso' ? 'bg-sky-500/10 text-sky-400 border border-sky-500/20' :
-                                    'bg-slate-800 text-slate-400')
-                                }}">
+                                <span style="padding: 0.15rem 0.5rem; border-radius: 0.25rem; font-size: 0.625rem; font-weight: 700; text-transform: uppercase;
+                                    {{ $p['estado'] === 'completado' ? 'background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.25);' :
+                                       ($p['estado'] === 'en_progreso' ? 'background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.25);' :
+                                       'background: #1e293b; color: #94a3b8;') }}">
                                     {{ str_replace('_', ' ', $p['estado']) }}
                                 </span>
                             </div>
                         @empty
-                            <div class="py-8 text-center text-xs text-slate-500">
+                            <div style="padding: 2rem 0; text-align: center; font-size: 0.75rem; color: #64748b;">
                                 No hay proyectos en curso.
                             </div>
                         @endforelse
@@ -210,82 +554,85 @@
             </div>
         </div>
 
-        {{-- ---------- TAB: OPERACIONES ---------- --}}
-        <div x-show="activeTab === 'operaciones'" x-cloak class="space-y-6">
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-sm">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-semibold text-slate-400">Brigadas Activas</span>
-                        <div class="rounded-lg bg-purple-500/10 p-2 text-purple-400 border border-purple-500/20">
-                            <x-heroicon-o-user-group class="h-4 w-4" />
+        {{-- ---------- TAB 2: OPERACIONES ---------- --}}
+        <div x-show="activeTab === 'operaciones'" x-cloak style="display: flex; flex-direction: column; gap: 1.5rem;">
+            <div class="dp-stat-grid-3">
+                <div class="dp-stat-card">
+                    <div class="dp-stat-top">
+                        <span class="dp-stat-label">Brigadas Activas</span>
+                        <div class="dp-stat-icon-box purple">
+                            <x-heroicon-o-user-group style="width: 1rem; height: 1rem;" />
                         </div>
                     </div>
-                    <p class="text-2xl font-bold text-purple-400 mt-2">{{ $data['brigadas_count'] }}</p>
-                    <p class="text-[11px] text-slate-400 mt-1">Cuadrillas disponibles en terreno</p>
+                    <p class="dp-stat-num" style="color: #c084fc;">{{ $data['brigadas_count'] }}</p>
+                    <p class="dp-stat-hint">Cuadrillas disponibles en terreno</p>
                 </div>
 
-                <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-sm">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-semibold text-slate-400">Servicios Instalados</span>
-                        <div class="rounded-lg bg-sky-500/10 p-2 text-sky-400 border border-sky-500/20">
-                            <x-heroicon-o-radio class="h-4 w-4" />
+                <div class="dp-stat-card">
+                    <div class="dp-stat-top">
+                        <span class="dp-stat-label">Servicios Instalados</span>
+                        <div class="dp-stat-icon-box sky">
+                            <x-heroicon-o-radio style="width: 1rem; height: 1rem;" />
                         </div>
                     </div>
-                    <p class="text-2xl font-bold text-sky-400 mt-2">{{ $data['servicios_total'] }}</p>
-                    <p class="text-[11px] text-slate-400 mt-1">CCTV, SACI y Gestión Remota 4G</p>
+                    <p class="dp-stat-num" style="color: #38bdf8;">{{ $data['servicios_total'] }}</p>
+                    <p class="dp-stat-hint">CCTV, SACI y Gestión Remota 4G</p>
                 </div>
 
-                <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-sm">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-semibold text-slate-400">Incidencias Abiertas</span>
-                        <div class="rounded-lg bg-rose-500/10 p-2 text-rose-400 border border-rose-500/20">
-                            <x-heroicon-o-exclamation-circle class="h-4 w-4" />
+                <div class="dp-stat-card">
+                    <div class="dp-stat-top">
+                        <span class="dp-stat-label">Incidencias Abiertas</span>
+                        <div class="dp-stat-icon-box rose">
+                            <x-heroicon-o-exclamation-circle style="width: 1rem; height: 1rem;" />
                         </div>
                     </div>
-                    <p class="text-2xl font-bold text-rose-400 mt-2">{{ $data['incidencias_abiertas'] }}</p>
-                    <p class="text-[11px] text-slate-400 mt-1">Tickets técnicos pendientes</p>
+                    <p class="dp-stat-num" style="color: #fb7185;">{{ $data['incidencias_abiertas'] }}</p>
+                    <p class="dp-stat-hint">Tickets técnicos pendientes</p>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {{-- Desglose de Servicios Técnicos --}}
-                <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-6 shadow-sm">
-                    <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2">
-                        <x-heroicon-o-radio class="h-4 w-4 text-sky-400" />
-                        Parque de Servicios Técnicos
-                    </h3>
-                    <div class="grid grid-cols-3 gap-3 mb-4">
-                        <div class="rounded-xl border border-slate-800 bg-slate-950 p-3 text-center">
-                            <x-heroicon-o-video-camera class="h-4 w-4 text-blue-400 mx-auto mb-1" />
-                            <p class="text-xl font-extrabold text-white">{{ $data['servicios_cctv'] }}</p>
-                            <p class="text-[10px] text-slate-400 uppercase font-semibold">CCTV</p>
+            <div class="dp-panel-grid-2">
+                {{-- Parque de Servicios Técnicos --}}
+                <div class="dp-panel">
+                    <div class="dp-panel-header">
+                        <h3 class="dp-panel-title">
+                            <x-heroicon-o-radio style="width: 1rem; height: 1rem; color: #38bdf8;" />
+                            Parque de Servicios Técnicos
+                        </h3>
+                        <a href="/admin/servicios" class="dp-panel-link">Ver servicios →</a>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; margin-bottom: 1rem;">
+                        <div class="dp-service-box">
+                            <x-heroicon-o-video-camera class="dp-service-icon" style="color: #60a5fa;" />
+                            <p style="font-size: 1.25rem; font-weight: 800; color: #ffffff; margin: 0; line-height: 1;">{{ $data['servicios_cctv'] }}</p>
+                            <p style="font-size: 0.625rem; color: #94a3b8; text-transform: uppercase; font-weight: 600; margin: 0.25rem 0 0;">CCTV</p>
                         </div>
-                        <div class="rounded-xl border border-slate-800 bg-slate-950 p-3 text-center">
-                            <x-heroicon-o-shield-check class="h-4 w-4 text-emerald-400 mx-auto mb-1" />
-                            <p class="text-xl font-extrabold text-white">{{ $data['servicios_saci'] }}</p>
-                            <p class="text-[10px] text-slate-400 uppercase font-semibold">Alarmas SACI</p>
+                        <div class="dp-service-box">
+                            <x-heroicon-o-shield-check class="dp-service-icon" style="color: #34d399;" />
+                            <p style="font-size: 1.25rem; font-weight: 800; color: #ffffff; margin: 0; line-height: 1;">{{ $data['servicios_saci'] }}</p>
+                            <p style="font-size: 0.625rem; color: #94a3b8; text-transform: uppercase; font-weight: 600; margin: 0.25rem 0 0;">Alarmas SACI</p>
                         </div>
-                        <div class="rounded-xl border border-slate-800 bg-slate-950 p-3 text-center">
-                            <x-heroicon-o-signal class="h-4 w-4 text-amber-400 mx-auto mb-1" />
-                            <p class="text-xl font-extrabold text-white">{{ $data['servicios_gr'] }}</p>
-                            <p class="text-[10px] text-slate-400 uppercase font-semibold">Gestión 4G</p>
+                        <div class="dp-service-box">
+                            <x-heroicon-o-signal class="dp-service-icon" style="color: #fbbf24;" />
+                            <p style="font-size: 1.25rem; font-weight: 800; color: #ffffff; margin: 0; line-height: 1;">{{ $data['servicios_gr'] }}</p>
+                            <p style="font-size: 0.625rem; color: #94a3b8; text-transform: uppercase; font-weight: 600; margin: 0.25rem 0 0;">Gestión 4G</p>
                         </div>
                     </div>
-                    <div class="space-y-2">
+                    <div>
                         @forelse($data['servicios_recientes'] as $s)
-                            <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 text-xs">
-                                <div>
-                                    <p class="font-semibold text-white">{{ $s['cliente_nombre'] }}</p>
-                                    <p class="text-[10px] text-slate-400">
+                            <div class="dp-list-row">
+                                <div style="min-width: 0; flex: 1;">
+                                    <p style="font-size: 0.75rem; font-weight: 600; color: #ffffff; margin: 0;">{{ $s['cliente_nombre'] }}</p>
+                                    <p style="font-size: 0.625rem; color: #94a3b8; margin: 0.2rem 0 0;">
                                         {{ $s['tipo'] }} · {{ $s['detalle'] }}
                                     </p>
                                 </div>
-                                <span class="font-mono text-[10px] text-sky-400 bg-sky-950/40 px-2 py-0.5 rounded border border-sky-500/20">
+                                <span style="font-family: monospace; font-size: 0.625rem; color: #38bdf8; background: rgba(8, 47, 73, 0.4); padding: 0.15rem 0.5rem; border-radius: 0.25rem; border: 1px solid rgba(56, 189, 248, 0.2);">
                                     {{ $s['codigo'] }}
                                 </span>
                             </div>
                         @empty
-                            <div class="py-8 text-center text-xs text-slate-500">
+                            <div style="padding: 2rem 0; text-align: center; font-size: 0.75rem; color: #64748b;">
                                 No hay servicios técnicos instalados en campo.
                             </div>
                         @endforelse
@@ -293,36 +640,35 @@
                 </div>
 
                 {{-- Incidencias Prioritarias --}}
-                <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-6 shadow-sm">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                            <x-heroicon-o-exclamation-circle class="h-4 w-4 text-rose-400" />
+                <div class="dp-panel">
+                    <div class="dp-panel-header">
+                        <h3 class="dp-panel-title">
+                            <x-heroicon-o-exclamation-circle style="width: 1rem; height: 1rem; color: #fb7185;" />
                             Incidencias Técnicas Recientes
                         </h3>
-                        <a href="/admin/incidencias" class="text-xs text-sky-400 hover:text-sky-300 font-semibold cursor-pointer">
-                            Ver tickets →
-                        </a>
+                        <a href="/admin/incidencias" class="dp-panel-link">Ver tickets →</a>
                     </div>
-                    <div class="space-y-2.5">
+                    <div>
                         @forelse($data['incidencias_recientes'] as $i)
-                            <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
-                                <div class="flex items-center justify-between text-xs">
-                                    <span class="font-semibold text-white truncate max-w-[200px]">{{ $i['titulo'] }}</span>
-                                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold {{
-                                        $i['prioridad'] === 'Critica' ? 'bg-rose-500/20 text-rose-300' :
-                                        ($i['prioridad'] === 'Alta' ? 'bg-amber-500/20 text-amber-300' :
-                                        'bg-slate-800 text-slate-300')
-                                    }}">
+                            <div class="dp-list-row" style="flex-direction: column; align-items: flex-start; gap: 0.25rem;">
+                                <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; font-size: 0.75rem;">
+                                    <span style="font-weight: 600; color: #ffffff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 75%;">
+                                        {{ $i['titulo'] }}
+                                    </span>
+                                    <span style="padding: 0.12rem 0.4rem; border-radius: 0.25rem; font-size: 0.625rem; font-weight: 700;
+                                        {{ $i['prioridad'] === 'Critica' ? 'background: rgba(244, 63, 94, 0.2); color: #fca5a5;' :
+                                           ($i['prioridad'] === 'Alta' ? 'background: rgba(245, 158, 11, 0.2); color: #fde68a;' :
+                                           'background: #1e293b; color: #cbd5e1;') }}">
                                         {{ $i['prioridad'] }}
                                     </span>
                                 </div>
-                                <p class="text-[11px] text-slate-400">
-                                    Cliente: <span class="text-slate-200">{{ $i['cliente_nombre'] }}</span> · Tipo: {{ $i['tipo'] }}
+                                <p style="font-size: 0.6875rem; color: #94a3b8; margin: 0;">
+                                    Cliente: <span style="color: #e2e8f0;">{{ $i['cliente_nombre'] }}</span> · Tipo: {{ $i['tipo'] }}
                                 </p>
                             </div>
                         @empty
-                            <div class="py-8 text-center text-xs text-slate-500 flex flex-col items-center justify-center">
-                                <x-heroicon-o-check-circle class="h-6 w-6 text-emerald-400 mb-1" />
+                            <div style="padding: 2rem 0; text-align: center; font-size: 0.75rem; color: #64748b; display: flex; flex-direction: column; align-items: center;">
+                                <x-heroicon-o-check-circle style="width: 1.5rem; height: 1.5rem; color: #34d399; margin-bottom: 0.25rem;" />
                                 <span>Sin incidencias reportadas. Todo en orden.</span>
                             </div>
                         @endforelse
@@ -331,89 +677,88 @@
             </div>
         </div>
 
-        {{-- ---------- TAB: INVENTARIO ---------- --}}
-        <div x-show="activeTab === 'inventario'" x-cloak class="space-y-6">
-            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-                <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-sm">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-semibold text-slate-400">Total Items</span>
-                        <div class="rounded-lg bg-sky-500/10 p-2 text-sky-400 border border-sky-500/20">
-                            <x-heroicon-o-archive-box class="h-4 w-4" />
+        {{-- ---------- TAB 3: INVENTARIO ---------- --}}
+        <div x-show="activeTab === 'inventario'" x-cloak style="display: flex; flex-direction: column; gap: 1.5rem;">
+            <div class="dp-stat-grid-4">
+                <div class="dp-stat-card">
+                    <div class="dp-stat-top">
+                        <span class="dp-stat-label">Total Items</span>
+                        <div class="dp-stat-icon-box sky">
+                            <x-heroicon-o-archive-box style="width: 1rem; height: 1rem;" />
                         </div>
                     </div>
-                    <p class="text-2xl font-bold text-white mt-2">{{ $data['items_total'] }}</p>
-                    <p class="text-[11px] text-slate-400 mt-1">En catálogo de inventario</p>
+                    <p class="dp-stat-num">{{ $data['items_total'] }}</p>
+                    <p class="dp-stat-hint">En catálogo de inventario</p>
                 </div>
 
-                <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-sm">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-semibold text-slate-400">Stock Bajo</span>
-                        <div class="rounded-lg bg-rose-500/10 p-2 text-rose-400 border border-rose-500/20">
-                            <x-heroicon-o-exclamation-triangle class="h-4 w-4" />
+                <div class="dp-stat-card">
+                    <div class="dp-stat-top">
+                        <span class="dp-stat-label">Stock Bajo</span>
+                        <div class="dp-stat-icon-box rose">
+                            <x-heroicon-o-exclamation-triangle style="width: 1rem; height: 1rem;" />
                         </div>
                     </div>
-                    <p class="text-2xl font-bold text-rose-400 mt-2">{{ $data['stock_bajo_count'] }}</p>
-                    <p class="text-[11px] text-slate-400 mt-1">Requieren reposición inmediata</p>
+                    <p class="dp-stat-num" style="color: #fb7185;">{{ $data['stock_bajo_count'] }}</p>
+                    <p class="dp-stat-hint">Requieren reposición inmediata</p>
                 </div>
 
-                <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-sm">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-semibold text-slate-400">Equipamiento</span>
-                        <div class="rounded-lg bg-purple-500/10 p-2 text-purple-400 border border-purple-500/20">
-                            <x-heroicon-o-cube class="h-4 w-4" />
+                <div class="dp-stat-card">
+                    <div class="dp-stat-top">
+                        <span class="dp-stat-label">Equipamiento</span>
+                        <div class="dp-stat-icon-box purple">
+                            <x-heroicon-o-cube style="width: 1rem; height: 1rem;" />
                         </div>
                     </div>
-                    <p class="text-2xl font-bold text-purple-400 mt-2">{{ $data['equipamiento_stock'] }}</p>
-                    <p class="text-[11px] text-slate-400 mt-1">Unidades en almacén</p>
+                    <p class="dp-stat-num" style="color: #c084fc;">{{ $data['equipamiento_stock'] }}</p>
+                    <p class="dp-stat-hint">Unidades en almacén</p>
                 </div>
 
-                <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-sm">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-semibold text-slate-400">Materiales & Consumibles</span>
-                        <div class="rounded-lg bg-emerald-500/10 p-2 text-emerald-400 border border-emerald-500/20">
-                            <x-heroicon-o-squares-plus class="h-4 w-4" />
+                <div class="dp-stat-card">
+                    <div class="dp-stat-top">
+                        <span class="dp-stat-label">Materiales & Consumibles</span>
+                        <div class="dp-stat-icon-box emerald">
+                            <x-heroicon-o-squares-plus style="width: 1rem; height: 1rem;" />
                         </div>
                     </div>
-                    <p class="text-2xl font-bold text-emerald-400 mt-2">{{ $data['materiales_stock'] }}</p>
-                    <p class="text-[11px] text-slate-400 mt-1">Unidades en stock</p>
+                    <p class="dp-stat-num" style="color: #34d399;">{{ $data['materiales_stock'] }}</p>
+                    <p class="dp-stat-hint">Unidades en stock</p>
                 </div>
             </div>
 
             {{-- Panel Alertas de Stock Bajo --}}
-            <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-6 shadow-sm">
-                <div class="flex items-center justify-between mb-4">
-                    <div class="flex items-center gap-2">
-                        <x-heroicon-s-exclamation-triangle class="h-5 w-5 text-rose-500" />
-                        <h3 class="text-sm font-bold text-white">Alertas de Stock Bajo</h3>
+            <div class="dp-panel">
+                <div class="dp-panel-header">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <x-heroicon-s-exclamation-triangle style="width: 1.25rem; height: 1.25rem; color: #f43f5e;" />
+                        <h3 class="dp-panel-title" style="margin: 0;">Alertas de Stock Bajo</h3>
                     </div>
-                    <span class="rounded-full bg-rose-500/10 px-2.5 py-0.5 text-xs font-bold text-rose-400 border border-rose-500/20">
+                    <span style="border-radius: 9999px; background: rgba(244, 63, 94, 0.15); padding: 0.2rem 0.65rem; font-size: 0.75rem; font-weight: 700; color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.25);">
                         {{ $data['stock_bajo_count'] }} ítems en umbral crítico
                     </span>
                 </div>
-                <div class="space-y-3">
+                <div>
                     @forelse($data['alertas_stock'] as $item)
-                        <div class="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border border-rose-500/30 bg-rose-950/20 gap-3">
+                        <div class="dp-alert-card">
                             <div>
-                                <p class="font-semibold text-xs text-white">{{ $item['nombre'] }}</p>
-                                <p class="text-[11px] text-slate-400 font-mono mt-0.5">
+                                <p style="font-weight: 600; font-size: 0.75rem; color: #ffffff; margin: 0;">{{ $item['nombre'] }}</p>
+                                <p style="font-size: 0.6875rem; color: #94a3b8; font-family: monospace; margin: 0.2rem 0 0;">
                                     Código: {{ $item['codigo'] }} · Categoría: {{ $item['categoria_nombre'] }}
                                 </p>
                             </div>
-                            <div class="flex items-center gap-3">
-                                <div class="text-right">
-                                    <p class="text-xs font-bold text-rose-400">
+                            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                <div style="text-align: right;">
+                                    <p style="font-size: 0.75rem; font-weight: 700; color: #fb7185; margin: 0;">
                                         {{ $item['stock_actual'] }} {{ $item['unidad_medida'] }} en stock
                                     </p>
-                                    <p class="text-[10px] text-slate-400">Mínimo: {{ $item['stock_minimo'] }}</p>
+                                    <p style="font-size: 0.625rem; color: #94a3b8; margin: 0.1rem 0 0;">Mínimo: {{ $item['stock_minimo'] }}</p>
                                 </div>
-                                <a href="/admin/inventario-movimientos/create"
-                                   class="rounded-lg bg-rose-500 hover:bg-rose-400 px-3 py-1.5 text-xs font-bold text-slate-950 transition-colors cursor-pointer">
+                                <a href="/admin/inventario-movimientos/create" class="dp-btn-reponer">
                                     Reponer
                                 </a>
                             </div>
                         </div>
                     @empty
-                        <div class="py-8 text-center text-xs text-slate-500">
+                        <div style="padding: 2rem 0; text-align: center; font-size: 0.75rem; color: #64748b;">
                             ¡Todo el inventario está sobre los niveles mínimos requeridos!
                         </div>
                     @endforelse
@@ -421,40 +766,38 @@
             </div>
         </div>
 
-        {{-- ---------- TAB: FINANZAS ---------- --}}
-        <div x-show="activeTab === 'finanzas'" x-cloak class="space-y-6">
-            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-                <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-sm">
-                    <span class="text-xs font-semibold text-slate-400">Presupuesto en Obras</span>
-                    <p class="text-2xl font-bold text-white mt-2">${{ number_format($data['presupuesto_total'], 2) }} CUP</p>
-                    <p class="text-[11px] text-slate-400 mt-1">Cartera de proyectos</p>
+        {{-- ---------- TAB 4: FINANZAS ---------- --}}
+        <div x-show="activeTab === 'finanzas'" x-cloak style="display: flex; flex-direction: column; gap: 1.5rem;">
+            <div class="dp-stat-grid-4">
+                <div class="dp-stat-card">
+                    <span class="dp-stat-label">Presupuesto en Obras</span>
+                    <p class="dp-stat-num">${{ number_format($data['presupuesto_total'], 2) }} CUP</p>
+                    <p class="dp-stat-hint">Cartera de proyectos</p>
                 </div>
-                <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-sm">
-                    <span class="text-xs font-semibold text-slate-400">Costo Equipamiento</span>
-                    <p class="text-2xl font-bold text-emerald-400 mt-2">${{ number_format($data['presupuesto_equipamiento'], 2) }} CUP</p>
-                    <p class="text-[11px] text-slate-400 mt-1">Líneas de presupuesto</p>
+                <div class="dp-stat-card">
+                    <span class="dp-stat-label">Costo Equipamiento</span>
+                    <p class="dp-stat-num" style="color: #34d399;">${{ number_format($data['presupuesto_equipamiento'], 2) }} CUP</p>
+                    <p class="dp-stat-hint">Líneas de presupuesto</p>
                 </div>
-                <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-sm">
-                    <span class="text-xs font-semibold text-slate-400">Costo Mano de Obra</span>
-                    <p class="text-2xl font-bold text-amber-400 mt-2">${{ number_format($data['presupuesto_mano_obra'], 2) }} CUP</p>
-                    <p class="text-[11px] text-slate-400 mt-1">Brigadas y técnicos</p>
+                <div class="dp-stat-card">
+                    <span class="dp-stat-label">Costo Mano de Obra</span>
+                    <p class="dp-stat-num" style="color: #fbbf24;">${{ number_format($data['presupuesto_mano_obra'], 2) }} CUP</p>
+                    <p class="dp-stat-hint">Brigadas y técnicos</p>
                 </div>
-                <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-sm">
-                    <span class="text-xs font-semibold text-slate-400">Inversión este Mes</span>
-                    <p class="text-2xl font-bold text-sky-400 mt-2">${{ number_format($data['finanzas_mes'], 2) }} CUP</p>
-                    <p class="text-[11px] text-slate-400 mt-1">Nuevas obras iniciadas</p>
+                <div class="dp-stat-card">
+                    <span class="dp-stat-label">Inversión este Mes</span>
+                    <p class="dp-stat-num" style="color: #38bdf8;">${{ number_format($data['finanzas_mes'], 2) }} CUP</p>
+                    <p class="dp-stat-hint">Nuevas obras iniciadas</p>
                 </div>
             </div>
 
-            <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-6 shadow-sm">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                        <x-heroicon-o-banknotes class="h-4 w-4 text-emerald-400" />
+            <div class="dp-panel">
+                <div class="dp-panel-header">
+                    <h3 class="dp-panel-title">
+                        <x-heroicon-o-banknotes style="width: 1rem; height: 1rem; color: #34d399;" />
                         Desglose Presupuestario por Categoría
                     </h3>
-                    <a href="/admin/proyectos" class="text-xs text-sky-400 hover:text-sky-300 font-semibold cursor-pointer">
-                        Ver presupuestos →
-                    </a>
+                    <a href="/admin/proyectos" class="dp-panel-link">Ver presupuestos →</a>
                 </div>
                 @php
                     $totalLineas = ($data['presupuesto_equipamiento'] + $data['presupuesto_mano_obra'] + $data['presupuesto_materiales'] + $data['presupuesto_transporte']) ?: 1;
@@ -463,99 +806,98 @@
                     $catMat = round(($data['presupuesto_materiales'] / $totalLineas) * 100);
                     $catTrans = round(($data['presupuesto_transporte'] / $totalLineas) * 100);
                 @endphp
-                <div class="space-y-4">
-                    <div class="space-y-1.5">
-                        <div class="flex items-center justify-between text-xs">
-                            <span class="font-semibold text-white">Equipamiento (Cámaras, Sensores, Enlaces)</span>
-                            <span class="font-mono font-bold text-emerald-400">${{ number_format($data['presupuesto_equipamiento'], 2) }} CUP ({{ $catEquip }}%)</span>
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <div>
+                        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.75rem;">
+                            <span style="font-weight: 600; color: #ffffff;">Equipamiento (Cámaras, Sensores, Enlaces)</span>
+                            <span style="font-family: monospace; font-weight: 700; color: #34d399;">${{ number_format($data['presupuesto_equipamiento'], 2) }} CUP ({{ $catEquip }}%)</span>
                         </div>
-                        <div class="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
-                            <div class="h-full rounded-full bg-emerald-500" style="width: {{ $catEquip }}%"></div>
-                        </div>
-                    </div>
-
-                    <div class="space-y-1.5">
-                        <div class="flex items-center justify-between text-xs">
-                            <span class="font-semibold text-white">Mano de Obra & Instalaciones</span>
-                            <span class="font-mono font-bold text-amber-400">${{ number_format($data['presupuesto_mano_obra'], 2) }} CUP ({{ $catMano }}%)</span>
-                        </div>
-                        <div class="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
-                            <div class="h-full rounded-full bg-amber-500" style="width: {{ $catMano }}%"></div>
+                        <div class="dp-progress-bg">
+                            <div class="dp-progress-bar" style="background: #10b981; width: {{ $catEquip }}%;"></div>
                         </div>
                     </div>
 
-                    <div class="space-y-1.5">
-                        <div class="flex items-center justify-between text-xs">
-                            <span class="font-semibold text-white">Materiales, Cables y Canalizaciones</span>
-                            <span class="font-mono font-bold text-sky-400">${{ number_format($data['presupuesto_materiales'], 2) }} CUP ({{ $catMat }}%)</span>
+                    <div>
+                        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.75rem;">
+                            <span style="font-weight: 600; color: #ffffff;">Mano de Obra & Instalaciones</span>
+                            <span style="font-family: monospace; font-weight: 700; color: #fbbf24;">${{ number_format($data['presupuesto_mano_obra'], 2) }} CUP ({{ $catMano }}%)</span>
                         </div>
-                        <div class="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
-                            <div class="h-full rounded-full bg-sky-500" style="width: {{ $catMat }}%"></div>
+                        <div class="dp-progress-bg">
+                            <div class="dp-progress-bar" style="background: #f59e0b; width: {{ $catMano }}%;"></div>
                         </div>
                     </div>
 
-                    <div class="space-y-1.5">
-                        <div class="flex items-center justify-between text-xs">
-                            <span class="font-semibold text-white">Logística & Transporte</span>
-                            <span class="font-mono font-bold text-purple-400">${{ number_format($data['presupuesto_transporte'], 2) }} CUP ({{ $catTrans }}%)</span>
+                    <div>
+                        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.75rem;">
+                            <span style="font-weight: 600; color: #ffffff;">Materiales, Cables y Canalizaciones</span>
+                            <span style="font-family: monospace; font-weight: 700; color: #38bdf8;">${{ number_format($data['presupuesto_materiales'], 2) }} CUP ({{ $catMat }}%)</span>
                         </div>
-                        <div class="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
-                            <div class="h-full rounded-full bg-purple-500" style="width: {{ $catTrans }}%"></div>
+                        <div class="dp-progress-bg">
+                            <div class="dp-progress-bar" style="background: #0ea5e9; width: {{ $catMat }}%;"></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.75rem;">
+                            <span style="font-weight: 600; color: #ffffff;">Logística & Transporte</span>
+                            <span style="font-family: monospace; font-weight: 700; color: #c084fc;">${{ number_format($data['presupuesto_transporte'], 2) }} CUP ({{ $catTrans }}%)</span>
+                        </div>
+                        <div class="dp-progress-bg">
+                            <div class="dp-progress-bar" style="background: #8b5cf6; width: {{ $catTrans }}%;"></div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        {{-- ---------- TAB: ADMINISTRACIÓN ---------- --}}
-        <div x-show="activeTab === 'administracion'" x-cloak class="space-y-6">
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-sm">
-                    <span class="text-xs font-semibold text-slate-400">Total Clientes en Sistema</span>
-                    <p class="text-2xl font-bold text-sky-400 mt-2">{{ $data['clientes_total'] }}</p>
-                    <p class="text-[11px] text-slate-400 mt-1">Portafolio oficial DataPlus</p>
+        {{-- ---------- TAB 5: ADMINISTRACIÓN ---------- --}}
+        <div x-show="activeTab === 'administracion'" x-cloak style="display: flex; flex-direction: column; gap: 1.5rem;">
+            <div class="dp-stat-grid-3">
+                <div class="dp-stat-card">
+                    <span class="dp-stat-label">Total Clientes en Sistema</span>
+                    <p class="dp-stat-num" style="color: #38bdf8;">{{ $data['clientes_total'] }}</p>
+                    <p class="dp-stat-hint">Portafolio oficial DataPlus</p>
                 </div>
-                <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-sm">
-                    <span class="text-xs font-semibold text-slate-400">Usuarios con Acceso</span>
-                    <p class="text-2xl font-bold text-emerald-400 mt-2">{{ $data['usuarios_total'] }}</p>
-                    <p class="text-[11px] text-slate-400 mt-1">Autenticación híbrida LDAP + Local</p>
+                <div class="dp-stat-card">
+                    <span class="dp-stat-label">Usuarios con Acceso</span>
+                    <p class="dp-stat-num" style="color: #34d399;">{{ $data['usuarios_total'] }}</p>
+                    <p class="dp-stat-hint">Autenticación híbrida LDAP + Local</p>
                 </div>
-                <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-sm">
-                    <span class="text-xs font-semibold text-slate-400">Directorio LDAP / LLDAP</span>
-                    <p class="text-2xl font-bold text-purple-400 mt-2">dc=dataplus,dc=cu</p>
-                    <p class="text-[11px] text-slate-400 mt-1">Servicio online y enlazado</p>
+                <div class="dp-stat-card">
+                    <span class="dp-stat-label">Directorio LDAP / LLDAP</span>
+                    <p class="dp-stat-num" style="color: #c084fc; font-size: 1.15rem;">dc=dataplus,dc=cu</p>
+                    <p class="dp-stat-hint">Servicio online y enlazado</p>
                 </div>
             </div>
 
-            <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-6 shadow-sm space-y-4">
-                <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                    <x-heroicon-o-shield-check class="h-4 w-4 text-sky-400" />
-                    Accesos Rápidos de Administración
-                </h3>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <a href="/admin/clientes"
-                       class="flex items-center justify-between p-3.5 rounded-xl border border-slate-800 bg-slate-950/70 hover:border-sky-500/40 text-left transition-colors cursor-pointer">
+            <div class="dp-panel">
+                <div class="dp-panel-header" style="margin-bottom: 1.25rem;">
+                    <h3 class="dp-panel-title">
+                        <x-heroicon-o-shield-check style="width: 1rem; height: 1rem; color: #38bdf8;" />
+                        Accesos Rápidos de Administración
+                    </h3>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(1, minmax(0, 1fr)); gap: 0.75rem;">
+                    <a href="/admin/clientes" class="dp-quick-link">
                         <div>
-                            <p class="text-xs font-bold text-white">Directorio de Clientes</p>
-                            <p class="text-[10px] text-slate-400 mt-0.5">{{ $data['clientes_total'] }} empresas registradas</p>
+                            <p style="font-size: 0.75rem; font-weight: 700; color: #ffffff; margin: 0;">Directorio de Clientes</p>
+                            <p style="font-size: 0.625rem; color: #94a3b8; margin: 0.15rem 0 0;">{{ $data['clientes_total'] }} empresas registradas</p>
                         </div>
-                        <x-heroicon-o-chevron-right class="h-4 w-4 text-slate-400" />
+                        <x-heroicon-o-chevron-right style="width: 1rem; height: 1rem; color: #94a3b8;" />
                     </a>
-                    <a href="/admin/users"
-                       class="flex items-center justify-between p-3.5 rounded-xl border border-slate-800 bg-slate-950/70 hover:border-sky-500/40 text-left transition-colors cursor-pointer">
+                    <a href="/admin/users" class="dp-quick-link">
                         <div>
-                            <p class="text-xs font-bold text-white">Usuarios & Permisos</p>
-                            <p class="text-[10px] text-slate-400 mt-0.5">Roles RBAC y cuentas</p>
+                            <p style="font-size: 0.75rem; font-weight: 700; color: #ffffff; margin: 0;">Usuarios & Permisos</p>
+                            <p style="font-size: 0.625rem; color: #94a3b8; margin: 0.15rem 0 0;">Roles RBAC y cuentas del sistema</p>
                         </div>
-                        <x-heroicon-o-chevron-right class="h-4 w-4 text-slate-400" />
+                        <x-heroicon-o-chevron-right style="width: 1rem; height: 1rem; color: #94a3b8;" />
                     </a>
-                    <a href="/admin/ldap-configurations"
-                       class="flex items-center justify-between p-3.5 rounded-xl border border-slate-800 bg-slate-950/70 hover:border-sky-500/40 text-left transition-colors cursor-pointer">
+                    <a href="/admin/ldap-configurations" class="dp-quick-link">
                         <div>
-                            <p class="text-xs font-bold text-white">Configuración LDAP</p>
-                            <p class="text-[10px] text-slate-400 mt-0.5">Parámetros de conexión LLDAP</p>
+                            <p style="font-size: 0.75rem; font-weight: 700; color: #ffffff; margin: 0;">Configuración LDAP</p>
+                            <p style="font-size: 0.625rem; color: #94a3b8; margin: 0.15rem 0 0;">Parámetros de conexión LLDAP</p>
                         </div>
-                        <x-heroicon-o-chevron-right class="h-4 w-4 text-slate-400" />
+                        <x-heroicon-o-chevron-right style="width: 1rem; height: 1rem; color: #94a3b8;" />
                     </a>
                 </div>
             </div>
