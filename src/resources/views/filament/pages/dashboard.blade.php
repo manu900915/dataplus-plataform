@@ -515,6 +515,14 @@
                     <span class="dp-finance-item-hint">Transporte: ${{ number_format($data['gastos_transporte_total'], 2) }} · Almuerzo: ${{ number_format($data['gastos_almuerzo_total'], 2) }}</span>
                 </div>
             </div>
+            <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid rgba(56, 189, 248, 0.2); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                <span style="font-size: 0.75rem; color: #94a3b8;">
+                    Consolidación en tiempo real de ingresos, gastos de campo y obras.
+                </span>
+                <a href="/admin/reportes" style="display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.775rem; font-weight: 700; color: #38bdf8; text-decoration: none;">
+                    <span>📊 Ver Reportes Diarios, Semanales, Mensuales y Balance del Año →</span>
+                </a>
+            </div>
         </div>
 
         {{-- ================= BARRA DE PESTAÑAS (TABS) ================= --}}
