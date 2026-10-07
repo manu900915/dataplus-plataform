@@ -103,9 +103,12 @@ class Incidencia extends Model
      */
     public function getEstaVencidaAttribute(): bool
     {
-        return $this->fecha_limite 
-            && $this->fecha_limite->isPast() 
-            && !in_array($this->estado, ['Resuelta', 'Revisada_Supervisor', 'Cerrada', 'Cancelada']);
+        // Solo puede estar vencida si NO está resuelta ni cerrada
+        if (in_array($this->estado, ['Resuelta', 'Revisada_Supervisor', 'Cerrada', 'Cancelada'])) {
+            return false;
+        }
+
+        return $this->fecha_limite && now()->gt($this->fecha_limite);
     }
 
     public function getHorasRestantesAttribute(): ?int
@@ -114,20 +117,24 @@ class Incidencia extends Model
             return null;
         }
 
+        if (now()->gt($this->fecha_limite)) {
+            return 0;
+        }
+
         return (int) now()->diffInHours($this->fecha_limite, false);
     }
 
     public function getHorasVencidaAttribute(): ?int
     {
-        if (!$this->esta_vencida) {
+        if (!$this->esta_vencida || !$this->fecha_limite) {
             return null;
         }
 
-        return (int) $this->fecha_limite->diffInHours(now());
+        return max(1, (int) $this->fecha_limite->diffInHours(now()));
     }
 
     /**
-     * Tiempo total de resolución técnica (desde reporte hasta que el técnico la marcó resuelta)
+     * Tiempo total de resolución técnica (desde reporte/creación hasta que se marcó resuelta)
      */
     public function getTiempoResolucionTextoAttribute(): ?string
     {
@@ -140,7 +147,7 @@ class Incidencia extends Model
             return null;
         }
 
-        $minutos = $inicio->diffInMinutes($this->fecha_resolucion);
+        $minutos = max(1, $inicio->diffInMinutes($this->fecha_resolucion));
         $dias = intdiv($minutos, 1440);
         $horas = intdiv($minutos % 1440, 60);
         $restoMinutos = $minutos % 60;
@@ -162,7 +169,7 @@ class Incidencia extends Model
             return null;
         }
 
-        $minutos = $this->fecha_inicio_trabajo->diffInMinutes($this->fecha_resolucion);
+        $minutos = max(1, $this->fecha_inicio_trabajo->diffInMinutes($this->fecha_resolucion));
         $dias = intdiv($minutos, 1440);
         $horas = intdiv($minutos % 1440, 60);
         $restoMinutos = $minutos % 60;
@@ -185,7 +192,7 @@ class Incidencia extends Model
             return '-';
         }
 
-        $minutos = $inicio->diffInMinutes(now());
+        $minutos = max(1, $inicio->diffInMinutes(now()));
         $dias = intdiv($minutos, 1440);
         $horas = intdiv($minutos % 1440, 60);
         $restoMinutos = $minutos % 60;
@@ -200,6 +207,10 @@ class Incidencia extends Model
 
     /**
      * Verifica si se cumplió con el SLA
+     * Retorna:
+     *  true  -> Resuelto dentro del plazo (fecha_resolucion <= fecha_limite)
+     *  false -> Excedió el plazo (fecha_resolucion > fecha_limite)
+     *  null  -> No tiene fecha_resolucion o fecha_limite
      */
     public function getCumplioSlaAttribute(): ?bool
     {
@@ -220,22 +231,47 @@ class Incidencia extends Model
                 $count = static::whereYear('created_at', $year)->count() + 1;
                 $incidencia->codigo = "INC-{$year}-" . str_pad($count, 4, '0', STR_PAD_LEFT);
             }
-            $incidencia->creado_por = auth()->id() ?? 1;
 
+            if (empty($incidencia->creado_por)) {
+                $incidencia->creado_por = auth()->id() ?? 1;
+            }
+
+            if (empty($incidencia->fecha_reporte)) {
+                $incidencia->fecha_reporte = now();
+            }
+
+            // Si al crear ya se especificó un responsable, pasa directamente a Asignada
+            if (!empty($incidencia->tecnico_id)) {
+                if (empty($incidencia->estado) || $incidencia->estado === 'Pendiente') {
+                    $incidencia->estado = 'Asignada';
+                }
+                if (empty($incidencia->fecha_asignacion)) {
+                    $incidencia->fecha_asignacion = now();
+                }
+            }
+
+            // SLA según prioridad
             if (empty($incidencia->fecha_limite)) {
-                $incidencia->fecha_limite = match ($incidencia->prioridad) {
-                    'Critica' => now()->addHours(8),
-                    'Alta'    => now()->addHours(24),
-                    'Media'   => now()->addHours(48),
-                    'Baja'    => now()->addDays(7),
-                    default   => now()->addHours(48),
+                $horas = match ($incidencia->prioridad) {
+                    'Critica' => 8,
+                    'Alta'    => 24,
+                    'Media'   => 48,
+                    'Baja'    => 168,
+                    default   => 48,
                 };
+                $incidencia->fecha_limite = now()->addHours($horas);
             }
         });
 
         static::updating(function ($incidencia) {
-            if ($incidencia->isDirty('tecnico_id') && $incidencia->tecnico_id && !$incidencia->fecha_asignacion) {
-                $incidencia->fecha_asignacion = now();
+            // Si se asigna responsable y estaba en Pendiente, pasa a Asignada
+            if ($incidencia->isDirty('tecnico_id') && $incidencia->tecnico_id) {
+                if (!$incidencia->fecha_asignacion) {
+                    $incidencia->fecha_asignacion = now();
+                }
+                if ($incidencia->estado === 'Pendiente') {
+                    $incidencia->estado = 'Asignada';
+                }
             }
 
             if ($incidencia->isDirty('estado') && $incidencia->estado === 'En_Progreso' && !$incidencia->fecha_inicio_trabajo) {

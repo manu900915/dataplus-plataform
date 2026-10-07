@@ -21,18 +21,39 @@ use Illuminate\Database\Eloquent\Builder;
 class IncidenciaResource extends Resource
 {
     protected static ?string $model = Incidencia::class;
-    protected static ?string $navigationIcon = 'heroicon-o-wrench-screwdriver';
     protected static ?string $navigationGroup = 'Operaciones';
+    protected static ?string $navigationLabel = 'Incidencias';
     protected static ?string $modelLabel = 'Incidencia';
-    protected static ?string $pluralModelLabel = 'Incidencias Técnicas';
+    protected static ?string $pluralModelLabel = 'Incidencias';
+    protected static ?string $navigationIcon = 'heroicon-o-exclamation-circle';
     protected static ?int $navigationSort = 2;
-    protected static ?string $recordTitleAttribute = 'codigo';
+
+    /**
+     * Devuelve la lista de usuarios operativos (Técnicos, Especialistas, Supervisores y Administradores).
+     */
+    public static function getUsuariosOperativosQuery(): Builder
+    {
+        $rolesValidos = [
+            'Técnico', 'tecnico', 'Tecnico',
+            'Especialista', 'especialista',
+            'Supervisor', 'supervisor',
+            'Administrador', 'admin', 'superadmin',
+        ];
+
+        return User::query()
+            ->where('activo', true)
+            ->where(function (Builder $q) use ($rolesValidos) {
+                $q->whereHas('roles', fn ($r) => $r->whereIn('name', $rolesValidos))
+                  ->orWhereDoesntHave('roles');
+            })
+            ->orderBy('name');
+    }
 
     public static function getNavigationBadge(): ?string
     {
         try {
-            $activas = static::getModel()::whereIn('estado', ['Pendiente', 'Asignada', 'En_Progreso', 'En_Espera'])->count();
-            return $activas > 0 ? (string) $activas : null;
+            $count = Incidencia::whereNotIn('estado', ['Resuelta', 'Revisada_Supervisor', 'Cerrada', 'Cancelada'])->count();
+            return $count > 0 ? (string) $count : null;
         } catch (\Throwable $e) {
             return null;
         }
@@ -41,12 +62,12 @@ class IncidenciaResource extends Resource
     public static function getNavigationBadgeColor(): ?string
     {
         try {
-            $criticasOVencidas = static::getModel()::whereIn('estado', ['Pendiente', 'Asignada', 'En_Progreso', 'En_Espera'])
-                ->where(function ($query) {
-                    $query->where('prioridad', 'Critica')
-                        ->orWhere(function ($q) {
-                            $q->whereNotNull('fecha_limite')->where('fecha_limite', '<', now());
-                        });
+            $criticasOVencidas = Incidencia::whereNotIn('estado', ['Resuelta', 'Revisada_Supervisor', 'Cerrada', 'Cancelada'])
+                ->where(function ($q) {
+                    $q->where('prioridad', 'Critica')
+                      ->orWhere(function ($sub) {
+                          $sub->whereNotNull('fecha_limite')->where('fecha_limite', '<', now());
+                      });
                 })->exists();
 
             return $criticasOVencidas ? 'danger' : 'warning';
@@ -64,9 +85,9 @@ class IncidenciaResource extends Resource
     {
         return $form
             ->schema([
-                // ─── SECCIÓN 1: Clasificación y Origen (Comercial / Mesa de Entrada) ───
+                // ─── SECCIÓN 1: Clasificación y Origen ───
                 Forms\Components\Section::make('Cliente y Sistema Afectado')
-                    ->description('Registrado por Comercial / Atención al Cliente.')
+                    ->description('Sede y tecnología afectada reportada por el cliente.')
                     ->columns(3)
                     ->schema([
                         Forms\Components\Select::make('cliente_id')
@@ -112,7 +133,6 @@ class IncidenciaResource extends Resource
                             ->options(function (Get $get) {
                                 $ubicacionId = $get('cliente_ubicacion_id');
                                 $clienteId = $get('cliente_id');
-
                                 $query = Servicio::query();
 
                                 if ($ubicacionId) {
@@ -125,10 +145,10 @@ class IncidenciaResource extends Resource
 
                                 return $query->get()->mapWithKeys(function ($serv) {
                                     $detalle = match ($serv->tipo) {
-                                        'CCTV' => "CCTV: " . ($serv->cctv_marca ?? 'DVR/NVR') . " (" . ($serv->cctv_canales ? $serv->cctv_canales . ' CH' : 'Cámaras') . ")",
-                                        'SACI' => "SACI: " . ($serv->saci_marca ?? 'Alarma') . " (" . ($serv->saci_solucion ?? 'Sistema') . ")",
+                                        'CCTV'           => "CCTV: " . ($serv->cctv_marca ?? 'DVR/NVR') . " (" . ($serv->cctv_canales ? $serv->cctv_canales . ' CH' : 'Cámaras') . ")",
+                                        'SACI'           => "SACI: " . ($serv->saci_marca ?? 'Alarma') . " (" . ($serv->saci_solucion ?? 'Sistema') . ")",
                                         'Gestion_Remota' => "Gestión Remota: " . ($serv->gr_tipo_solucion ?? 'Router'),
-                                        default => "{$serv->tipo} - Estado: {$serv->estado}",
+                                        default          => "{$serv->tipo} - Estado: {$serv->estado}",
                                     };
                                     return [$serv->id => $detalle];
                                 });
@@ -147,7 +167,7 @@ class IncidenciaResource extends Resource
                     ]),
 
                 // ─── SECCIÓN 2: Tipificación y Estado de la Incidencia ───
-                Forms\Components\Section::make('Clasificación y SLA')
+                Forms\Components\Section::make('Clasificación y Estado')
                     ->columns(3)
                     ->schema([
                         Forms\Components\Select::make('tipo')
@@ -163,7 +183,7 @@ class IncidenciaResource extends Resource
                             ->native(false),
 
                         Forms\Components\Select::make('prioridad')
-                            ->label('Prioridad')
+                            ->label('Prioridad / SLA')
                             ->options([
                                 'Baja'    => 'Baja (SLA: 7 días)',
                                 'Media'   => 'Media (SLA: 48 horas)',
@@ -188,9 +208,9 @@ class IncidenciaResource extends Resource
                         Forms\Components\Select::make('estado')
                             ->label('Estado Operativo')
                             ->options([
-                                'Pendiente'           => '1. Pendiente (Mesa de Entrada)',
-                                'Asignada'            => '2. Asignada a Técnico / Brigada',
-                                'En_Progreso'         => '3. En Progreso (Intervención)',
+                                'Pendiente'           => '1. Pendiente (Sin responsable asignado)',
+                                'Asignada'            => '2. Asignada (A técnico o brigada)',
+                                'En_Progreso'         => '3. En Progreso (Intervención técnica)',
                                 'En_Espera'           => '4. En Espera (Repuestos/Cliente)',
                                 'Resuelta'            => '5. Culminada por Técnico (Por Revisar Supervisor)',
                                 'Revisada_Supervisor' => '6. Visto Bueno Supervisor (Por Cerrar Comercial)',
@@ -207,13 +227,13 @@ class IncidenciaResource extends Resource
                     ->columns(1)
                     ->schema([
                         Forms\Components\TextInput::make('titulo')
-                            ->label('Título / Asunto de la Incidencia')
+                            ->label('Asunto / Título de la Falla')
                             ->required()
-                            ->placeholder('Ej: Pérdida de señal en cámara 4 y 5 del almacén')
+                            ->placeholder('Ej: Pérdida de señal en cámara entrada principal')
                             ->maxLength(255),
 
                         Forms\Components\Textarea::make('descripcion')
-                            ->label('Descripción de la falla reportada por el cliente')
+                            ->label('Descripción Detallada')
                             ->required()
                             ->rows(3)
                             ->placeholder('Indique síntomas, cuándo comenzó el problema y cualquier detalle aportado por el cliente...'),
@@ -245,11 +265,18 @@ class IncidenciaResource extends Resource
                             ->maxLength(255),
 
                         Forms\Components\Select::make('tecnico_id')
-                            ->label('Técnico Responsable')
-                            ->relationship('tecnico', 'name', fn (Builder $query) => $query->role(['Técnico', 'Administrador', 'Supervisor']))
+                            ->label('Responsable (Técnico / Especialista / Supervisor)')
+                            ->relationship('tecnico', 'name', fn (Builder $query) => static::getUsuariosOperativosQuery())
                             ->searchable()
                             ->preload()
-                            ->placeholder('Sin asignar'),
+                            ->placeholder('Seleccione responsable...')
+                            ->live()
+                            ->afterStateUpdated(function (Set $set, $state, Get $get) {
+                                // Si se selecciona un responsable y el estado estaba en Pendiente, pasa a Asignada
+                                if ($state && ($get('estado') === 'Pendiente' || empty($get('estado')))) {
+                                    $set('estado', 'Asignada');
+                                }
+                            }),
 
                         Forms\Components\Select::make('brigada_id')
                             ->label('Brigada Asignada')
@@ -260,50 +287,45 @@ class IncidenciaResource extends Resource
 
                         Forms\Components\DateTimePicker::make('fecha_limite')
                             ->label('Fecha Límite (SLA)')
-                            ->helperText('Plazo máximo objetivo de solución')
+                            ->helperText('Plazo máximo objetivo de solución acordado con el cliente')
                             ->native(false),
                     ]),
 
-                // ─── SECCIÓN 5: Tiempos de Resolución y Métricas ───
-                Forms\Components\Section::make('Tiempos de Atención y Resolución')
-                    ->visible(fn (string $context): bool => $context === 'edit')
+                // ─── SECCIÓN 5: Tiempos de Atención y Registro SLA ───
+                Forms\Components\Section::make('Tiempos de Atención y SLA')
+                    ->description('Registro de hitos temporales para evaluación del SLA de servicio.')
                     ->columns(3)
                     ->schema([
-                        Forms\Components\Placeholder::make('metrica_resolucion')
-                            ->label('Tiempo Total de Resolución')
-                            ->content(function (?Incidencia $record): string {
-                                if (!$record || !$record->fecha_resolucion) {
-                                    return 'En curso (Abierta hace ' . ($record?->tiempo_transcurrido_texto ?? '-') . ')';
-                                }
-                                return '⏱ ' . $record->tiempo_resolucion_texto . ' (desde el reporte)';
-                            }),
+                        Forms\Components\DateTimePicker::make('fecha_reporte')
+                            ->label('Fecha/Hora de Reporte')
+                            ->default(now())
+                            ->native(false)
+                            ->helperText('Momento en que se registró la incidencia'),
 
-                        Forms\Components\Placeholder::make('metrica_intervencion')
-                            ->label('Tiempo de Trabajo en Sitio')
-                            ->content(function (?Incidencia $record): string {
-                                if (!$record || !$record->fecha_resolucion) {
-                                    return $record?->fecha_inicio_trabajo ? 'En intervención ahora' : 'No iniciado';
-                                }
-                                return $record->tiempo_intervencion_texto 
-                                    ? '🛠 ' . $record->tiempo_intervencion_texto . ' en sitio'
-                                    : 'Sin registro de inicio';
-                            }),
+                        Forms\Components\DateTimePicker::make('fecha_resolucion')
+                            ->label('Fecha/Hora de Resolución Técnica')
+                            ->native(false)
+                            ->helperText('Momento en que el técnico concluyó la reparación'),
 
                         Forms\Components\Placeholder::make('metrica_sla')
-                            ->label('Evaluación de SLA')
+                            ->label('Estado Actual del SLA')
                             ->content(function (?Incidencia $record): string {
-                                if (!$record) return '-';
+                                if (!$record) return 'Se calculará al guardar';
                                 if ($record->fecha_resolucion) {
-                                    return $record->cumplio_sla === true
-                                        ? '✅ Resuelto DENTRO del SLA'
-                                        : ($record->cumplio_sla === false ? '❌ Superó el plazo del SLA' : 'Sin SLA fijado');
+                                    if ($record->cumplio_sla === true) {
+                                        return '✅ CUMPLIDO: Resuelto dentro del plazo de SLA (' . ($record->tiempo_resolucion_texto ?? '') . ')';
+                                    }
+                                    if ($record->cumplio_sla === false) {
+                                        return '❌ EXCEDIDO: Superó el plazo del SLA pactado';
+                                    }
+                                    return 'Resuelta (sin plazo límite definido)';
                                 }
                                 if ($record->esta_vencida) {
                                     return '⚠️ SLA Vencido hace ' . $record->horas_vencida . ' horas';
                                 }
-                                return $record->horas_restantes !== null 
+                                return $record->horas_restantes !== null
                                     ? '⏳ Quedan ' . $record->horas_restantes . ' horas para el límite'
-                                    : 'Sin fecha límite';
+                                    : 'Sin fecha límite configurada';
                             }),
                     ]),
 
@@ -399,13 +421,13 @@ class IncidenciaResource extends Resource
                     ->label('Estado')
                     ->badge()
                     ->colors([
-                        'gray'      => 'Pendiente',
-                        'info'      => 'Asignada',
-                        'warning'   => 'En_Progreso',
-                        'purple'    => 'En_Espera',
-                        'primary'   => 'Resuelta',
-                        'success'   => ['Revisada_Supervisor', 'Cerrada'],
-                        'danger'    => 'Cancelada',
+                        'gray'    => 'Pendiente',
+                        'info'    => 'Asignada',
+                        'warning' => 'En_Progreso',
+                        'purple'  => 'En_Espera',
+                        'primary' => 'Resuelta',
+                        'success' => ['Revisada_Supervisor', 'Cerrada'],
+                        'danger'  => 'Cancelada',
                     ])
                     ->formatStateUsing(fn ($state) => match ($state) {
                         'Pendiente'           => 'Pendiente',
@@ -442,7 +464,7 @@ class IncidenciaResource extends Resource
                     ]),
 
                 Tables\Columns\TextColumn::make('tecnico.name')
-                    ->label('Técnico / Brigada')
+                    ->label('Responsable')
                     ->placeholder('Sin asignar')
                     ->formatStateUsing(function ($state, $record) {
                         if ($record->tecnico && $record->brigada) {
@@ -458,7 +480,7 @@ class IncidenciaResource extends Resource
                     })
                     ->searchable(),
 
-                // ─── Columna de Tiempos y Resolución ───
+                // ─── Columna de Tiempos y Resolución SLA ───
                 Tables\Columns\TextColumn::make('fecha_resolucion')
                     ->label('Resolución / SLA')
                     ->sortable()
@@ -467,7 +489,7 @@ class IncidenciaResource extends Resource
                             return "⏱ {$record->tiempo_resolucion_texto}";
                         }
                         if ($record->fecha_limite) {
-                            return $record->fecha_limite->format('d/m H:i');
+                            return "Límite: " . $record->fecha_limite->format('d/m H:i');
                         }
                         return 'Sin SLA';
                     })
@@ -482,27 +504,24 @@ class IncidenciaResource extends Resource
                         if ($record->horas_restantes !== null && $record->horas_restantes <= 8 && $record->horas_restantes >= 0) {
                             return 'warning';
                         }
-                        return null;
+                        return 'info';
                     })
                     ->description(function (Incidencia $record) {
                         if ($record->fecha_resolucion) {
                             if ($record->cumplio_sla === true) {
-                                return '✓ Dentro de SLA';
+                                return '✓ Resuelta en SLA';
                             }
                             if ($record->cumplio_sla === false) {
-                                return '⚠ Excedió SLA';
+                                return '⚠ Superó plazo SLA';
                             }
                             return 'Resuelta: ' . $record->fecha_resolucion->format('d/m H:i');
                         }
-
                         if ($record->esta_vencida) {
                             return "¡Vencida hace {$record->horas_vencida}h!";
                         }
-
                         if ($record->horas_restantes !== null) {
-                            return "Abierta {$record->tiempo_transcurrido_texto} (Quedan {$record->horas_restantes}h)";
+                            return "Restan {$record->horas_restantes}h de SLA";
                         }
-
                         return "Abierta hace {$record->tiempo_transcurrido_texto}";
                     }),
             ])
@@ -542,15 +561,15 @@ class IncidenciaResource extends Resource
                     ->query(fn (Builder $query) => $query->where('fecha_limite', '<', now())->whereNotIn('estado', ['Resuelta', 'Revisada_Supervisor', 'Cerrada', 'Cancelada'])),
             ])
             ->actions([
-                // ─── 1. Tomar Incidencia (Técnico se auto-asigna) ───
+                // ─── 1. Tomar Incidencia: SOLO si NO TIENE responsable asignado ───
                 Tables\Actions\Action::make('tomar')
                     ->label('Tomar')
                     ->icon('heroicon-m-hand-raised')
                     ->color('info')
                     ->requiresConfirmation()
                     ->modalHeading('¿Tomar esta incidencia?')
-                    ->modalDescription('Se asignará a tu usuario técnico y pasará a "En Progreso".')
-                    ->visible(fn (Incidencia $record) => in_array($record->estado, ['Pendiente', 'Asignada']) && $record->tecnico_id !== auth()->id())
+                    ->modalDescription('Se te asignará como responsable técnico y pasará a "En Progreso".')
+                    ->visible(fn (Incidencia $record) => empty($record->tecnico_id) && in_array($record->estado, ['Pendiente', 'Asignada']))
                     ->action(function (Incidencia $record) {
                         $record->update([
                             'tecnico_id'           => auth()->id(),
@@ -566,23 +585,25 @@ class IncidenciaResource extends Resource
                             ->send();
                     }),
 
-                // ─── 2. Asignar (Comercial / Supervisor) ───
+                // ─── 2. Asignar Técnico: SOLO si NO TIENE responsable asignado ───
                 Tables\Actions\Action::make('asignar')
                     ->label('Asignar')
                     ->icon('heroicon-m-user-plus')
-                    ->color('gray')
-                    ->visible(fn (Incidencia $record) => in_array($record->estado, ['Pendiente', 'Asignada']))
+                    ->color('warning')
+                    ->visible(fn (Incidencia $record) => empty($record->tecnico_id) && in_array($record->estado, ['Pendiente', 'Asignada']))
                     ->form([
                         Forms\Components\Select::make('tecnico_id')
-                            ->label('Técnico Responsable')
-                            ->options(User::role(['Técnico', 'Supervisor', 'Administrador'])->pluck('name', 'id'))
+                            ->label('Responsable (Técnico / Especialista / Supervisor)')
+                            ->options(fn () => static::getUsuariosOperativosQuery()->pluck('name', 'id'))
                             ->searchable()
+                            ->preload()
                             ->required(),
 
                         Forms\Components\Select::make('brigada_id')
                             ->label('Brigada Asignada (Opcional)')
                             ->relationship('brigada', 'nombre')
-                            ->searchable(),
+                            ->searchable()
+                            ->preload(),
                     ])
                     ->action(function (Incidencia $record, array $data) {
                         $record->update([
@@ -599,12 +620,12 @@ class IncidenciaResource extends Resource
                             ->send();
                     }),
 
-                // ─── 3. Iniciar Trabajo (Técnico) ───
+                // ─── 3. Iniciar Trabajo (cuando ya está asignada) ───
                 Tables\Actions\Action::make('iniciar')
                     ->label('Iniciar')
                     ->icon('heroicon-m-play')
                     ->color('warning')
-                    ->visible(fn (Incidencia $record) => $record->estado === 'Asignada')
+                    ->visible(fn (Incidencia $record) => !empty($record->tecnico_id) && $record->estado === 'Asignada')
                     ->action(function (Incidencia $record) {
                         $record->update([
                             'estado'               => 'En_Progreso',
@@ -618,13 +639,53 @@ class IncidenciaResource extends Resource
                             ->send();
                     }),
 
-                // ─── 4. Culminar / Resolver (Técnico) ───
+                // ─── 4. Reasignar (Supervisor cambia de responsable) ───
+                Tables\Actions\Action::make('reasignar')
+                    ->label('Reasignar')
+                    ->icon('heroicon-m-arrows-right-left')
+                    ->color('gray')
+                    ->visible(fn (Incidencia $record) => !empty($record->tecnico_id) && in_array($record->estado, ['Asignada', 'En_Progreso', 'En_Espera']))
+                    ->form([
+                        Forms\Components\Select::make('tecnico_id')
+                            ->label('Nuevo Responsable')
+                            ->options(fn () => static::getUsuariosOperativosQuery()->pluck('name', 'id'))
+                            ->searchable()
+                            ->preload()
+                            ->required(),
+
+                        Forms\Components\Select::make('brigada_id')
+                            ->label('Brigada Asignada (Opcional)')
+                            ->relationship('brigada', 'nombre')
+                            ->searchable()
+                            ->preload(),
+                    ])
+                    ->action(function (Incidencia $record, array $data) {
+                        $record->update([
+                            'tecnico_id' => $data['tecnico_id'],
+                            'brigada_id' => $data['brigada_id'] ?? null,
+                        ]);
+
+                        Notification::make()
+                            ->title('Incidencia Reasignada')
+                            ->body("La incidencia {$record->codigo} ahora está a cargo del nuevo responsable.")
+                            ->info()
+                            ->send();
+                    }),
+
+                // ─── 5. Culminar / Resolver (con selector de fecha real de resolución) ───
                 Tables\Actions\Action::make('resolver')
                     ->label('Culminar')
                     ->icon('heroicon-m-check-circle')
                     ->color('primary')
                     ->visible(fn (Incidencia $record) => in_array($record->estado, ['Asignada', 'En_Progreso', 'En_Espera']))
                     ->form([
+                        Forms\Components\DateTimePicker::make('fecha_resolucion')
+                            ->label('Fecha y Hora Real de Resolución')
+                            ->default(now())
+                            ->required()
+                            ->native(false)
+                            ->helperText('Indique cuándo concluyó realmente la reparación técnica (se contrastará con el SLA)'),
+
                         Forms\Components\Textarea::make('solucion')
                             ->label('Solución Aplicada / Trabajo Realizado')
                             ->required()
@@ -647,17 +708,17 @@ class IncidenciaResource extends Resource
                             'solucion'           => $data['solucion'],
                             'requiere_repuestos' => $data['requiere_repuestos'] ?? false,
                             'costo_estimado'     => $data['costo_estimado'] ?? null,
-                            'fecha_resolucion'   => now(),
+                            'fecha_resolucion'   => $data['fecha_resolucion'] ?? now(),
                         ]);
 
                         Notification::make()
-                            ->title('Incidencia Culminada por Técnico')
+                            ->title('Incidencia Culminada')
                             ->body("Pasa a revisión del Supervisor.")
                             ->success()
                             ->send();
                     }),
 
-                // ─── 5. Visto Bueno (Supervisor) ───
+                // ─── 6. Visto Bueno (Supervisor) ───
                 Tables\Actions\Action::make('aprobar_supervisor')
                     ->label('VºBº Supervisor')
                     ->icon('heroicon-m-shield-check')
@@ -685,7 +746,7 @@ class IncidenciaResource extends Resource
                             ->send();
                     }),
 
-                // ─── 6. Cierre Comercial con Cliente (Comercial) ───
+                // ─── 7. Cierre Comercial con Cliente ───
                 Tables\Actions\Action::make('cierre_comercial')
                     ->label('Cerrar')
                     ->icon('heroicon-m-document-check')
