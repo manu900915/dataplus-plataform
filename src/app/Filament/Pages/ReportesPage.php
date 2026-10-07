@@ -18,7 +18,7 @@ class ReportesPage extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
     protected static ?string $navigationGroup = 'Reportes';
-    protected static ?string $navigationLabel = 'Reportes protected static ?string $navigationLabel = 'Reportes & Balances'; Balances';
+    protected static ?string $navigationLabel = 'Reportes & Balances';
     protected static ?string $slug = 'reportes';
     protected static ?string $title = 'Centro de Reportes & Balances';
     protected static ?int $navigationSort = 1;
