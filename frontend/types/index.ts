@@ -125,6 +125,9 @@ export interface Incidencia {
   fecha_resolucion?: string;
   solucion?: string;
   costo_estimado?: number;
+  gasto_transporte?: number;
+  gasto_almuerzo?: number;
+  cumplio_sla?: boolean;
   requiere_repuestos: boolean;
   creado_por: string;
 }
