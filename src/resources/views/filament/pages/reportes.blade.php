@@ -85,7 +85,7 @@
             letter-spacing: 0.05em;
         }
         .dp-input-field {
-            background: #020617;
+            background-color: #020617;
             border: 1px solid #334155;
             border-radius: 0.5rem;
             padding: 0.55rem 0.85rem;
@@ -97,6 +97,30 @@
         }
         .dp-input-field:focus {
             border-color: #38bdf8;
+        }
+
+        /* ─── Reglas estrictas para <select> (elimina flechas repetidas y duplicadas) ─── */
+        select.dp-input-field,
+        select.dp-select-field {
+            appearance: none !important;
+            -webkit-appearance: none !important;
+            -moz-appearance: none !important;
+            background-color: #020617 !important;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e") !important;
+            background-position: right 0.75rem center !important;
+            background-repeat: no-repeat !important;
+            background-size: 1.15rem 1.15rem !important;
+            padding-right: 2.5rem !important;
+            cursor: pointer;
+        }
+        select.dp-input-field::-ms-expand,
+        select.dp-select-field::-ms-expand {
+            display: none !important;
+        }
+        select.dp-input-field option,
+        select.dp-select-field option {
+            background-color: #0f172a !important;
+            color: #ffffff !important;
         }
 
         /* Botón de impresión ejecutiva */
@@ -425,7 +449,7 @@
                 @elseif($periodo === 'anual')
                     <div class="dp-input-group">
                         <label class="dp-input-label">Año a Evaluar</label>
-                        <select wire:model.live="ano" class="dp-input-field">
+                        <select wire:model.live="ano" class="dp-input-field dp-select-field">
                             @foreach([2024, 2025, 2026, 2027, 2028] as $a)
                                 <option value="{{ $a }}">{{ $a }}</option>
                             @endforeach
@@ -445,7 +469,7 @@
                 {{-- Filtro por Especialista / Técnico --}}
                 <div class="dp-input-group">
                     <label class="dp-input-label">Especialista / Técnico</label>
-                    <select wire:model.live="tecnicoId" class="dp-input-field">
+                    <select wire:model.live="tecnicoId" class="dp-input-field dp-select-field">
                         <option value="">Todos los especialistas</option>
                         @foreach($this->tecnicos as $id => $name)
                             <option value="{{ $id }}">{{ $name }}</option>
@@ -456,7 +480,7 @@
                 {{-- Filtro por Cliente --}}
                 <div class="dp-input-group">
                     <label class="dp-input-label">Cliente</label>
-                    <select wire:model.live="clienteId" class="dp-input-field">
+                    <select wire:model.live="clienteId" class="dp-input-field dp-select-field">
                         <option value="">Todos los clientes</option>
                         @foreach($this->clientes as $id => $name)
                             <option value="{{ $id }}">{{ $name }}</option>
