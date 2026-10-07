@@ -905,7 +905,7 @@
                         </div>
                     </div>
                     <p class="dp-stat-num" style="color: #fbbf24;">${{ number_format($data['gastos_campo_total'], 2) }}</p>
-                    <p class="dp-stat-hint">Transporte ${{ number_format($data['gasto_transporte_total'], 2) }} · Almuerzo ${{ number_format($data['gasto_almuerzo_total'], 2) }}</p>
+                    <p class="dp-stat-hint">Transporte ${{ number_format(($data['gastos_transporte'] ?? $data['gasto_transporte_total'] ?? 0), 2) }} · Almuerzo ${{ number_format(($data['gastos_almuerzo'] ?? $data['gasto_almuerzo_total'] ?? 0), 2) }}</p>
                 </div>
 
                 {{-- 3. Balance Neto --}}
@@ -916,7 +916,7 @@
                             <x-heroicon-o-scale style="width: 1.1rem; height: 1.1rem;" />
                         </div>
                     </div>
-                    <p class="dp-stat-num" style="color: #34d399;">${{ number_format($data['margen_neto_total'], 2) }}</p>
+                    <p class="dp-stat-num" style="color: #34d399;">${{ number_format(($data['margen_operativo_neto'] ?? $data['margen_neto_total'] ?? 0), 2) }}</p>
                     <p class="dp-stat-hint">Ingresos menos gastos en terreno</p>
                 </div>
 
@@ -1251,11 +1251,11 @@
                         <div style="background: #ffffff; border: 1px solid #94a3b8; border-radius: 6px; padding: 10px 12px;">
                             <span style="font-size: 0.675rem; font-weight: 700; color: #475569; text-transform: uppercase;">Gastos Terreno</span>
                             <div style="font-size: 1.2rem; font-weight: 800; color: #d97706; margin-top: 4px;">${{ number_format($data['gastos_campo_total'], 2) }}</div>
-                            <span style="font-size: 0.65rem; color: #64748b;">Transp. ${{ number_format($data['gasto_transporte_total'], 2) }} + Alm.</span>
+                            <span style="font-size: 0.65rem; color: #64748b;">Transp. ${{ number_format(($data['gastos_transporte'] ?? $data['gasto_transporte_total'] ?? 0), 2) }} + Alm.</span>
                         </div>
                         <div style="background: #ffffff; border: 1px solid #94a3b8; border-radius: 6px; padding: 10px 12px;">
                             <span style="font-size: 0.675rem; font-weight: 700; color: #475569; text-transform: uppercase;">Balance Neto</span>
-                            <div style="font-size: 1.2rem; font-weight: 800; color: #059669; margin-top: 4px;">${{ number_format($data['margen_neto_total'], 2) }}</div>
+                            <div style="font-size: 1.2rem; font-weight: 800; color: #059669; margin-top: 4px;">${{ number_format(($data['margen_operativo_neto'] ?? $data['margen_neto_total'] ?? 0), 2) }}</div>
                             <span style="font-size: 0.65rem; color: #64748b;">Margen operativo</span>
                         </div>
                         <div style="background: #ffffff; border: 1px solid #94a3b8; border-radius: 6px; padding: 10px 12px;">
