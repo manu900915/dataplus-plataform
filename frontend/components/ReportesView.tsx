@@ -135,72 +135,8 @@ export const ReportesView: React.FC<ReportesViewProps> = ({
     document.body.removeChild(link);
   };
 
-  // Motor de Impresión Aislado (Garantiza que la vista previa NUNCA salga en blanco)
   const handlePrint = () => {
-    const sourceEl = document.getElementById('dp-react-printable-sheet');
-    if (!sourceEl) {
-      window.print();
-      return;
-    }
-
-    const existingFrame = document.getElementById('dp_react_print_frame');
-    if (existingFrame) {
-      existingFrame.remove();
-    }
-
-    const iframe = document.createElement('iframe');
-    iframe.id = 'dp_react_print_frame';
-    iframe.setAttribute('style', 'position:fixed;top:-9999px;left:-9999px;width:1024px;height:768px;border:none;visibility:hidden;');
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentWindow?.document;
-    if (!doc) {
-      window.print();
-      return;
-    }
-
-    doc.open();
-    doc.write(`<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <title>Reporte Oficial - DataPlus S.R.L.</title>
-  <style>
-    @page { size: letter portrait; margin: 12mm 15mm 15mm 15mm; }
-    *, *::before, *::after { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #ffffff !important; color: #0f172a !important; font-size: 11px; line-height: 1.35; }
-    h1, h2, h3, h4, p { margin: 0; }
-    table { width: 100% !important; border-collapse: collapse !important; }
-    .sheet-box { width: 100% !important; max-width: 100% !important; padding: 0 !important; margin: 0 !important; box-shadow: none !important; border: none !important; }
-    .print-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 16px; }
-    .hero-banner { background: #f8fafc; border: 1.5px solid #0f172a; border-radius: 8px; padding: 14px 18px; margin-bottom: 16px; }
-    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
-    .card { background: #ffffff; border: 1px solid #94a3b8; border-radius: 6px; padding: 8px 10px; }
-    .panel { background: #ffffff; border: 1px solid #94a3b8; border-radius: 6px; padding: 10px; margin-bottom: 14px; page-break-inside: avoid; }
-    .panel-hdr { border-bottom: 1px solid #cbd5e1; padding-bottom: 6px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
-    th { background: #f1f5f9; color: #0f172a; font-weight: 700; border-bottom: 1.5px solid #0f172a; padding: 5px 6px; text-align: left; font-size: 8.5px; text-transform: uppercase; }
-    td { color: #0f172a; border-bottom: 1px solid #e2e8f0; padding: 5px 6px; font-size: 8.5px; vertical-align: top; }
-    .signatures { display: grid; grid-template-columns: repeat(2, 1fr); gap: 50px; margin-top: 32px; padding-top: 8px; page-break-inside: avoid; }
-    .sig-line { border-top: 1.5px solid #0f172a; text-align: center; padding-top: 5px; font-size: 9.5px; font-weight: 700; color: #0f172a; }
-  </style>
-</head>
-<body>
-  <div class="sheet-box">
-    ${sourceEl.innerHTML}
-  </div>
-</body>
-</html>`);
-    doc.close();
-
-    setTimeout(() => {
-      try {
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-      } catch (err) {
-        console.error('Fallback window.print():', err);
-        window.print();
-      }
-    }, 250);
+    window.print();
   };
 
   return (

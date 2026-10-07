@@ -833,7 +833,7 @@
                             <x-heroicon-o-eye style="width: 1.1rem; height: 1.1rem;" />
                             <span>Vista Previa</span>
                         </button>
-                        <button type="button" onclick="imprimirDocumentoReporte()" class="dp-btn-print" title="Imprimir directamente o guardar en PDF">
+                        <button type="button" onclick="window.print()" class="dp-btn-print" title="Imprimir directamente o guardar en PDF">
                             <x-heroicon-o-printer style="width: 1.1rem; height: 1.1rem;" />
                             <span>Imprimir / PDF</span>
                         </button>
@@ -1188,7 +1188,7 @@
                 </div>
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <button type="button"
-                            onclick="imprimirDocumentoReporte()"
+                            onclick="window.print()"
                             style="display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: #ffffff; border: none; border-radius: 8px; padding: 8px 18px; font-size: 0.825rem; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4); transition: transform 0.15s ease;"
                             onmouseover="this.style.transform='translateY(-1px)'"
                             onmouseout="this.style.transform='translateY(0)'">
@@ -1429,74 +1429,7 @@
          ============================================================ --}}
     <script>
         function imprimirDocumentoReporte() {
-            // Obtenemos el elemento con el formato de papel limpio o el contenido imprimible
-            var sourceEl = document.getElementById('dp-sheet-preview-render') || document.getElementById('dp-print-content');
-            if (!sourceEl) {
-                window.print();
-                return;
-            }
-
-            // Eliminar cualquier iframe previo si existiera
-            var existingIframe = document.getElementById('dp_isolated_print_frame');
-            if (existingIframe) {
-                existingIframe.remove();
-            }
-
-            // Crear un iframe invisible exclusivo para enviar a la impresora
-            var iframe = document.createElement('iframe');
-            iframe.id = 'dp_isolated_print_frame';
-            iframe.setAttribute('style', 'position:fixed;top:-9999px;left:-9999px;width:1024px;height:768px;border:none;visibility:hidden;');
-            document.body.appendChild(iframe);
-
-            var printHtml = sourceEl.innerHTML;
-
-            var doc = iframe.contentWindow.document;
-            doc.open();
-            doc.write('<!DOCTYPE html>' +
-                '<html lang="es">' +
-                '<head>' +
-                '<meta charset="UTF-8">' +
-                '<title>Reporte Oficial - DataPlus S.R.L.</title>' +
-                '<style>' +
-                '@page { size: letter portrait; margin: 12mm 15mm 15mm 15mm; }' +
-                '*, *::before, *::after { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }' +
-                'body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: #ffffff !important; color: #0f172a !important; font-size: 11px; line-height: 1.35; }' +
-                'h1, h2, h3, h4, p { margin: 0; }' +
-                'table { width: 100% !important; border-collapse: collapse !important; }' +
-                '.dp-sheet { width: 100% !important; max-width: 100% !important; padding: 0 !important; margin: 0 !important; box-shadow: none !important; border: none !important; }' +
-                '.dp-print-header { display: block !important; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 2px solid #0f172a !important; }' +
-                '.dp-rep-hero { background: #f8fafc !important; border: 1.5px solid #0f172a !important; border-radius: 8px !important; padding: 14px 18px !important; margin-bottom: 16px !important; }' +
-                '.dp-rep-hero-title { color: #0f172a !important; font-size: 16px !important; font-weight: 800 !important; }' +
-                '.dp-rep-hero-sub { color: #334155 !important; font-size: 10px !important; }' +
-                '.dp-stat-grid-4 { display: grid !important; grid-template-columns: repeat(4, 1fr) !important; gap: 8px !important; margin-bottom: 16px !important; }' +
-                '.dp-stat-card { background: #ffffff !important; border: 1px solid #94a3b8 !important; border-radius: 6px !important; padding: 8px 10px !important; }' +
-                '.dp-stat-num { color: #0f172a !important; font-size: 14px !important; font-weight: 800 !important; }' +
-                '.dp-panel { background: #ffffff !important; border: 1px solid #94a3b8 !important; border-radius: 6px !important; padding: 10px !important; margin-bottom: 14px !important; page-break-inside: avoid; }' +
-                '.dp-panel-header { border-bottom: 1px solid #cbd5e1 !important; padding-bottom: 6px !important; margin-bottom: 8px !important; }' +
-                '.dp-panel-title { color: #0f172a !important; font-size: 11px !important; font-weight: 700 !important; }' +
-                '.dp-table th { background: #f1f5f9 !important; color: #0f172a !important; font-weight: 700 !important; border-bottom: 1.5px solid #0f172a !important; padding: 5px 6px !important; text-align: left !important; font-size: 8.5px !important; text-transform: uppercase !important; }' +
-                '.dp-table td { color: #0f172a !important; border-bottom: 1px solid #e2e8f0 !important; padding: 5px 6px !important; font-size: 8.5px !important; vertical-align: top !important; }' +
-                '.dp-print-signatures { display: grid !important; grid-template-columns: repeat(2, 1fr) !important; gap: 50px !important; margin-top: 30px !important; padding-top: 8px !important; page-break-inside: avoid; }' +
-                '.dp-sig-line { border-top: 1.5px solid #0f172a !important; text-align: center !important; padding-top: 5px !important; font-size: 9.5px !important; font-weight: 700 !important; color: #0f172a !important; }' +
-                'svg { width: 12px; height: 12px; vertical-align: middle; }' +
-                '</style>' +
-                '</head>' +
-                '<body>' +
-                '<div class="dp-sheet">' + printHtml + '</div>' +
-                '</body>' +
-                '</html>');
-            doc.close();
-
-            // Esperar que el navegador renderice la estructura del iframe y luego invocar el diálogo de impresión
-            setTimeout(function() {
-                try {
-                    iframe.contentWindow.focus();
-                    iframe.contentWindow.print();
-                } catch(err) {
-                    console.error('Fallback a window.print() debido a excepción:', err);
-                    window.print();
-                }
-            }, 300);
+            window.print();
         }
     </script>
 </x-filament-panels::page>
