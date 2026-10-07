@@ -15,6 +15,7 @@ use App\Models\SolicitudServicio;
 use App\Models\User;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class Dashboard extends Page
 {
@@ -24,11 +25,33 @@ class Dashboard extends Page
     protected static string $view = 'filament.pages.dashboard';
 
     /**
-     * Datos del Dashboard calculados para reflejar exclusivamente los módulos y modelos reales.
+     * Datos del Dashboard con consolidación financiera por todos los conceptos y módulos reales.
      */
     public function getData(): array
     {
-        return Cache::remember('dashboard:real_modules:v1', now()->addMinutes(1), function () {
+        return Cache::remember('dashboard:real_modules:v2', now()->addMinutes(1), function () {
+            // ─── CONSOLIDACIÓN FINANCIERA (DINERO GENERADO POR CUALQUIER CONCEPTO) ───
+            $presupuestoObras = (float) Proyecto::sum('presupuesto_total');
+            $solicitudesAprobadasMonto = (float) SolicitudServicio::whereIn('estado', ['Aprobada', 'Convertida_Proyecto'])
+                ->sum('presupuesto_estimado');
+            $solicitudesTodasMonto = (float) SolicitudServicio::sum('presupuesto_estimado');
+            $facturacionIncidencias = (float) Incidencia::sum('monto_facturado');
+            $costoIntervenciones = (float) Incidencia::sum('costo_estimado');
+            $recargasGestionRemota = (float) Servicio::sum('gr_recarga_monto');
+
+            // Gastos de campo reportados por especialistas (transporte y almuerzo)
+            $gastosTransporteTotal = (float) Incidencia::sum('gasto_transporte');
+            $gastosAlmuerzoTotal = (float) Incidencia::sum('gasto_almuerzo');
+            $gastosCampoTotal = $gastosTransporteTotal + $gastosAlmuerzoTotal;
+
+            // Valoración de inventario en almacenes
+            $valorInventario = (float) Item::select(DB::raw('SUM(stock_actual * COALESCE(precio_venta, precio_unitario, precio_costo, 0)) as total'))
+                ->value('total');
+
+            // Dinero total generado por cualquier concepto (obras + solicitudes en cartera + asistencias facturadas + servicios 4G)
+            $ingresosServiciosTotal = $facturacionIncidencias > 0 ? $facturacionIncidencias : $costoIntervenciones;
+            $dineroGeneradoTotal = $presupuestoObras + $solicitudesAprobadasMonto + $ingresosServiciosTotal + $recargasGestionRemota;
+
             // ─── 1. OPERACIONES (Servicios, Incidencias, Brigadas) ───
             $brigadasCount = Brigada::where('activa', true)->count();
             $serviciosTotal = Servicio::count();
@@ -48,7 +71,7 @@ class Dashboard extends Page
                     'detalle'        => $s->cctv_modelo ?: ($s->saci_modelo ?: ($s->notas ?: 'Operativo en campo')),
                 ])->all();
 
-            $incidenciasAbiertas = Incidencia::whereNotIn('estado', ['Resuelta', 'Cerrada', 'Cancelada'])->count();
+            $incidenciasAbiertas = Incidencia::whereNotIn('estado', ['Resuelta', 'Revisada_Supervisor', 'Cerrada', 'Cancelada'])->count();
             $incidenciasCriticas = Incidencia::whereIn('estado', ['Pendiente', 'Asignada', 'En_Progreso', 'En_Espera'])
                 ->where(function ($q) {
                     $q->where('prioridad', 'Critica')
@@ -63,13 +86,16 @@ class Dashboard extends Page
                 ->take(4)
                 ->get()
                 ->map(fn (Incidencia $i) => [
-                    'id'             => $i->id,
-                    'codigo'         => $i->codigo,
-                    'titulo'         => $i->titulo,
-                    'cliente_nombre' => $i->cliente?->nombre ?? 'Sin cliente',
-                    'prioridad'      => $i->prioridad,
-                    'tipo'           => $i->tipo,
-                    'estado'         => $i->estado,
+                    'id'               => $i->id,
+                    'codigo'           => $i->codigo,
+                    'titulo'           => $i->titulo,
+                    'cliente_nombre'   => $i->cliente?->nombre ?? 'Sin cliente',
+                    'prioridad'        => $i->prioridad,
+                    'tipo'             => $i->tipo,
+                    'estado'           => $i->estado,
+                    'gasto_transporte' => (float) ($i->gasto_transporte ?? 0),
+                    'gasto_almuerzo'   => (float) ($i->gasto_almuerzo ?? 0),
+                    'total_gastos'     => (float) ($i->total_gastos_operativos ?? 0),
                 ])->all();
 
             // ─── 2. PROYECTOS & COMERCIAL (Proyectos, Solicitudes) ───
@@ -79,7 +105,6 @@ class Dashboard extends Page
                 ->whereNotNull('fecha_fin')
                 ->where('fecha_fin', '<', now())
                 ->count();
-            $presupuestoTotal = (float) Proyecto::sum('presupuesto_total');
             $maxPresupuesto = (float) (Proyecto::max('presupuesto_total') ?: 1);
 
             $solicitudesPendientes = SolicitudServicio::where('estado', 'Pendiente_Aprobacion')->count();
@@ -189,55 +214,65 @@ class Dashboard extends Page
             // ─── 5. ADMINISTRACIÓN & SISTEMA ───
             $usuariosTotal = User::where('activo', true)->count();
             $tecnicosTotal = User::where('activo', true)
-                ->whereHas('roles', fn ($q) => $q->where('name', 'like', '%tecnico%')->orWhere('name', 'like', '%brigada%'))
+                ->whereHas('roles', fn ($q) => $q->where('name', 'like', '%tecnico%')->orWhere('name', 'like', '%brigada%')->orWhere('name', 'like', '%especialista%'))
                 ->count();
             if ($tecnicosTotal === 0) {
-                // Si aún no están configurados los roles con ese nombre exacto, contar usuarios activos
                 $tecnicosTotal = $usuariosTotal;
             }
 
             return [
+                // Consolidación Financiera (Dinero por cualquier concepto)
+                'dinero_generado_total'    => $dineroGeneradoTotal,
+                'presupuesto_total'        => $presupuestoObras,
+                'solicitudes_monto'        => $solicitudesAprobadasMonto,
+                'solicitudes_todas_monto'  => $solicitudesTodasMonto,
+                'ingresos_servicios_total' => $ingresosServiciosTotal,
+                'recargas_gr_total'        => $recargasGestionRemota,
+                'gastos_transporte_total'  => $gastosTransporteTotal,
+                'gastos_almuerzo_total'    => $gastosAlmuerzoTotal,
+                'gastos_campo_total'       => $gastosCampoTotal,
+                'valor_inventario_total'   => $valorInventario,
+
                 // Operaciones
-                'brigadas_count'         => $brigadasCount,
-                'servicios_total'        => $serviciosTotal,
-                'servicios_cctv'         => $serviciosCctv,
-                'servicios_saci'         => $serviciosSaci,
-                'servicios_gr'           => $serviciosGr,
-                'servicios_recientes'    => $serviciosRecientes,
-                'incidencias_abiertas'   => $incidenciasAbiertas,
-                'incidencias_criticas'   => $incidenciasCriticas,
-                'incidencias_recientes'  => $incidenciasRecientes,
+                'brigadas_count'           => $brigadasCount,
+                'servicios_total'          => $serviciosTotal,
+                'servicios_cctv'           => $serviciosCctv,
+                'servicios_saci'           => $serviciosSaci,
+                'servicios_gr'             => $serviciosGr,
+                'servicios_recientes'      => $serviciosRecientes,
+                'incidencias_abiertas'     => $incidenciasAbiertas,
+                'incidencias_criticas'     => $incidenciasCriticas,
+                'incidencias_recientes'    => $incidenciasRecientes,
 
                 // Proyectos & Comercial
-                'proyectos_activos'      => $proyectosActivos,
-                'proyectos_completados'  => $proyectosCompletados,
-                'retrasados'             => $retrasados,
-                'presupuesto_total'      => $presupuestoTotal,
-                'max_presupuesto'        => $maxPresupuesto,
-                'solicitudes_pendientes' => $solicitudesPendientes,
-                'solicitudes_recientes'  => $solicitudesRecientes,
-                'top_proyectos'          => $topProyectos,
-                'proyectos_recientes'    => $proyectosRecientes,
+                'proyectos_activos'        => $proyectosActivos,
+                'proyectos_completados'    => $proyectosCompletados,
+                'retrasados'               => $retrasados,
+                'max_presupuesto'          => $maxPresupuesto,
+                'solicitudes_pendientes'   => $solicitudesPendientes,
+                'solicitudes_recientes'    => $solicitudesRecientes,
+                'top_proyectos'            => $topProyectos,
+                'proyectos_recientes'      => $proyectosRecientes,
 
                 // Inventario & Almacenes
-                'items_total'            => $itemsTotal,
-                'stock_bajo_count'       => $stockBajoCount,
-                'equipamiento_stock'     => $equipamientoStock,
-                'almacenes_total'        => $almacenesTotal,
-                'alertas_stock'          => $alertasStock,
-                'almacenes_list'         => $almacenesList,
+                'items_total'              => $itemsTotal,
+                'stock_bajo_count'         => $stockBajoCount,
+                'equipamiento_stock'       => $equipamientoStock,
+                'almacenes_total'          => $almacenesTotal,
+                'alertas_stock'            => $alertasStock,
+                'almacenes_list'           => $almacenesList,
 
                 // Clientes & Sedes
-                'clientes_total'         => $clientesTotal,
-                'clientes_activos'       => $clientesActivos,
-                'ubicaciones_total'      => $ubicacionesTotal,
-                'contactos_total'        => $contactosTotal,
-                'clientes_recientes'     => $clientesRecientes,
-                'ubicaciones_recientes'  => $ubicacionesRecientes,
+                'clientes_total'           => $clientesTotal,
+                'clientes_activos'         => $clientesActivos,
+                'ubicaciones_total'        => $ubicacionesTotal,
+                'contactos_total'          => $contactosTotal,
+                'clientes_recientes'       => $clientesRecientes,
+                'ubicaciones_recientes'    => $ubicacionesRecientes,
 
                 // Administración
-                'usuarios_total'         => $usuariosTotal,
-                'tecnicos_total'         => $tecnicosTotal,
+                'usuarios_total'           => $usuariosTotal,
+                'tecnicos_total'           => $tecnicosTotal,
             ];
         });
     }

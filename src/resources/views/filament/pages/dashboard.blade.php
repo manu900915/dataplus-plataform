@@ -4,17 +4,16 @@
         $data = $this->getData();
 
         $tabs = [
-            'operaciones'    => ['label' => 'Operaciones',    'icon' => 'heroicon-o-cpu-chip'],
-            'proyectos'      => ['label' => 'Proyectos',      'icon' => 'heroicon-o-briefcase'],
-            'inventario'     => ['label' => 'Inventario',     'icon' => 'heroicon-o-archive-box'],
-            'clientes'       => ['label' => 'Clientes',       'icon' => 'heroicon-o-building-office-2'],
-            'administracion' => ['label' => 'Administración', 'icon' => 'heroicon-o-shield-check'],
+            'operaciones'    => ['label' => 'Operaciones & Incidencias', 'icon' => 'heroicon-o-cpu-chip'],
+            'proyectos'      => ['label' => 'Proyectos & Obras',         'icon' => 'heroicon-o-briefcase'],
+            'inventario'     => ['label' => 'Inventario & Almacén',      'icon' => 'heroicon-o-archive-box'],
+            'clientes'       => ['label' => 'Clientes & Sedes',          'icon' => 'heroicon-o-building-office-2'],
+            'administracion' => ['label' => 'Administración',            'icon' => 'heroicon-o-shield-check'],
         ];
     @endphp
 
     {{-- ============================================================
-         ESTILOS AUTO-CONTENIDOS CON SEPARACIÓN Y ESPACIADO ROBUSTO
-         (Alineado 100% con los módulos reales de DataPlus Platform)
+         ESTILOS AUTO-CONTENIDOS CON SEPARACIÓN AMPLIA Y ACABADO EJECUTIVO
          ============================================================ --}}
     <style>
         [x-cloak] { display: none !important; }
@@ -26,7 +25,7 @@
             width: 100%;
         }
 
-        /* ─── Hero Ejecutivo DataPlus ─── */
+        /* ─── Hero Banner DataPlus ─── */
         .dp-hero {
             position: relative;
             overflow: hidden;
@@ -45,7 +44,7 @@
             gap: 1.25rem;
             justify-content: space-between;
         }
-        @media (min-width: 768px) {
+        @media (min-width: 900px) {
             .dp-hero-content {
                 flex-direction: row;
                 align-items: center;
@@ -55,8 +54,8 @@
             position: absolute;
             right: -3rem;
             bottom: -3rem;
-            width: 16rem;
-            height: 16rem;
+            width: 18rem;
+            height: 18rem;
             border-radius: 9999px;
             background: rgba(255, 255, 255, 0.14);
             filter: blur(48px);
@@ -99,14 +98,55 @@
             backdrop-filter: blur(10px);
         }
 
-        /* ─── Navegación de Pestañas (Tabs) ─── */
+        /* ─── Ribbon Financiero Consolidado (Dinero Generado por Cualquier Concepto) ─── */
+        .dp-finance-bar {
+            border-radius: 1rem;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            background: linear-gradient(90deg, rgba(15, 23, 42, 0.95) 0%, rgba(8, 47, 73, 0.6) 100%);
+            padding: 1.25rem 1.5rem;
+            margin-bottom: 2rem !important;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+        }
+        .dp-finance-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1.25rem;
+        }
+        @media (min-width: 768px) {
+            .dp-finance-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        }
+        .dp-finance-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+        .dp-finance-item-label {
+            font-size: 0.725rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #94a3b8;
+        }
+        .dp-finance-item-val {
+            font-size: 1.35rem;
+            font-weight: 800;
+            color: #ffffff;
+            font-family: monospace;
+            line-height: 1.1;
+        }
+        .dp-finance-item-hint {
+            font-size: 0.675rem;
+            color: #64748b;
+        }
+
+        /* ─── Pestañas de Navegación ─── */
         .dp-tabs-box {
             border-radius: 0.85rem;
             border: 1px solid #1e293b;
             background: rgba(15, 23, 42, 0.9);
             padding: 0.45rem;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
-            margin-bottom: 2.25rem !important; /* Separación amplia con los recuadros */
+            margin-bottom: 2.25rem !important; /* Separación garantizada de 36px */
         }
         .dp-tabs-nav {
             display: flex;
@@ -138,7 +178,7 @@
             box-shadow: 0 4px 14px rgba(14, 165, 233, 0.4);
         }
 
-        /* ─── Grids de Tarjetas KPI Superiores (SEPARACIÓN CLARA) ─── */
+        /* ─── Grids de Tarjetas KPI Superiores (Separación 36px) ─── */
         .dp-stat-grid-4 {
             display: grid;
             grid-template-columns: repeat(1, minmax(0, 1fr));
@@ -162,7 +202,6 @@
             .dp-stat-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
         }
 
-        /* ─── Tarjeta KPI Individual ─── */
         .dp-stat-card {
             border-radius: 1rem;
             border: 1px solid #1e293b;
@@ -236,7 +275,7 @@
         .dp-panel-grid-2 {
             display: grid;
             grid-template-columns: repeat(1, minmax(0, 1fr));
-            gap: 1.75rem !important; /* Espacio generoso entre paneles izquierdo y derecho */
+            gap: 1.75rem !important;
             margin-bottom: 2rem !important;
         }
         @media (min-width: 1024px) {
@@ -328,7 +367,6 @@
             background: rgba(136, 19, 55, 0.18);
             gap: 0.85rem;
             margin-bottom: 0.85rem;
-            transition: border-color 0.2s ease;
         }
         .dp-alert-card:last-child {
             margin-bottom: 0;
@@ -406,7 +444,7 @@
          }"
          x-init="$watch('activeTab', v => localStorage.setItem('dp-dash-tab', v))">
 
-        {{-- ================= HERO BANNER EJECUTIVO ================= --}}
+        {{-- ================= HERO BANNER EJECUTIVO CON DINERO TOTAL GENERADO ================= --}}
         <div class="dp-hero">
             <div class="dp-hero-content">
                 <div>
@@ -420,29 +458,63 @@
                         DataPlus Platform · {{ $data['servicios_total'] }} servicios en campo · 
                         {{ $data['incidencias_abiertas'] }} incidencias activas · 
                         {{ $data['proyectos_activos'] }} proyectos en curso · 
-                        {{ $data['stock_bajo_count'] > 0 ? $data['stock_bajo_count'] . ' alertas de stock' : 'stock en orden' }}
+                        Gastos especialista: ${{ number_format($data['gastos_campo_total'], 2) }} CUP
                     </p>
                 </div>
                 <div class="dp-hero-pills">
+                    {{-- Dinero Total Generado por cualquier concepto --}}
+                    <div class="dp-hero-pill" style="border-color: rgba(56, 189, 248, 0.5); background: rgba(8, 47, 73, 0.45);">
+                        <p style="font-size: 0.625rem; text-transform: uppercase; font-weight: 700; color: #7dd3fc;">Dinero Total Generado</p>
+                        <p style="font-size: 1.35rem; font-weight: 800; color: #ffffff; line-height: 1;">
+                            ${{ number_format($data['dinero_generado_total'], 2) }} <span style="font-size: 0.8rem; font-weight: 600; color: #7dd3fc;">CUP</span>
+                        </p>
+                    </div>
+
+                    {{-- Gastos de campo del especialista (Transporte + Almuerzo) --}}
+                    @if($data['gastos_campo_total'] > 0)
+                        <div class="dp-hero-pill" style="border-color: rgba(251, 191, 36, 0.4); background: rgba(120, 53, 15, 0.25);">
+                            <p style="font-size: 0.625rem; text-transform: uppercase; font-weight: 700; color: #fde68a;">Gastos de Campo</p>
+                            <p style="font-size: 1.25rem; font-weight: 800; color: #fbbf24; line-height: 1;">
+                                ${{ number_format($data['gastos_campo_total'], 2) }}
+                            </p>
+                        </div>
+                    @endif
+
                     @if($data['incidencias_criticas'] > 0)
                         <div class="dp-hero-pill" style="border-color: rgba(244, 63, 94, 0.4); background: rgba(136, 19, 55, 0.35);">
                             <p style="font-size: 0.625rem; text-transform: uppercase; font-weight: 700; color: #fca5a5;">SLA Crítico</p>
                             <p style="font-size: 1.25rem; font-weight: 800; color: #ffffff; line-height: 1;">{{ $data['incidencias_criticas'] }}</p>
                         </div>
                     @endif
-                    @if($data['retrasados'] > 0)
-                        <div class="dp-hero-pill">
-                            <p style="font-size: 0.625rem; text-transform: uppercase; font-weight: 700; color: #fde68a;">Con retraso</p>
-                            <p style="font-size: 1.25rem; font-weight: 800; color: #fcd34d; line-height: 1;">{{ $data['retrasados'] }}</p>
-                        </div>
-                    @endif
-                    <div class="dp-hero-pill">
-                        <p style="font-size: 0.625rem; text-transform: uppercase; font-weight: 700; color: #e0f2fe;">Cartera Obras</p>
-                        <p style="font-size: 1.25rem; font-weight: 800; color: #ffffff; line-height: 1;">${{ number_format($data['presupuesto_total'], 2) }} CUP</p>
-                    </div>
                 </div>
             </div>
             <div class="dp-hero-glow"></div>
+        </div>
+
+        {{-- ================= DESGLOSE FINANCIERO: DINERO POR CUALQUIER CONCEPTO ================= --}}
+        <div class="dp-finance-bar">
+            <div class="dp-finance-grid">
+                <div class="dp-finance-item">
+                    <span class="dp-finance-item-label">Obras & Proyectos</span>
+                    <span class="dp-finance-item-val" style="color: #38bdf8;">${{ number_format($data['presupuesto_total'], 2) }}</span>
+                    <span class="dp-finance-item-hint">Presupuestos de proyectos contratados</span>
+                </div>
+                <div class="dp-finance-item">
+                    <span class="dp-finance-item-label">Solicitudes Comerciales</span>
+                    <span class="dp-finance-item-val" style="color: #34d399;">${{ number_format($data['solicitudes_monto'], 2) }}</span>
+                    <span class="dp-finance-item-hint">Requerimientos aprobados en cartera</span>
+                </div>
+                <div class="dp-finance-item">
+                    <span class="dp-finance-item-label">Servicios & Asistencias</span>
+                    <span class="dp-finance-item-val" style="color: #c084fc;">${{ number_format($data['ingresos_servicios_total'], 2) }}</span>
+                    <span class="dp-finance-item-hint">Facturado por incidencias y gestión 4G</span>
+                </div>
+                <div class="dp-finance-item">
+                    <span class="dp-finance-item-label">Gastos Especialista</span>
+                    <span class="dp-finance-item-val" style="color: #fbbf24;">-${{ number_format($data['gastos_campo_total'], 2) }}</span>
+                    <span class="dp-finance-item-hint">Transporte: ${{ number_format($data['gastos_transporte_total'], 2) }} · Almuerzo: ${{ number_format($data['gastos_almuerzo_total'], 2) }}</span>
+                </div>
+            </div>
         </div>
 
         {{-- ================= BARRA DE PESTAÑAS (TABS) ================= --}}
@@ -462,10 +534,9 @@
         </div>
 
         {{-- ============================================================
-             SECCIÓN 1: OPERACIONES (Servicios, Incidencias, Brigadas)
+             SECCIÓN 1: OPERACIONES (Servicios, Incidencias, Gastos de Campo)
              ============================================================ --}}
         <div x-show="activeTab === 'operaciones'" x-cloak style="display: block;">
-            {{-- Tarjetas KPI Superiores (con separación de 36px abajo) --}}
             <div class="dp-stat-grid-4">
                 <div class="dp-stat-card">
                     <div class="dp-stat-top">
@@ -492,27 +563,30 @@
                 <div class="dp-stat-card">
                     <div class="dp-stat-top">
                         <span class="dp-stat-label">Incidencias Activas</span>
-                        <div class="dp-stat-icon-box amber">
+                        <div class="dp-stat-icon-box rose">
                             <x-heroicon-o-wrench-screwdriver style="width: 1.1rem; height: 1.1rem;" />
                         </div>
                     </div>
-                    <p class="dp-stat-num" style="color: #fbbf24;">{{ $data['incidencias_abiertas'] }}</p>
+                    <p class="dp-stat-num" style="color: #fb7185;">{{ $data['incidencias_abiertas'] }}</p>
                     <p class="dp-stat-hint">En atención o espera técnica</p>
                 </div>
 
+                {{-- Gasto Especialistas (Transporte y Almuerzo) --}}
                 <div class="dp-stat-card">
                     <div class="dp-stat-top">
-                        <span class="dp-stat-label">SLA Crítico / Alertas</span>
-                        <div class="dp-stat-icon-box rose">
-                            <x-heroicon-o-exclamation-triangle style="width: 1.1rem; height: 1.1rem;" />
+                        <span class="dp-stat-label">Gastos Especialistas</span>
+                        <div class="dp-stat-icon-box amber">
+                            <x-heroicon-o-banknotes style="width: 1.1rem; height: 1.1rem;" />
                         </div>
                     </div>
-                    <p class="dp-stat-num" style="color: #fb7185;">{{ $data['incidencias_criticas'] }}</p>
-                    <p class="dp-stat-hint">Atención prioritaria inmediata</p>
+                    <p class="dp-stat-num" style="color: #fbbf24;">${{ number_format($data['gastos_campo_total'], 2) }}</p>
+                    <p class="dp-stat-hint">
+                        Transporte: ${{ number_format($data['gastos_transporte_total'], 2) }} · Almuerzo: ${{ number_format($data['gastos_almuerzo_total'], 2) }}
+                    </p>
                 </div>
             </div>
 
-            {{-- Paneles Inferiores (Servicios Técnicos e Incidencias Recientes) --}}
+            {{-- Paneles Inferiores (Servicios Técnicos e Incidencias Recientes con Gastos) --}}
             <div class="dp-panel-grid-2">
                 {{-- Parque de Servicios Técnicos --}}
                 <div class="dp-panel">
@@ -561,12 +635,12 @@
                     </div>
                 </div>
 
-                {{-- Incidencias Técnicas Recientes --}}
+                {{-- Incidencias Técnicas Recientes (Con reflejo explícito de gastos) --}}
                 <div class="dp-panel">
                     <div class="dp-panel-header">
                         <h3 class="dp-panel-title">
                             <x-heroicon-o-exclamation-circle style="width: 1.1rem; height: 1.1rem; color: #fb7185;" />
-                            Incidencias Técnicas Recientes
+                            Incidencias & Gastos de Especialistas
                         </h3>
                         <a href="/admin/incidencias" class="dp-panel-link">Ver tickets →</a>
                     </div>
@@ -574,20 +648,34 @@
                         @forelse($data['incidencias_recientes'] as $i)
                             <div class="dp-list-row" style="flex-direction: column; align-items: flex-start; gap: 0.35rem;">
                                 <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; font-size: 0.775rem;">
-                                    <span style="font-weight: 600; color: #ffffff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 75%;">
+                                    <span style="font-weight: 600; color: #ffffff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70%;">
                                         {{ $i['titulo'] }}
                                     </span>
-                                    <span style="padding: 0.15rem 0.45rem; border-radius: 0.35rem; font-size: 0.65rem; font-weight: 700;
-                                        {{ $i['prioridad'] === 'Critica' ? 'background: rgba(244, 63, 94, 0.22); color: #fca5a5; border: 1px solid rgba(244, 63, 94, 0.35);' :
-                                           ($i['prioridad'] === 'Alta' ? 'background: rgba(245, 158, 11, 0.22); color: #fde68a; border: 1px solid rgba(245, 158, 11, 0.35);' :
-                                           'background: #1e293b; color: #cbd5e1;') }}">
-                                        {{ $i['prioridad'] }}
-                                    </span>
+                                    <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                        @if($i['total_gastos'] > 0)
+                                            <span style="font-size: 0.65rem; font-weight: 700; color: #fbbf24; background: rgba(245, 158, 11, 0.15); padding: 0.15rem 0.45rem; border-radius: 0.35rem; border: 1px solid rgba(245, 158, 11, 0.25);">
+                                                Gastos: ${{ number_format($i['total_gastos'], 2) }}
+                                            </span>
+                                        @endif
+                                        <span style="padding: 0.15rem 0.45rem; border-radius: 0.35rem; font-size: 0.65rem; font-weight: 700;
+                                            {{ $i['prioridad'] === 'Critica' ? 'background: rgba(244, 63, 94, 0.22); color: #fca5a5; border: 1px solid rgba(244, 63, 94, 0.35);' :
+                                               ($i['prioridad'] === 'Alta' ? 'background: rgba(245, 158, 11, 0.22); color: #fde68a; border: 1px solid rgba(245, 158, 11, 0.35);' :
+                                               'background: #1e293b; color: #cbd5e1;') }}">
+                                            {{ $i['prioridad'] }}
+                                        </span>
+                                    </div>
                                 </div>
-                                <p style="font-size: 0.7rem; color: #94a3b8; margin: 0;">
-                                    <span style="font-family: monospace; color: #38bdf8;">{{ $i['codigo'] }}</span> · 
-                                    Cliente: <span style="color: #e2e8f0;">{{ $i['cliente_nombre'] }}</span> · Tipo: {{ $i['tipo'] }}
-                                </p>
+                                <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; font-size: 0.7rem; color: #94a3b8; margin: 0;">
+                                    <span>
+                                        <span style="font-family: monospace; color: #38bdf8;">{{ $i['codigo'] }}</span> · 
+                                        Cliente: <span style="color: #e2e8f0;">{{ $i['cliente_nombre'] }}</span>
+                                    </span>
+                                    @if($i['total_gastos'] > 0)
+                                        <span style="color: #fde68a; font-size: 0.65rem;">
+                                            Trans: ${{ number_format($i['gasto_transporte'], 2) }} · Alm: ${{ number_format($i['gasto_almuerzo'], 2) }}
+                                        </span>
+                                    @endif
+                                </div>
                             </div>
                         @empty
                             <div style="padding: 2.5rem 0; text-align: center; font-size: 0.75rem; color: #64748b; display: flex; flex-direction: column; align-items: center;">
@@ -624,7 +712,7 @@
                         </div>
                     </div>
                     <p class="dp-stat-num" style="color: #fbbf24;">{{ $data['solicitudes_pendientes'] }}</p>
-                    <p class="dp-stat-hint">Esperando evaluación supervisor</p>
+                    <p class="dp-stat-hint">Esperando evaluación comercial</p>
                 </div>
 
                 <div class="dp-stat-card">
@@ -757,23 +845,23 @@
 
                 <div class="dp-stat-card">
                     <div class="dp-stat-top">
-                        <span class="dp-stat-label">Equipamiento Técnico</span>
-                        <div class="dp-stat-icon-box purple">
-                            <x-heroicon-o-cube style="width: 1.1rem; height: 1.1rem;" />
+                        <span class="dp-stat-label">Valor en Almacén</span>
+                        <div class="dp-stat-icon-box emerald">
+                            <x-heroicon-o-currency-dollar style="width: 1.1rem; height: 1.1rem;" />
                         </div>
                     </div>
-                    <p class="dp-stat-num" style="color: #c084fc;">{{ $data['equipamiento_stock'] }}</p>
-                    <p class="dp-stat-hint">Unidades en almacenes</p>
+                    <p class="dp-stat-num" style="color: #34d399;">${{ number_format($data['valor_inventario_total'], 2) }}</p>
+                    <p class="dp-stat-hint">Capital en existencias físicas</p>
                 </div>
 
                 <div class="dp-stat-card">
                     <div class="dp-stat-top">
                         <span class="dp-stat-label">Almacenes Físicos</span>
-                        <div class="dp-stat-icon-box emerald">
+                        <div class="dp-stat-icon-box purple">
                             <x-heroicon-o-building-storefront style="width: 1.1rem; height: 1.1rem;" />
                         </div>
                     </div>
-                    <p class="dp-stat-num" style="color: #34d399;">{{ $data['almacenes_total'] }}</p>
+                    <p class="dp-stat-num" style="color: #c084fc;">{{ $data['almacenes_total'] }}</p>
                     <p class="dp-stat-hint">Puntos de almacenamiento</p>
                 </div>
             </div>
@@ -977,9 +1065,9 @@
                     <p class="dp-stat-hint">Cuentas activas en la plataforma</p>
                 </div>
                 <div class="dp-stat-card">
-                    <span class="dp-stat-label">Personal Técnico</span>
+                    <span class="dp-stat-label">Personal Operativo</span>
                     <p class="dp-stat-num" style="color: #34d399;">{{ $data['tecnicos_total'] }}</p>
-                    <p class="dp-stat-hint">Operadores y brigadistas</p>
+                    <p class="dp-stat-hint">Técnicos, especialistas y brigadistas</p>
                 </div>
                 <div class="dp-stat-card">
                     <span class="dp-stat-label">Directorio LDAP / LLDAP</span>
@@ -1006,7 +1094,7 @@
                     <a href="/admin/users" class="dp-quick-link">
                         <div>
                             <p style="font-size: 0.8rem; font-weight: 700; color: #ffffff; margin: 0;">Usuarios, Roles y Permisos RBAC</p>
-                            <p style="font-size: 0.65rem; color: #94a3b8; margin: 0.2rem 0 0;">Control de acceso para supervisores, técnicos y comerciales</p>
+                            <p style="font-size: 0.65rem; color: #94a3b8; margin: 0.2rem 0 0;">Control de acceso para supervisores, especialistas y técnicos</p>
                         </div>
                         <x-heroicon-o-chevron-right style="width: 1.1rem; height: 1.1rem; color: #94a3b8;" />
                     </a>

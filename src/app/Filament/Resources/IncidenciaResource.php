@@ -272,7 +272,6 @@ class IncidenciaResource extends Resource
                             ->placeholder('Seleccione responsable...')
                             ->live()
                             ->afterStateUpdated(function (Set $set, $state, Get $get) {
-                                // Si se selecciona un responsable y el estado estaba en Pendiente, pasa a Asignada
                                 if ($state && ($get('estado') === 'Pendiente' || empty($get('estado')))) {
                                     $set('estado', 'Asignada');
                                 }
@@ -329,26 +328,62 @@ class IncidenciaResource extends Resource
                             }),
                     ]),
 
-                // ─── SECCIÓN 6: Resolución Técnica (Técnico / Especialista) ───
-                Forms\Components\Section::make('Resolución Técnica y Costos')
+                // ─── SECCIÓN 6: Resolución Técnica, Gastos de Campo y Costos ───
+                Forms\Components\Section::make('Gastos de Intervención y Resolución')
+                    ->description('Registro de gastos reales del especialista (transporte, almuerzo) y costos de repuestos.')
                     ->visible(fn (string $context): bool => $context === 'edit')
-                    ->columns(2)
+                    ->columns(3)
                     ->schema([
+                        Forms\Components\TextInput::make('gasto_transporte')
+                            ->label('Gasto Transporte ($)')
+                            ->numeric()
+                            ->prefix('$')
+                            ->default(0)
+                            ->placeholder('0.00')
+                            ->helperText('Pasajes, taxi o combustible del especialista'),
+
+                        Forms\Components\TextInput::make('gasto_almuerzo')
+                            ->label('Gasto Almuerzo / Dieta ($)')
+                            ->numeric()
+                            ->prefix('$')
+                            ->default(0)
+                            ->placeholder('0.00')
+                            ->helperText('Almuerzo o refrigerio en terreno'),
+
+                        Forms\Components\TextInput::make('costo_estimado')
+                            ->label('Repuestos / Materiales ($)')
+                            ->numeric()
+                            ->prefix('$')
+                            ->default(0)
+                            ->placeholder('0.00')
+                            ->helperText('Costo de materiales o repuestos sustituidos'),
+
+                        Forms\Components\TextInput::make('monto_facturado')
+                            ->label('Monto Facturado al Cliente ($)')
+                            ->numeric()
+                            ->prefix('$')
+                            ->placeholder('0.00')
+                            ->helperText('Importe cobrado al cliente por la asistencia técnica'),
+
+                        Forms\Components\Toggle::make('requiere_repuestos')
+                            ->label('¿Requirió Repuestos?')
+                            ->default(false),
+
+                        Forms\Components\Placeholder::make('total_gastos_vista')
+                            ->label('Total Gastos de Campo')
+                            ->content(fn (?Incidencia $record) => '$' . number_format($record?->total_gastos_operativos ?? 0, 2) . ' CUP (Transporte + Almuerzo)'),
+
+                        Forms\Components\Textarea::make('detalle_gastos')
+                            ->label('Detalle de Gastos Operativos')
+                            ->columnSpanFull()
+                            ->rows(2)
+                            ->placeholder('Detalle de pasajes tomados, lugar de almuerzo o comprobantes de gasto...'),
+
                         Forms\Components\Textarea::make('solucion')
                             ->label('Solución Aplicada')
                             ->columnSpanFull()
                             ->rows(3)
-                            ->placeholder('Detalle de las acciones realizadas para resolver la falla...'),
-
-                        Forms\Components\Toggle::make('requiere_repuestos')
-                            ->label('¿Requirió Repuestos / Materiales?')
-                            ->default(false),
-
-                        Forms\Components\TextInput::make('costo_estimado')
-                            ->label('Costo Total Intervención ($)')
-                            ->numeric()
-                            ->prefix('$')
-                            ->maxValue(999999.99),
+                            ->placeholder('Detalle de las acciones técnicas realizadas para resolver la falla...'),
                     ]),
 
                 // ─── SECCIÓN 7: Control de Calidad del Supervisor ───
@@ -369,7 +404,7 @@ class IncidenciaResource extends Resource
                             ->label('Dictamen Técnico del Supervisor')
                             ->columnSpanFull()
                             ->rows(2)
-                            ->placeholder('Conformidad técnica del trabajo realizado...'),
+                            ->placeholder('Conformidad técnica del trabajo realizado y validación de gastos...'),
                     ]),
 
                 // ─── SECCIÓN 8: Cierre Comercial y del Cliente ───
@@ -444,7 +479,7 @@ class IncidenciaResource extends Resource
                 Tables\Columns\TextColumn::make('titulo')
                     ->label('Asunto')
                     ->searchable()
-                    ->limit(30)
+                    ->limit(28)
                     ->tooltip(fn ($record) => $record->titulo),
 
                 Tables\Columns\TextColumn::make('cliente.nombre')
@@ -479,6 +514,24 @@ class IncidenciaResource extends Resource
                         return 'Sin asignar';
                     })
                     ->searchable(),
+
+                // ─── Columna de Gastos de Campo (Transporte y Almuerzo) ───
+                Tables\Columns\TextColumn::make('gastos_campo')
+                    ->label('Gastos Especialista')
+                    ->formatStateUsing(function ($state, Incidencia $record) {
+                        $total = $record->total_gastos_operativos;
+                        return $total > 0 ? '$' . number_format($total, 2) : '-';
+                    })
+                    ->description(function (Incidencia $record) {
+                        if ($record->total_gastos_operativos > 0) {
+                            $trans = number_format($record->gasto_transporte, 2);
+                            $alm = number_format($record->gasto_almuerzo, 2);
+                            return "Trans: \${$trans} · Alm: \${$alm}";
+                        }
+                        return null;
+                    })
+                    ->badge(fn (Incidencia $record) => $record->total_gastos_operativos > 0)
+                    ->color('warning'),
 
                 // ─── Columna de Tiempos y Resolución SLA ───
                 Tables\Columns\TextColumn::make('fecha_resolucion')
@@ -672,7 +725,7 @@ class IncidenciaResource extends Resource
                             ->send();
                     }),
 
-                // ─── 5. Culminar / Resolver (con selector de fecha real de resolución) ───
+                // ─── 5. Culminar / Resolver (con registro de transporte y almuerzo) ───
                 Tables\Actions\Action::make('resolver')
                     ->label('Culminar')
                     ->icon('heroicon-m-check-circle')
@@ -684,23 +737,57 @@ class IncidenciaResource extends Resource
                             ->default(now())
                             ->required()
                             ->native(false)
-                            ->helperText('Indique cuándo concluyó realmente la reparación técnica (se contrastará con el SLA)'),
+                            ->helperText('Momento exacto en que concluyó la reparación técnica (se contrastará con el SLA)'),
+
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                Forms\Components\TextInput::make('gasto_transporte')
+                                    ->label('Gasto de Transporte ($)')
+                                    ->numeric()
+                                    ->prefix('$')
+                                    ->default(0)
+                                    ->placeholder('0.00')
+                                    ->helperText('Pasajes, taxi o combustible'),
+
+                                Forms\Components\TextInput::make('gasto_almuerzo')
+                                    ->label('Gasto de Almuerzo ($)')
+                                    ->numeric()
+                                    ->prefix('$')
+                                    ->default(0)
+                                    ->placeholder('0.00')
+                                    ->helperText('Almuerzo / dieta del especialista'),
+                            ]),
+
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                Forms\Components\TextInput::make('costo_estimado')
+                                    ->label('Repuestos / Materiales ($)')
+                                    ->numeric()
+                                    ->prefix('$')
+                                    ->placeholder('0.00'),
+
+                                Forms\Components\TextInput::make('monto_facturado')
+                                    ->label('Monto Facturado al Cliente ($)')
+                                    ->numeric()
+                                    ->prefix('$')
+                                    ->placeholder('0.00')
+                                    ->helperText('Importe a cobrar al cliente'),
+                            ]),
 
                         Forms\Components\Textarea::make('solucion')
                             ->label('Solución Aplicada / Trabajo Realizado')
                             ->required()
-                            ->rows(3)
+                            ->rows(2)
                             ->placeholder('Describa qué se reparó o reemplazó...'),
+
+                        Forms\Components\Textarea::make('detalle_gastos')
+                            ->label('Detalle de Gastos Operativos (Opcional)')
+                            ->rows(2)
+                            ->placeholder('Detalles de boletos de transporte, lugar de almuerzo, etc.'),
 
                         Forms\Components\Toggle::make('requiere_repuestos')
                             ->label('¿Requirió Repuestos o Materiales?')
                             ->default(false),
-
-                        Forms\Components\TextInput::make('costo_estimado')
-                            ->label('Costo Estimado Intervención ($)')
-                            ->numeric()
-                            ->prefix('$')
-                            ->placeholder('0.00'),
                     ])
                     ->action(function (Incidencia $record, array $data) {
                         $record->update([
@@ -708,12 +795,16 @@ class IncidenciaResource extends Resource
                             'solucion'           => $data['solucion'],
                             'requiere_repuestos' => $data['requiere_repuestos'] ?? false,
                             'costo_estimado'     => $data['costo_estimado'] ?? null,
+                            'gasto_transporte'   => $data['gasto_transporte'] ?? 0,
+                            'gasto_almuerzo'     => $data['gasto_almuerzo'] ?? 0,
+                            'monto_facturado'    => $data['monto_facturado'] ?? null,
+                            'detalle_gastos'     => $data['detalle_gastos'] ?? null,
                             'fecha_resolucion'   => $data['fecha_resolucion'] ?? now(),
                         ]);
 
                         Notification::make()
                             ->title('Incidencia Culminada')
-                            ->body("Pasa a revisión del Supervisor.")
+                            ->body("Pasa a revisión del Supervisor con los gastos registrados.")
                             ->success()
                             ->send();
                     }),
@@ -726,10 +817,10 @@ class IncidenciaResource extends Resource
                     ->visible(fn (Incidencia $record) => $record->estado === 'Resuelta')
                     ->form([
                         Forms\Components\Textarea::make('notas_supervisor')
-                            ->label('Dictamen Técnico del Supervisor')
+                            ->label('Dictamen Técnico y Validación de Gastos')
                             ->required()
                             ->rows(2)
-                            ->placeholder('Certifico que la solución técnica es conforme y los materiales son correctos.'),
+                            ->placeholder('Certifico solución técnica conforme y gastos de transporte/almuerzo válidos.'),
                     ])
                     ->action(function (Incidencia $record, array $data) {
                         $record->update([

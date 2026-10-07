@@ -41,6 +41,10 @@ class Incidencia extends Model
         'conformidad_cliente',
         'observaciones_cierre_comercial',
         'costo_estimado',
+        'gasto_transporte',
+        'gasto_almuerzo',
+        'monto_facturado',
+        'detalle_gastos',
         'creado_por',
         'cerrado_por',
     ];
@@ -56,6 +60,9 @@ class Incidencia extends Model
         'requiere_repuestos' => 'boolean',
         'conformidad_cliente' => 'boolean',
         'costo_estimado' => 'decimal:2',
+        'gasto_transporte' => 'decimal:2',
+        'gasto_almuerzo' => 'decimal:2',
+        'monto_facturado' => 'decimal:2',
     ];
 
     public function cliente(): BelongsTo
@@ -96,6 +103,19 @@ class Incidencia extends Model
     public function cerrador(): BelongsTo
     {
         return $this->belongsTo(User::class, 'cerrado_por');
+    }
+
+    /**
+     * Helpers de gastos operativos del especialista/técnico
+     */
+    public function getTotalGastosOperativosAttribute(): float
+    {
+        return (float) ($this->gasto_transporte ?? 0) + (float) ($this->gasto_almuerzo ?? 0);
+    }
+
+    public function getTotalCostoIntervencionAttribute(): float
+    {
+        return (float) ($this->costo_estimado ?? 0) + $this->total_gastos_operativos;
     }
 
     /**
@@ -207,10 +227,6 @@ class Incidencia extends Model
 
     /**
      * Verifica si se cumplió con el SLA
-     * Retorna:
-     *  true  -> Resuelto dentro del plazo (fecha_resolucion <= fecha_limite)
-     *  false -> Excedió el plazo (fecha_resolucion > fecha_limite)
-     *  null  -> No tiene fecha_resolucion o fecha_limite
      */
     public function getCumplioSlaAttribute(): ?bool
     {
