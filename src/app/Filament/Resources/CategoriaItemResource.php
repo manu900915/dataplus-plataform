@@ -13,11 +13,17 @@ use Filament\Tables\Table;
 class CategoriaItemResource extends Resource
 {
     protected static ?string $model = CategoriaItem::class;
+
     protected static ?string $navigationIcon = 'heroicon-o-tag';
-    protected static ?string $navigationGroup = 'Inventario'; // 👈 AGREGADO
+
+    protected static ?string $navigationGroup = 'Inventario';
+
     protected static ?string $navigationLabel = 'Categorías';
+
     protected static ?string $modelLabel = 'Categoría';
+
     protected static ?string $pluralModelLabel = 'Categorías';
+
     protected static ?int $navigationSort = 1;
 
     public static function form(Form $form): Form
@@ -25,16 +31,29 @@ class CategoriaItemResource extends Resource
         return $form
             ->schema([
                 Forms\Components\TextInput::make('nombre')
+                    ->label('Nombre de la Categoría')
                     ->required()
-                    ->maxLength(255),
+                    ->maxLength(255)
+                    ->columnSpanFull(),
+
+                Forms\Components\Textarea::make('descripcion')
+                    ->label('Descripción / Subcomponentes')
+                    ->rows(3)
+                    ->nullable()
+                    ->columnSpanFull()
+                    ->helperText('Detalla los tipos de equipos o materiales que pertenecen a esta categoría.'),
+
                 Forms\Components\Select::make('tipo')
+                    ->label('Tipo')
                     ->options([
                         'equipamiento' => 'Equipamiento',
                         'material' => 'Material',
                         'ambos' => 'Ambos',
                     ])
                     ->required(),
+
                 Forms\Components\Toggle::make('activo')
+                    ->label('Activo')
                     ->default(true),
             ]);
     }
@@ -44,16 +63,34 @@ class CategoriaItemResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('nombre')
+                    ->label('Categoría')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->weight('bold'),
+
+                Tables\Columns\TextColumn::make('descripcion')
+                    ->label('Descripción')
+                    ->limit(55)
+                    ->tooltip(fn ($record) => $record->descripcion)
+                    ->searchable()
+                    ->color('gray'),
+
                 Tables\Columns\BadgeColumn::make('tipo')
+                    ->label('Tipo')
                     ->colors([
                         'primary' => 'equipamiento',
                         'success' => 'material',
                         'info' => 'ambos',
                     ]),
+
                 Tables\Columns\IconColumn::make('activo')
+                    ->label('Activo')
                     ->boolean(),
+
+                Tables\Columns\TextColumn::make('items_count')
+                    ->counts('items')
+                    ->label('Ítems')
+                    ->sortable(),
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),

@@ -9,9 +9,16 @@ class CategoriaItem extends Model
 {
     protected $table = 'categorias_item';
 
-    protected $fillable = ['nombre', 'tipo', 'activo'];
+    protected $fillable = [
+        'nombre',
+        'descripcion',
+        'tipo',
+        'activo',
+    ];
 
-    protected $casts = ['activo' => 'boolean'];
+    protected $casts = [
+        'activo' => 'boolean',
+    ];
 
     public function items(): HasMany
     {

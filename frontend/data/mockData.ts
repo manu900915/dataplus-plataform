@@ -144,15 +144,19 @@ export const INITIAL_TIPOS_NEGOCIO: TipoNegocio[] = [
 ];
 
 export const INITIAL_CATEGORIAS_ITEM: CategoriaItem[] = [
-  { id: 'cat-1', nombre: 'Insecticidas y plaguicidas', tipo: 'material', activo: true, items_count: 0 },
-  { id: 'cat-2', nombre: 'Cebos y trampas', tipo: 'material', activo: true, items_count: 0 },
-  { id: 'cat-3', nombre: 'Envases y consumibles', tipo: 'material', activo: true, items_count: 0 },
-  { id: 'cat-4', nombre: 'Equipos de aspersión', tipo: 'equipamiento', activo: true, items_count: 0 },
-  { id: 'cat-5', nombre: 'Herramientas', tipo: 'equipamiento', activo: true, items_count: 0 },
-  { id: 'cat-6', nombre: 'EPI (protección personal)', tipo: 'ambos', activo: true, items_count: 0 },
-  { id: 'cat-7', nombre: 'Cámaras CCTV & Grabadores NVR', tipo: 'equipamiento', activo: true, items_count: 0 },
-  { id: 'cat-8', nombre: 'Sistemas de Alarma SACI', tipo: 'equipamiento', activo: true, items_count: 0 },
-  { id: 'cat-9', nombre: 'Routers 4G & Equipos de Red', tipo: 'equipamiento', activo: true, items_count: 0 }
+  { id: 'cat-1', nombre: 'CCTV - Cámaras y Dispositivos de Captura', descripcion: 'Cámaras IP, domos, tubulares/bullet, PTZ, térmicas y minidomos con audio', tipo: 'equipamiento', activo: true, items_count: 0 },
+  { id: 'cat-2', nombre: 'CCTV - Grabadores y Almacenamiento (NVR / DVR)', descripcion: 'Grabadores NVR, DVR/XVR, discos duros para videovigilancia (WD Purple, SkyHawk) y tarjetas industriales', tipo: 'equipamiento', activo: true, items_count: 0 },
+  { id: 'cat-3', nombre: 'SACI - Paneles de Alarma y Centrales de Control', descripcion: 'Centrales de alarma cableadas e inalámbricas, paneles de control, expansores y comunicadores GSM/IP', tipo: 'equipamiento', activo: true, items_count: 0 },
+  { id: 'cat-4', nombre: 'SACI - Sensores y Detección de Intrusión', descripcion: 'Sensores de movimiento PIR interiores/exteriores, contactos magnéticos, detectores de impacto y barreras perimetrales', tipo: 'equipamiento', activo: true, items_count: 0 },
+  { id: 'cat-5', nombre: 'SACI - Notificación Sonora y Señalización', descripcion: 'Sirenas exteriores con flash/estroboscopio, sirenas piezoeléctricas de interior, campanas y módulos de voz', tipo: 'equipamiento', activo: true, items_count: 0 },
+  { id: 'cat-6', nombre: 'Redes, Conectividad y Gestión Remota', descripcion: 'Routers 4G/LTE industriales, módems, switches PoE/Gigabit gestionables, access points y tarjetas SIM M2M', tipo: 'equipamiento', activo: true, items_count: 0 },
+  { id: 'cat-7', nombre: 'Control de Acceso e Intercomunicación', descripcion: 'Controladores de acceso IP, lectores biométricos (huella/facial), lectores RFID, electroimanes, cantoneras y pulsadores No Touch', tipo: 'equipamiento', activo: true, items_count: 0 },
+  { id: 'cat-8', nombre: 'Energía, Respaldo y Protección Eléctrica', descripcion: 'Sistemas UPS ininterrumpidos, fuentes conmutadas centralizadas (12V/24V), baterías AGM (12V 4Ah/7Ah) y supresores de sobretensión', tipo: 'ambos', activo: true, items_count: 0 },
+  { id: 'cat-9', nombre: 'Cableado Estructurado y Conectividad Pasiva', descripcion: 'Bobinas UTP/FTP Cat 6/6A para interior y exterior, conectores RJ45 apantallados, patch panels, jacks y patch cords', tipo: 'material', activo: true, items_count: 0 },
+  { id: 'cat-10', nombre: 'Canalizaciones, Tuberías y Cajas de Conexión', descripcion: 'Tuberías conduit metálicas EMT y PVC, canaletas ranuradas/decorativas, uniones, curvas y cajas estancas IP65/IP66', tipo: 'material', activo: true, items_count: 0 },
+  { id: 'cat-11', nombre: 'Fijación, Tornillería y Consumibles de Montaje', descripcion: 'Tarugos plásticos y metálicos, tornillos autoperforantes, amarres/bridas UV, cinta vulcanizada y silicona', tipo: 'material', activo: true, items_count: 0 },
+  { id: 'cat-12', nombre: 'Herramientas de Trabajo e Instrumental de Medición', descripcion: 'Crimpeadoras RJ45, herramientas punch-down, probadores/testers de red, multímetros, rotomartillos y escaleras', tipo: 'equipamiento', activo: true, items_count: 0 },
+  { id: 'cat-13', nombre: 'Equipos de Protección Individual (EPI / EPP)', descripcion: 'Cascos dieléctricos, arneses anticaídas de cuerpo entero, guantes técnicos, gafas de seguridad y chalecos reflectivos', tipo: 'material', activo: true, items_count: 0 }
 ];
 
 export const INITIAL_ALMACENES: Almacen[] = [

@@ -153,6 +153,7 @@ export interface ItemInventario {
 export interface CategoriaItem {
   id: string;
   nombre: string;
+  descripcion?: string;
   tipo: ItemCategoryType;
   activo: boolean;
   items_count: number;
