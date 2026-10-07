@@ -2,13 +2,16 @@
 
 namespace App\Filament\Pages;
 
+use App\Models\Almacen;
 use App\Models\Brigada;
 use App\Models\Cliente;
+use App\Models\ClienteUbicacion;
+use App\Models\ContactoCliente;
 use App\Models\Incidencia;
 use App\Models\Item;
-use App\Models\LineaPresupuesto;
 use App\Models\Proyecto;
 use App\Models\Servicio;
+use App\Models\SolicitudServicio;
 use App\Models\User;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Cache;
@@ -21,12 +24,55 @@ class Dashboard extends Page
     protected static string $view = 'filament.pages.dashboard';
 
     /**
-     * Datos del Dashboard calculados y cacheados 1 minuto para máxima reactividad y velocidad.
+     * Datos del Dashboard calculados para reflejar exclusivamente los módulos y modelos reales.
      */
     public function getData(): array
     {
-        return Cache::remember('dashboard:preview_match:v3', now()->addMinutes(1), function () {
-            // Proyectos
+        return Cache::remember('dashboard:real_modules:v1', now()->addMinutes(1), function () {
+            // ─── 1. OPERACIONES (Servicios, Incidencias, Brigadas) ───
+            $brigadasCount = Brigada::where('activa', true)->count();
+            $serviciosTotal = Servicio::count();
+            $serviciosCctv = Servicio::where('tipo', 'CCTV')->count();
+            $serviciosSaci = Servicio::where('tipo', 'SACI')->count();
+            $serviciosGr = Servicio::whereIn('tipo', ['Gestion_Remota', 'Redes'])->count();
+
+            $serviciosRecientes = Servicio::with('ubicacion.cliente')
+                ->latest()
+                ->take(4)
+                ->get()
+                ->map(fn (Servicio $s) => [
+                    'id'             => $s->id,
+                    'codigo'         => 'SRV-' . str_pad($s->id, 4, '0', STR_PAD_LEFT),
+                    'tipo'           => $s->tipo,
+                    'cliente_nombre' => $s->ubicacion?->cliente?->nombre ?? 'Sede Central',
+                    'detalle'        => $s->cctv_modelo ?: ($s->saci_modelo ?: ($s->notas ?: 'Operativo en campo')),
+                ])->all();
+
+            $incidenciasAbiertas = Incidencia::whereNotIn('estado', ['Resuelta', 'Cerrada', 'Cancelada'])->count();
+            $incidenciasCriticas = Incidencia::whereIn('estado', ['Pendiente', 'Asignada', 'En_Progreso', 'En_Espera'])
+                ->where(function ($q) {
+                    $q->where('prioridad', 'Critica')
+                      ->orWhere(function ($sub) {
+                          $sub->whereNotNull('fecha_limite')->where('fecha_limite', '<', now());
+                      });
+                })->count();
+
+            $incidenciasRecientes = Incidencia::with('cliente')
+                ->whereNotIn('estado', ['Cerrada', 'Cancelada'])
+                ->latest()
+                ->take(4)
+                ->get()
+                ->map(fn (Incidencia $i) => [
+                    'id'             => $i->id,
+                    'codigo'         => $i->codigo,
+                    'titulo'         => $i->titulo,
+                    'cliente_nombre' => $i->cliente?->nombre ?? 'Sin cliente',
+                    'prioridad'      => $i->prioridad,
+                    'tipo'           => $i->tipo,
+                    'estado'         => $i->estado,
+                ])->all();
+
+            // ─── 2. PROYECTOS & COMERCIAL (Proyectos, Solicitudes) ───
             $proyectosActivos = Proyecto::whereIn('estado', ['borrador', 'en_progreso'])->count();
             $proyectosCompletados = Proyecto::where('estado', 'completado')->count();
             $retrasados = Proyecto::where('estado', 'en_progreso')
@@ -35,6 +81,21 @@ class Dashboard extends Page
                 ->count();
             $presupuestoTotal = (float) Proyecto::sum('presupuesto_total');
             $maxPresupuesto = (float) (Proyecto::max('presupuesto_total') ?: 1);
+
+            $solicitudesPendientes = SolicitudServicio::where('estado', 'Pendiente_Aprobacion')->count();
+            $solicitudesRecientes = SolicitudServicio::with('cliente')
+                ->latest()
+                ->take(4)
+                ->get()
+                ->map(fn (SolicitudServicio $s) => [
+                    'id'          => $s->id,
+                    'codigo'      => $s->codigo,
+                    'titulo'      => $s->titulo,
+                    'cliente'     => $s->cliente?->nombre ?? 'Sin cliente',
+                    'estado'      => $s->estado,
+                    'presupuesto' => (float) $s->presupuesto_estimado,
+                    'prioridad'   => $s->prioridad,
+                ])->all();
 
             $topProyectos = Proyecto::with('cliente')
                 ->orderByDesc('presupuesto_total')
@@ -60,46 +121,11 @@ class Dashboard extends Page
                     'cliente_nombre' => $p->cliente?->nombre ?? 'Sin cliente',
                 ])->all();
 
-            // Operaciones / Servicios / Incidencias
-            $brigadasCount = Brigada::where('activa', true)->count();
-            $serviciosTotal = Servicio::count();
-            $serviciosCctv = Servicio::where('tipo', 'CCTV')->count();
-            $serviciosSaci = Servicio::where('tipo', 'SACI')->count();
-            $serviciosGr = Servicio::whereIn('tipo', ['Gestion_Remota', 'Redes'])->count();
-
-            $serviciosRecientes = Servicio::with('ubicacion.cliente')
-                ->latest()
-                ->take(4)
-                ->get()
-                ->map(fn (Servicio $s) => [
-                    'id'             => $s->id,
-                    'codigo'         => 'SRV-' . str_pad($s->id, 4, '0', STR_PAD_LEFT),
-                    'tipo'           => $s->tipo,
-                    'cliente_nombre' => $s->ubicacion?->cliente?->nombre ?? 'Sede Central',
-                    'detalle'        => $s->cctv_modelo ?: ($s->saci_modelo ?: ($s->notas ?: 'Operativo en campo')),
-                ])->all();
-
-            $incidenciasAbiertas = Incidencia::whereNotIn('estado', ['Resuelta', 'Cerrada', 'Cancelada'])->count();
-            $incidenciasRecientes = Incidencia::with('cliente')
-                ->whereNotIn('estado', ['Cerrada', 'Cancelada'])
-                ->latest()
-                ->take(4)
-                ->get()
-                ->map(fn (Incidencia $i) => [
-                    'id'             => $i->id,
-                    'codigo'         => $i->codigo,
-                    'titulo'         => $i->titulo,
-                    'cliente_nombre' => $i->cliente?->nombre ?? 'Sin cliente',
-                    'prioridad'      => $i->prioridad,
-                    'tipo'           => $i->tipo,
-                    'estado'         => $i->estado,
-                ])->all();
-
-            // Inventario (usando relación 'categoria', ya que Item pertenece a CategoriaItem)
+            // ─── 3. INVENTARIO & ALMACENES ───
             $itemsTotal = Item::count();
             $stockBajoCount = Item::whereColumn('stock_actual', '<=', 'stock_minimo')->count();
             $equipamientoStock = (int) Item::where('es_equipamiento', true)->sum('stock_actual');
-            $materialesStock = (int) Item::where('es_equipamiento', false)->sum('stock_actual');
+            $almacenesTotal = Almacen::count();
 
             $alertasStock = Item::with('categoria')
                 ->whereColumn('stock_actual', '<=', 'stock_minimo')
@@ -116,56 +142,102 @@ class Dashboard extends Page
                     'stock_minimo'     => $item->stock_minimo,
                 ])->all();
 
-            // Finanzas
-            $presupuestoEquipamiento = (float) LineaPresupuesto::where('tipo_linea', 'equipamiento')->sum('subtotal');
-            $presupuestoManoObra = (float) LineaPresupuesto::where('tipo_linea', 'mano_obra')->sum('subtotal');
-            $presupuestoMateriales = (float) LineaPresupuesto::where('tipo_linea', 'material')->sum('subtotal');
-            $presupuestoTransporte = (float) LineaPresupuesto::where('tipo_linea', 'transporte')->sum('subtotal');
-            $finanzasMes = (float) Proyecto::whereMonth('created_at', now()->month)->sum('presupuesto_total');
+            $almacenesList = Almacen::with('responsable')
+                ->latest()
+                ->take(4)
+                ->get()
+                ->map(fn (Almacen $a) => [
+                    'id'          => $a->id,
+                    'nombre'      => $a->nombre,
+                    'provincia'   => $a->provincia ?? 'La Habana',
+                    'municipio'   => $a->municipio ?? 'Plaza',
+                    'responsable' => $a->responsable?->name ?? 'Sin asignar',
+                ])->all();
 
-            // Administración
+            // ─── 4. CLIENTES & SEDES ───
             $clientesTotal = Cliente::count();
             $clientesActivos = Cliente::where('activo', true)->count();
+            $ubicacionesTotal = ClienteUbicacion::count();
+            $contactosTotal = ContactoCliente::count();
+
+            $clientesRecientes = Cliente::withCount(['ubicaciones', 'servicios'])
+                ->latest()
+                ->take(5)
+                ->get()
+                ->map(fn (Cliente $c) => [
+                    'id'          => $c->id,
+                    'nombre'      => $c->nombre,
+                    'cif'         => $c->cif ?? 'S/N',
+                    'telefono'    => $c->telefono ?? 'Sin teléfono',
+                    'ubicaciones' => $c->ubicaciones_count ?? 0,
+                    'servicios'   => $c->servicios_count ?? 0,
+                    'activo'      => $c->activo,
+                ])->all();
+
+            $ubicacionesRecientes = ClienteUbicacion::with(['cliente', 'tipoNegocio'])
+                ->latest()
+                ->take(4)
+                ->get()
+                ->map(fn (ClienteUbicacion $u) => [
+                    'id'           => $u->id,
+                    'nombre'       => $u->nombre,
+                    'cliente'      => $u->cliente?->nombre ?? 'Cliente',
+                    'provincia'    => $u->provincia ?? 'La Habana',
+                    'tipo_negocio' => $u->tipoNegocio?->nombre ?? 'Comercial',
+                ])->all();
+
+            // ─── 5. ADMINISTRACIÓN & SISTEMA ───
             $usuariosTotal = User::where('activo', true)->count();
+            $tecnicosTotal = User::where('activo', true)
+                ->whereHas('roles', fn ($q) => $q->where('name', 'like', '%tecnico%')->orWhere('name', 'like', '%brigada%'))
+                ->count();
+            if ($tecnicosTotal === 0) {
+                // Si aún no están configurados los roles con ese nombre exacto, contar usuarios activos
+                $tecnicosTotal = $usuariosTotal;
+            }
 
             return [
-                // Proyectos
-                'proyectos_activos'        => $proyectosActivos,
-                'proyectos_completados'    => $proyectosCompletados,
-                'retrasados'               => $retrasados,
-                'presupuesto_total'        => $presupuestoTotal,
-                'max_presupuesto'          => $maxPresupuesto,
-                'top_proyectos'            => $topProyectos,
-                'proyectos_recientes'      => $proyectosRecientes,
-
                 // Operaciones
-                'brigadas_count'           => $brigadasCount,
-                'servicios_total'          => $serviciosTotal,
-                'servicios_cctv'           => $serviciosCctv,
-                'servicios_saci'           => $serviciosSaci,
-                'servicios_gr'             => $serviciosGr,
-                'servicios_recientes'      => $serviciosRecientes,
-                'incidencias_abiertas'     => $incidenciasAbiertas,
-                'incidencias_recientes'    => $incidenciasRecientes,
+                'brigadas_count'         => $brigadasCount,
+                'servicios_total'        => $serviciosTotal,
+                'servicios_cctv'         => $serviciosCctv,
+                'servicios_saci'         => $serviciosSaci,
+                'servicios_gr'           => $serviciosGr,
+                'servicios_recientes'    => $serviciosRecientes,
+                'incidencias_abiertas'   => $incidenciasAbiertas,
+                'incidencias_criticas'   => $incidenciasCriticas,
+                'incidencias_recientes'  => $incidenciasRecientes,
 
-                // Inventario
-                'items_total'              => $itemsTotal,
-                'stock_bajo_count'         => $stockBajoCount,
-                'equipamiento_stock'       => $equipamientoStock,
-                'materiales_stock'         => $materialesStock,
-                'alertas_stock'            => $alertasStock,
+                // Proyectos & Comercial
+                'proyectos_activos'      => $proyectosActivos,
+                'proyectos_completados'  => $proyectosCompletados,
+                'retrasados'             => $retrasados,
+                'presupuesto_total'      => $presupuestoTotal,
+                'max_presupuesto'        => $maxPresupuesto,
+                'solicitudes_pendientes' => $solicitudesPendientes,
+                'solicitudes_recientes'  => $solicitudesRecientes,
+                'top_proyectos'          => $topProyectos,
+                'proyectos_recientes'    => $proyectosRecientes,
 
-                // Finanzas
-                'presupuesto_equipamiento' => $presupuestoEquipamiento,
-                'presupuesto_mano_obra'    => $presupuestoManoObra,
-                'presupuesto_materiales'   => $presupuestoMateriales,
-                'presupuesto_transporte'   => $presupuestoTransporte,
-                'finanzas_mes'             => $finanzasMes,
+                // Inventario & Almacenes
+                'items_total'            => $itemsTotal,
+                'stock_bajo_count'       => $stockBajoCount,
+                'equipamiento_stock'     => $equipamientoStock,
+                'almacenes_total'        => $almacenesTotal,
+                'alertas_stock'          => $alertasStock,
+                'almacenes_list'         => $almacenesList,
+
+                // Clientes & Sedes
+                'clientes_total'         => $clientesTotal,
+                'clientes_activos'       => $clientesActivos,
+                'ubicaciones_total'      => $ubicacionesTotal,
+                'contactos_total'        => $contactosTotal,
+                'clientes_recientes'     => $clientesRecientes,
+                'ubicaciones_recientes'  => $ubicacionesRecientes,
 
                 // Administración
-                'clientes_total'           => $clientesTotal,
-                'clientes_activos'         => $clientesActivos,
-                'usuarios_total'           => $usuariosTotal,
+                'usuarios_total'         => $usuariosTotal,
+                'tecnicos_total'         => $tecnicosTotal,
             ];
         });
     }
