@@ -4,15 +4,51 @@ namespace App\Filament\Pages;
 
 use App\Models\Proyecto;
 use Filament\Pages\Page;
+use Illuminate\Database\Eloquent\Builder;
 
 class SeguimientoProyectos extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-queue-list';
     protected static ?string $navigationLabel = 'Seguimiento';
-    protected static ?string $title = 'Seguimiento de Proyectos I+D';
+    protected static ?string $title = 'Seguimiento de Proyectos';
     protected static ?string $navigationGroup = 'Proyectos';
     protected static ?int $navigationSort = 1;
     protected static string $view = 'filament.pages.seguimiento-proyectos';
+
+    public string $filtroTipo = 'todos';
+
+    public function setFiltro(string $tipo): void
+    {
+        $this->filtroTipo = $tipo;
+    }
+
+    protected function getBaseQuery(): Builder
+    {
+        $query = Proyecto::query()->with(['tipoProyecto', 'cliente', 'responsable']);
+
+        if ($this->filtroTipo === 'instalacion') {
+            $query->where(function (Builder $q) {
+                $q->where('tipo_seguimiento', 'instalacion')
+                  ->orWhereNull('tipo_seguimiento');
+            });
+        } elseif ($this->filtroTipo === 'investigacion') {
+            $query->where('tipo_seguimiento', 'investigacion');
+        }
+
+        return $query;
+    }
+
+    public function getCounts(): array
+    {
+        return [
+            'todos' => Proyecto::count(),
+            'instalacion' => Proyecto::where(function (Builder $q) {
+                $q->where('tipo_seguimiento', 'instalacion')
+                  ->orWhereNull('tipo_seguimiento');
+            })->count(),
+            'investigacion' => Proyecto::where('tipo_seguimiento', 'investigacion')->count(),
+        ];
+    }
 
     public function getColumns(): array
     {
@@ -20,32 +56,66 @@ class SeguimientoProyectos extends Page
             'por_hacer' => [
                 'title' => '📋 Por Hacer',
                 'color' => 'gray',
-                'proyectos' => Proyecto::where('tipo_seguimiento', 'investigacion')
-                    ->where('estado_kanban', 'por_hacer')
-                    ->orderBy('created_at')
+                'proyectos' => $this->getBaseQuery()
+                    ->where(function (Builder $query) {
+                        $query->where('estado_kanban', 'por_hacer')
+                            ->orWhere(function (Builder $q) {
+                                $q->where('estado', 'borrador')
+                                    ->where(function (Builder $sub) {
+                                        $sub->whereNull('estado_kanban')
+                                            ->orWhereNotIn('estado_kanban', ['en_progreso', 'en_revision', 'completado']);
+                                    });
+                            })
+                            ->orWhere(function (Builder $q) {
+                                $q->whereNull('estado_kanban')
+                                    ->whereNotIn('estado', ['en_progreso', 'completado']);
+                            });
+                    })
+                    ->where('estado', '!=', 'completado')
+                    ->where('estado_kanban', '!=', 'completado')
+                    ->where('estado', '!=', 'en_progreso')
+                    ->where('estado_kanban', '!=', 'en_progreso')
+                    ->where('estado_kanban', '!=', 'en_revision')
+                    ->orderBy('created_at', 'desc')
                     ->get(),
             ],
             'en_progreso' => [
                 'title' => '🔄 En Progreso',
                 'color' => 'warning',
-                'proyectos' => Proyecto::where('tipo_seguimiento', 'investigacion')
-                    ->where('estado_kanban', 'en_progreso')
+                'proyectos' => $this->getBaseQuery()
+                    ->where(function (Builder $query) {
+                        $query->where('estado_kanban', 'en_progreso')
+                            ->orWhere(function (Builder $q) {
+                                $q->where('estado', 'en_progreso')
+                                    ->where(function (Builder $sub) {
+                                        $sub->whereNull('estado_kanban')
+                                            ->orWhereNotIn('estado_kanban', ['en_revision', 'completado']);
+                                    });
+                            });
+                    })
+                    ->where('estado', '!=', 'completado')
+                    ->where('estado_kanban', '!=', 'completado')
                     ->orderBy('updated_at', 'desc')
                     ->get(),
             ],
             'en_revision' => [
-                'title' => ' En Revisión',
+                'title' => '🔍 En Revisión',
                 'color' => 'info',
-                'proyectos' => Proyecto::where('tipo_seguimiento', 'investigacion')
+                'proyectos' => $this->getBaseQuery()
                     ->where('estado_kanban', 'en_revision')
+                    ->where('estado', '!=', 'completado')
+                    ->where('estado_kanban', '!=', 'completado')
                     ->orderBy('updated_at', 'desc')
                     ->get(),
             ],
             'completado' => [
                 'title' => '✅ Completado',
                 'color' => 'success',
-                'proyectos' => Proyecto::where('tipo_seguimiento', 'investigacion')
-                    ->where('estado_kanban', 'completado')
+                'proyectos' => $this->getBaseQuery()
+                    ->where(function (Builder $query) {
+                        $query->where('estado_kanban', 'completado')
+                            ->orWhere('estado', 'completado');
+                    })
                     ->orderBy('updated_at', 'desc')
                     ->get(),
             ],

@@ -13,10 +13,21 @@ class ProyectoKanbanController extends Controller
             'estado_kanban' => 'required|in:por_hacer,en_progreso,en_revision,completado',
         ]);
 
-        $proyecto->update([
+        $updateData = [
             'estado_kanban' => $request->estado_kanban,
-        ]);
+        ];
 
-        return back()->with('success', 'Estado actualizado correctamente');
+        // Sincronizar estado general acorde al flujo kanban
+        if ($request->estado_kanban === 'completado') {
+            $updateData['estado'] = 'completado';
+        } elseif (in_array($request->estado_kanban, ['en_progreso', 'en_revision'])) {
+            $updateData['estado'] = 'en_progreso';
+        } elseif ($request->estado_kanban === 'por_hacer' && $proyecto->estado === 'completado') {
+            $updateData['estado'] = 'en_progreso';
+        }
+
+        $proyecto->update($updateData);
+
+        return back()->with('success', 'Fase de seguimiento actualizada correctamente');
     }
 }

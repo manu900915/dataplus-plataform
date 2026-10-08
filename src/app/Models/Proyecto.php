@@ -34,6 +34,35 @@ class Proyecto extends Model
         'presupuesto_total' => 'decimal:2',
     ];
 
+    protected static function booted(): void
+    {
+        static::saving(function (Proyecto $proyecto) {
+            // Sincronizar estado general y estado kanban de forma bidireccional
+            if ($proyecto->isDirty('estado') && !$proyecto->isDirty('estado_kanban')) {
+                if ($proyecto->estado === 'completado') {
+                    $proyecto->estado_kanban = 'completado';
+                } elseif ($proyecto->estado === 'en_progreso' && in_array($proyecto->estado_kanban, [null, 'por_hacer', 'completado'])) {
+                    $proyecto->estado_kanban = 'en_progreso';
+                } elseif ($proyecto->estado === 'borrador' && in_array($proyecto->estado_kanban, ['completado', 'en_progreso', 'en_revision'])) {
+                    $proyecto->estado_kanban = 'por_hacer';
+                }
+            } elseif ($proyecto->isDirty('estado_kanban') && !$proyecto->isDirty('estado')) {
+                if ($proyecto->estado_kanban === 'completado') {
+                    $proyecto->estado = 'completado';
+                } elseif (in_array($proyecto->estado_kanban, ['en_progreso', 'en_revision']) && $proyecto->estado !== 'en_progreso') {
+                    $proyecto->estado = 'en_progreso';
+                } elseif ($proyecto->estado_kanban === 'por_hacer' && $proyecto->estado === 'completado') {
+                    $proyecto->estado = 'en_progreso';
+                }
+            }
+
+            // Si se crea o guarda y estado_kanban está vacío pero estado es completado
+            if (empty($proyecto->estado_kanban)) {
+                $proyecto->estado_kanban = $proyecto->estado === 'completado' ? 'completado' : 'por_hacer';
+            }
+        });
+    }
+
     public function tipoProyecto(): BelongsTo
     {
         return $this->belongsTo(TipoProyecto::class, 'tipo_proyecto_id');

@@ -11,26 +11,57 @@ class OperacionesChart extends ChartWidget
 {
     use AnimatedCharts;
 
-    protected static ?string $heading = 'Proyectos I+D por Estado Kanban';
+    protected static ?string $heading = 'Proyectos por Fase de Seguimiento';
+
     protected static ?int $sort = 3;
+
     protected int | string | array $columnSpan = 1;
 
     protected function getData(): array
     {
-        $stats = Proyecto::where('tipo_seguimiento', 'investigacion')
-            ->select('estado_kanban', DB::raw('count(*) as total'))
+        $stats = Proyecto::select('estado_kanban', DB::raw('count(*) as total'))
             ->groupBy('estado_kanban')
             ->pluck('total', 'estado_kanban');
+
+        // Contabilizar también completados por estado general si estado_kanban estuviese desincronizado
+        $completados = Proyecto::where('estado_kanban', 'completado')
+            ->orWhere('estado', 'completado')
+            ->count();
+
+        $enRevision = Proyecto::where('estado_kanban', 'en_revision')
+            ->where('estado', '!=', 'completado')
+            ->count();
+
+        $enProgreso = Proyecto::where(function ($q) {
+                $q->where('estado_kanban', 'en_progreso')
+                  ->orWhere('estado', 'en_progreso');
+            })
+            ->where('estado', '!=', 'completado')
+            ->where('estado_kanban', '!=', 'completado')
+            ->where('estado_kanban', '!=', 'en_revision')
+            ->count();
+
+        $porHacer = Proyecto::where(function ($q) {
+                $q->where('estado_kanban', 'por_hacer')
+                  ->orWhereNull('estado_kanban')
+                  ->orWhere('estado', 'borrador');
+            })
+            ->where('estado', '!=', 'completado')
+            ->where('estado_kanban', '!=', 'completado')
+            ->where('estado', '!=', 'en_progreso')
+            ->where('estado_kanban', '!=', 'en_progreso')
+            ->where('estado_kanban', '!=', 'en_revision')
+            ->count();
 
         return [
             'datasets' => [
                 [
                     'label' => 'Proyectos',
                     'data' => [
-                        $stats['por_hacer'] ?? 0,
-                        $stats['en_progreso'] ?? 0,
-                        $stats['en_revision'] ?? 0,
-                        $stats['completado'] ?? 0,
+                        $porHacer,
+                        $enProgreso,
+                        $enRevision,
+                        $completados,
                     ],
                     'backgroundColor' => [
                         'rgba(107, 114, 128, 0.8)',

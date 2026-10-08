@@ -96,10 +96,20 @@ class ProyectoResource extends Resource
                                 'cancelado' => 'Cancelado',
                             ])
                             ->default('borrador')
-                            ->required(),
+                            ->required()
+                            ->live()
+                            ->afterStateUpdated(function ($state, Forms\Set $set) {
+                                if ($state === 'completado') {
+                                    $set('estado_kanban', 'completado');
+                                } elseif ($state === 'en_progreso') {
+                                    $set('estado_kanban', 'en_progreso');
+                                } elseif ($state === 'borrador') {
+                                    $set('estado_kanban', 'por_hacer');
+                                }
+                            }),
 
                         Forms\Components\Select::make('estado_kanban')
-                            ->label('Estado Kanban')
+                            ->label('Fase en Seguimiento (Kanban)')
                             ->options([
                                 'por_hacer' => '📋 Por Hacer',
                                 'en_progreso' => '🔄 En Progreso',
@@ -107,7 +117,14 @@ class ProyectoResource extends Resource
                                 'completado' => '✅ Completado',
                             ])
                             ->default('por_hacer')
-                            ->visible(fn (Get $get) => $get('tipo_seguimiento') === 'investigacion'),
+                            ->live()
+                            ->afterStateUpdated(function ($state, Forms\Set $set) {
+                                if ($state === 'completado') {
+                                    $set('estado', 'completado');
+                                } elseif (in_array($state, ['en_progreso', 'en_revision'])) {
+                                    $set('estado', 'en_progreso');
+                                }
+                            }),
 
                         Forms\Components\DatePicker::make('fecha_inicio')
                             ->label('Fecha de Inicio')
@@ -716,16 +733,22 @@ class ProyectoResource extends Resource
                     }),
 
                 Tables\Columns\TextColumn::make('estado_kanban')
-                    ->label('Kanban')
+                    ->label('Fase Seguimiento')
                     ->badge()
-                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                    ->formatStateUsing(fn (?string $state): string => match ($state) {
                         'por_hacer' => '📋 Por Hacer',
                         'en_progreso' => '🔄 En Progreso',
                         'en_revision' => '🔍 En Revisión',
                         'completado' => '✅ Completado',
-                        default => $state,
+                        default => '📋 Por Hacer',
                     })
-                    ->visible(fn (?Proyecto $record) => $record?->tipo_seguimiento === 'investigacion'),
+                    ->color(fn (?string $state): string => match ($state) {
+                        'por_hacer' => 'gray',
+                        'en_progreso' => 'warning',
+                        'en_revision' => 'info',
+                        'completado' => 'success',
+                        default => 'gray',
+                    }),
 
                 Tables\Columns\TextColumn::make('presupuesto_total')
                     ->label('Presupuesto')
