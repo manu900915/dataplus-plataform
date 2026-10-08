@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
 	$this->call([
             PermissionSeeder::class,
             TipoNegocioSeeder::class,
+            TipoProyectoSeeder::class,
             // Otros seeders que tengas
         ]);
         User::factory()->create([

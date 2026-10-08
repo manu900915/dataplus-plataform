@@ -125,12 +125,16 @@ export const LDAP_DIRECTORY_USERS: UserAccount[] = [
 // 6. CATÁLOGOS ESTRUCTURALES DEL SISTEMA
 // ============================================================
 export const INITIAL_TIPOS_PROYECTO: TipoProyecto[] = [
-  { id: 'tp-1', nombre: 'Instalación de CCTV & Videovigilancia', descripcion: 'Montaje de cámaras IP, cableado y grabadores NVR', activo: true, proyectos_count: 0 },
-  { id: 'tp-2', nombre: 'Sistema de Alarma SACI & Anti-Intrusión', descripcion: 'Instalación de centrales DSC/Paradox y sensores de intrusión', activo: true, proyectos_count: 0 },
-  { id: 'tp-3', nombre: 'Enlaces 4G y Gestión Remota', descripcion: 'Conectividad con routers 4G LTE y chips SIM Cubacel', activo: true, proyectos_count: 0 },
-  { id: 'tp-4', nombre: 'Redes de Datos & WiFi Empresarial', descripcion: 'Cableado estructurado Cat6 y puntos de acceso WiFi', activo: true, proyectos_count: 0 },
-  { id: 'tp-5', nombre: 'Fumigación & Control Integral de Plagas', descripcion: 'Aplicación técnica de plaguicidas y desinsectación', activo: true, proyectos_count: 0 },
-  { id: 'tp-6', nombre: 'Mantenimiento Preventivo & Pólizas', descripcion: 'Revisión periódica de equipos y líneas de señal', activo: true, proyectos_count: 0 }
+  { id: 'tp-1', nombre: 'Instalación de CCTV & Videovigilancia', descripcion: 'Montaje y configuración de cámaras de seguridad IP/HD, grabadores NVR/XVR, cableado y visualización remota.', activo: true, proyectos_count: 0 },
+  { id: 'tp-2', nombre: 'Sistemas de Alarma Contra Intrusión (SACI)', descripcion: 'Instalación de centrales de alarma, sensores de movimiento, contactos magnéticos, sirenas y teclados de armado.', activo: true, proyectos_count: 0 },
+  { id: 'tp-3', nombre: 'Control de Acceso & Cerraduras Electrónicas', descripcion: 'Cerraduras digitales biométricas, electroimanes, lectores RFID, pulsadores y control de asistencia.', activo: true, proyectos_count: 0 },
+  { id: 'tp-4', nombre: 'Redes de Datos & Cableado Estructurado', descripcion: 'Tendido y conectorización Cat6/Cat6A, gabinetes rack, patch panels, switches y certificación de puntos de red.', activo: true, proyectos_count: 0 },
+  { id: 'tp-5', nombre: 'Wi-Fi Empresarial & Enlaces Inalámbricos', descripcion: 'Puntos de acceso de alta densidad, controladores centralizados, antenas y enlaces de radio punto a punto.', activo: true, proyectos_count: 0 },
+  { id: 'tp-6', nombre: 'Video Porteros & Intercomunicación IP', descripcion: 'Sistemas de timbre inteligente, monitores interiores de videoportero y apertura remota de accesos.', activo: true, proyectos_count: 0 },
+  { id: 'tp-7', nombre: 'Detección de Incendio & Seguridad Perimetral', descripcion: 'Detectores de humo fotoeléctricos, estaciones manuales, sirenas estroboscópicas y sensores perimetrales.', activo: true, proyectos_count: 0 },
+  { id: 'tp-8', nombre: 'Respaldo Energético & UPS para Sistemas Críticos', descripcion: 'Bancos de baterías, inversores y UPS para alimentación ininterrumpida de cámaras y servidores.', activo: true, proyectos_count: 0 },
+  { id: 'tp-9', nombre: 'Mantenimiento Preventivo & Pólizas de Soporte', descripcion: 'Revisión periódica de equipos, limpieza de ópticas, ajuste de cableado y soporte técnico prioritario.', activo: true, proyectos_count: 0 },
+  { id: 'tp-10', nombre: 'Investigación & Desarrollo (I+D) / Obras Especiales', descripcion: 'Proyectos de innovación tecnológica, prototipado de hardware, automatización e integraciones personalizadas.', activo: true, proyectos_count: 0 }
 ];
 
 export const INITIAL_TIPOS_NEGOCIO: TipoNegocio[] = [
