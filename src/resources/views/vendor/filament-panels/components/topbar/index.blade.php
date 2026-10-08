@@ -28,7 +28,7 @@
     } elseif (str_contains($currentUrl, 'brigadas')) {
         $section = 'Operaciones';
         $pageTitle = 'Brigadas Técnicas';
-    } elseif (str_contains($currentUrl, 'edit-profile')) {
+    } elseif ((str_contains($currentUrl, 'profile') || str_contains($currentUrl, 'edit-profile'))) {
         $section = 'Usuario';
         $pageTitle = 'Mi Perfil';
     }
@@ -187,7 +187,7 @@
                         <p style="font-size: 12px; font-weight: 700; color: #ffffff; margin: 2px 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ $user?->email ?? 'admin@dataplus.cu' }}</p>
                     </div>
 
-                    <a href="/admin/edit-profile" class="dp-menu-item" style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; color: #94a3b8; text-decoration: none; transition: all 0.15s ease;">
+                    <a href="{{ filament()->getProfileUrl() ?? url('/admin/profile') }}" class="dp-menu-item" style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; color: #94a3b8; text-decoration: none; transition: all 0.15s ease;">
                         <svg style="width: 15px; height: 15px; color: #64748b;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                         </svg>

@@ -12,6 +12,7 @@ Route::get('/', function () {
 // Redirecciones para evitar confusiones
 Route::redirect('/login', '/admin/login');
 Route::redirect('/dashboard', '/admin');
+Route::redirect('/admin/edit-profile', '/admin/profile');
 
 // Tus rutas personalizadas
 Route::get('/proyectos/{proyecto}/presupuesto/excel', [PresupuestoController::class, 'exportarExcel'])

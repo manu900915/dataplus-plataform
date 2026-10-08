@@ -8,15 +8,15 @@ use Filament\Pages\Auth\EditProfile as BaseEditProfile;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
-use Filament\Notifications\Notification;
 
 class EditProfile extends BaseEditProfile
 {
     protected static ?string $navigationIcon = 'heroicon-o-user-circle';
+
     protected static ?string $navigationLabel = 'Mi Perfil';
+
     protected static ?string $title = 'Editar Perfil';
 
-    // 👇 Esto evita que aparezca en el sidebar
     public static function shouldRegisterNavigation(): bool
     {
         return false;
@@ -27,6 +27,7 @@ class EditProfile extends BaseEditProfile
         return $form
             ->schema([
                 Forms\Components\Section::make('Información Personal')
+                    ->description('Actualice los datos personales y de contacto de su cuenta.')
                     ->columns(2)
                     ->schema([
                         Forms\Components\TextInput::make('name')
@@ -39,7 +40,7 @@ class EditProfile extends BaseEditProfile
                             ->email()
                             ->required()
                             ->maxLength(255)
-                            ->rule(fn () => Rule::unique('users', 'email')->ignore(auth()->id())),
+                            ->unique(ignoreRecord: true),
 
                         Forms\Components\Select::make('country_code')
                             ->label('Código país')
@@ -47,8 +48,8 @@ class EditProfile extends BaseEditProfile
                                 '+53' => '🇨🇺 Cuba (+53)',
                                 '+52' => '🇲🇽 México (+52)',
                                 '+34' => '🇪🇸 España (+34)',
-                                '+1'  => '🇸 EE.UU./Canadá (+1)',
-                                '+54' => '🇷 Argentina (+54)',
+                                '+1'  => '🇺🇸 EE.UU./Canadá (+1)',
+                                '+54' => '🇦🇷 Argentina (+54)',
                                 '+56' => '🇨🇱 Chile (+56)',
                                 '+57' => '🇨🇴 Colombia (+57)',
                                 '+51' => '🇵🇪 Perú (+51)',
@@ -71,11 +72,13 @@ class EditProfile extends BaseEditProfile
                             ->directory('avatars')
                             ->avatar()
                             ->maxSize(2048)
-                            ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp']),
+                            ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
+                            ->columnSpanFull(),
                     ]),
 
                 Forms\Components\Section::make('Cambiar Contraseña')
                     ->description('Dejar en blanco para mantener la contraseña actual.')
+                    ->columns(2)
                     ->schema([
                         Forms\Components\TextInput::make('password')
                             ->label('Nueva contraseña')
@@ -84,11 +87,10 @@ class EditProfile extends BaseEditProfile
                             ->autocomplete('new-password')
                             ->dehydrateStateUsing(fn ($state) => Hash::make($state))
                             ->dehydrated(fn ($state) => filled($state))
-                            ->rule(Password::min(8)->mixedCase()->numbers())
+                            ->rules([Password::min(8)])
                             ->minLength(8)
                             ->validationMessages([
                                 'min' => 'La contraseña debe tener al menos 8 caracteres.',
-                                'rule' => 'La contraseña debe contener al menos una mayúscula, una minúscula y un número.',
                             ]),
 
                         Forms\Components\TextInput::make('password_confirmation')
@@ -103,6 +105,8 @@ class EditProfile extends BaseEditProfile
                             ]),
                     ]),
             ])
+            ->operation('edit')
+            ->model($this->getUser())
             ->statePath('data');
     }
 }
