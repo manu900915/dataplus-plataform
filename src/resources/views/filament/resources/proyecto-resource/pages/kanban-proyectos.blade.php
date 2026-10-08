@@ -1,154 +1,234 @@
 <x-filament-panels::page>
-    {{-- Selector de filtro de tipo de seguimiento --}}
-    @php
-        $counts = $this->getCounts();
-    @endphp
-    <div class="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-gray-200 dark:border-gray-800">
-        <div class="flex items-center gap-2">
-            <button 
-                type="button"
-                wire:click="setFiltro('todos')"
-                class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center gap-2 cursor-pointer {{ $filtroTipo === 'todos' ? 'bg-primary-600 text-white shadow-sm' : 'bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700' }}"
-            >
-                <span>Todos los Proyectos</span>
-                <span class="px-1.5 py-0.5 rounded-full text-[10px] {{ $filtroTipo === 'todos' ? 'bg-primary-800 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200' }}">
-                    {{ $counts['todos'] }}
-                </span>
-            </button>
+    <style>
+        .dp-kanban-grid {
+            display: grid;
+            grid-template-columns: repeat(1, minmax(0, 1fr));
+            gap: 1.25rem;
+            align-items: start;
+            width: 100%;
+        }
+        @media (min-width: 640px) {
+            .dp-kanban-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        @media (min-width: 1024px) {
+            .dp-kanban-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+        }
+        .dp-kanban-col {
+            background: #0b1325 !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            border-radius: 14px !important;
+            padding: 1rem !important;
+            min-height: 480px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+        .dp-kanban-card {
+            background: #131f37 !important;
+            border: 1px solid rgba(255, 255, 255, 0.09) !important;
+            border-radius: 12px !important;
+            padding: 1rem !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            color: #f8fafc !important;
+        }
+        .dp-kanban-card:hover {
+            border-color: rgba(0, 229, 163, 0.45) !important;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 16px rgba(0, 229, 163, 0.1);
+        }
+    </style>
 
-            <button 
-                type="button"
-                wire:click="setFiltro('instalacion')"
-                class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center gap-2 cursor-pointer {{ $filtroTipo === 'instalacion' ? 'bg-primary-600 text-white shadow-sm' : 'bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700' }}"
-            >
-                <span>📦 Instalaciones & Obras</span>
-                <span class="px-1.5 py-0.5 rounded-full text-[10px] {{ $filtroTipo === 'instalacion' ? 'bg-primary-800 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200' }}">
-                    {{ $counts['instalacion'] }}
-                </span>
-            </button>
+    <div class="dp-kanban-wrapper">
+        {{-- Toolbar con Filtros y Botón de Acción --}}
+        @php
+            $counts = $this->getCounts();
+        @endphp
+        <div class="dp-kanban-toolbar">
+            <div class="dp-kanban-filters">
+                <button 
+                    type="button"
+                    wire:click="setFiltro('todos')"
+                    class="dp-kanban-filter-btn {{ $filtroTipo === 'todos' ? 'active' : '' }}"
+                >
+                    <span>Todos los Proyectos</span>
+                    <span class="dp-kanban-pill">
+                        {{ $counts['todos'] }}
+                    </span>
+                </button>
 
-            <button 
-                type="button"
-                wire:click="setFiltro('investigacion')"
-                class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center gap-2 cursor-pointer {{ $filtroTipo === 'investigacion' ? 'bg-primary-600 text-white shadow-sm' : 'bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700' }}"
+                <button 
+                    type="button"
+                    wire:click="setFiltro('instalacion')"
+                    class="dp-kanban-filter-btn {{ $filtroTipo === 'instalacion' ? 'active' : '' }}"
+                >
+                    <span>📦 Instalaciones & Obras</span>
+                    <span class="dp-kanban-pill">
+                        {{ $counts['instalacion'] }}
+                    </span>
+                </button>
+
+                <button 
+                    type="button"
+                    wire:click="setFiltro('investigacion')"
+                    class="dp-kanban-filter-btn {{ $filtroTipo === 'investigacion' ? 'active' : '' }}"
+                >
+                    <span>🔬 I+D Especiales</span>
+                    <span class="dp-kanban-pill">
+                        {{ $counts['investigacion'] }}
+                    </span>
+                </button>
+            </div>
+
+            <a 
+                href="{{ \App\Filament\Resources\ProyectoResource::getUrl('create') }}"
+                class="dp-kanban-create-btn"
             >
-                <span>🔬 I+D Especiales</span>
-                <span class="px-1.5 py-0.5 rounded-full text-[10px] {{ $filtroTipo === 'investigacion' ? 'bg-primary-800 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200' }}">
-                    {{ $counts['investigacion'] }}
-                </span>
-            </button>
+                <x-heroicon-m-plus class="w-4 h-4" />
+                <span>Nuevo Proyecto</span>
+            </a>
         </div>
 
-        <a 
-            href="{{ \App\Filament\Resources\ProyectoResource::getUrl('create') }}"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
-        >
-            <x-heroicon-m-plus class="w-4 h-4" />
-            <span>Nuevo Proyecto</span>
-        </a>
-    </div>
+        {{-- Tablero Kanban Grid --}}
+        <div class="dp-kanban-grid">
+            @foreach($this->getColumns() as $columnId => $column)
+                @php
+                    $headerColors = [
+                        'por_hacer' => ['border' => '#64748b', 'badge_bg' => 'rgba(100, 116, 139, 0.2)', 'badge_color' => '#94a3b8'],
+                        'en_progreso' => ['border' => '#f59e0b', 'badge_bg' => 'rgba(245, 158, 11, 0.2)', 'badge_color' => '#fbbf24'],
+                        'en_revision' => ['border' => '#38bdf8', 'badge_bg' => 'rgba(56, 189, 248, 0.2)', 'badge_color' => '#38bdf8'],
+                        'completado' => ['border' => '#10b981', 'badge_bg' => 'rgba(16, 185, 129, 0.2)', 'badge_color' => '#34d399'],
+                    ];
+                    $hInfo = $headerColors[$columnId] ?? ['border' => '#64748b', 'badge_bg' => 'rgba(255,255,255,0.08)', 'badge_color' => '#94a3b8'];
+                @endphp
 
-    {{-- Columnas Kanban --}}
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-2">
-        @foreach($this->getColumns() as $columnId => $column)
-            <div class="bg-gray-100/80 dark:bg-gray-900/80 rounded-xl p-3.5 border border-gray-200 dark:border-gray-800 flex flex-col min-h-[500px]">
-                <div class="flex items-center justify-between mb-3 pb-2 border-b border-gray-200 dark:border-gray-800">
-                    <h3 class="font-bold text-sm text-gray-900 dark:text-white flex items-center gap-1.5">
-                        {{ $column['title'] }}
-                    </h3>
-                    <x-filament::badge :color="$column['color']" size="sm">
-                        {{ $column['proyectos']->count() }}
-                    </x-filament::badge>
-                </div>
+                <div class="dp-kanban-col" style="border-top: 3px solid {{ $hInfo['border'] }} !important;">
+                    <div class="dp-kanban-col-header">
+                        <div class="dp-kanban-col-title">
+                            <span style="font-size: 1.05rem;">
+                                @if($columnId === 'por_hacer') 📋
+                                @elseif($columnId === 'en_progreso') 🔄
+                                @elseif($columnId === 'en_revision') 🔍
+                                @elseif($columnId === 'completado') ✅
+                                @endif
+                            </span>
+                            <span>
+                                @if($columnId === 'por_hacer') Por Hacer
+                                @elseif($columnId === 'en_progreso') En Progreso
+                                @elseif($columnId === 'en_revision') En Revisión
+                                @elseif($columnId === 'completado') Completado
+                                @endif
+                            </span>
+                        </div>
+                        <span class="dp-kanban-col-badge" style="background: {{ $hInfo['badge_bg'] }} !important; color: {{ $hInfo['badge_color'] }} !important;">
+                            {{ $column['proyectos']->count() }}
+                        </span>
+                    </div>
 
-                <div class="space-y-3 flex-1 overflow-y-auto">
-                    @foreach($column['proyectos'] as $proyecto)
-                        <div class="bg-white dark:bg-gray-800/90 rounded-lg p-3.5 shadow-sm border border-gray-200 dark:border-gray-700 hover:border-primary-400 dark:hover:border-primary-500 transition-all">
-                            <div class="flex items-start justify-between gap-2 mb-1.5">
-                                <span class="font-mono text-xs font-bold text-primary-600 dark:text-primary-400">
-                                    {{ $proyecto->codigo }}
-                                </span>
-                                <div class="flex items-center gap-1">
-                                    @if($proyecto->tipo_seguimiento === 'investigacion')
-                                        <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
-                                            I+D
-                                        </span>
-                                    @else
-                                        <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-                                            Instalación
-                                        </span>
+                    <div class="dp-kanban-cards">
+                        @foreach($column['proyectos'] as $proyecto)
+                            <div class="dp-kanban-card">
+                                {{-- Cabecera de la tarjeta --}}
+                                <div class="dp-kanban-card-top">
+                                    <span class="dp-kanban-card-code">
+                                        {{ $proyecto->codigo }}
+                                    </span>
+                                    <div style="display: flex; align-items: center; gap: 0.35rem;">
+                                        @if($proyecto->tipo_seguimiento === 'investigacion')
+                                            <span class="dp-kanban-tag investigacion">I+D</span>
+                                        @else
+                                            <span class="dp-kanban-tag instalacion">Instalación</span>
+                                        @endif
+
+                                        <a 
+                                            href="{{ \App\Filament\Resources\ProyectoResource::getUrl('edit', ['record' => $proyecto]) }}"
+                                            style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; background: rgba(255,255,255,0.06); color: #94a3b8; transition: color 0.15s;"
+                                            title="Editar proyecto"
+                                            onmouseover="this.style.color='#00e5a3'; this.style.background='rgba(0,229,163,0.12)'"
+                                            onmouseout="this.style.color='#94a3b8'; this.style.background='rgba(255,255,255,0.06)'"
+                                        >
+                                            <x-heroicon-m-pencil-square class="w-3.5 h-3.5" />
+                                        </a>
+                                    </div>
+                                </div>
+
+                                {{-- Nombre del Proyecto --}}
+                                <div class="dp-kanban-card-title">
+                                    {{ $proyecto->nombre }}
+                                </div>
+
+                                {{-- Metadatos: Cliente y Responsable --}}
+                                <div class="dp-kanban-card-meta">
+                                    @if($proyecto->cliente)
+                                        <div class="dp-kanban-card-meta-row" title="Cliente: {{ $proyecto->cliente->nombre }}">
+                                            <span style="opacity: 0.7;">🏢</span>
+                                            <span>{{ $proyecto->cliente->nombre }}</span>
+                                        </div>
                                     @endif
 
-                                    <a 
-                                        href="{{ \App\Filament\Resources\ProyectoResource::getUrl('edit', ['record' => $proyecto]) }}"
-                                        class="p-1 text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-                                        title="Editar proyecto"
+                                    @if($proyecto->responsable)
+                                        <div class="dp-kanban-card-meta-row" title="Responsable: {{ $proyecto->responsable->name }}">
+                                            <span style="opacity: 0.7;">👤</span>
+                                            <span>{{ $proyecto->responsable->name }}</span>
+                                        </div>
+                                    @endif
+                                </div>
+
+                                {{-- Presupuesto si existe --}}
+                                @if($proyecto->presupuesto_total > 0)
+                                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; margin-top: 0.35rem; padding-top: 0.35rem; border-top: 1px dashed rgba(255,255,255,0.06);">
+                                        <span style="color: #64748b; font-weight: 600;">Presupuesto:</span>
+                                        <span style="color: #00e5a3; font-weight: 700; font-family: monospace;">
+                                            ${{ number_format($proyecto->presupuesto_total, 2) }}
+                                        </span>
+                                    </div>
+                                @endif
+
+                                {{-- Barra de progreso --}}
+                                @php
+                                    $progress = ($columnId === 'completado' || $proyecto->estado === 'completado') ? 100 : ($columnId === 'en_revision' ? 85 : ($columnId === 'en_progreso' ? 50 : 15));
+                                    $progressGrad = ($columnId === 'completado' || $proyecto->estado === 'completado') ? 'linear-gradient(90deg, #059669, #00e5a3)' : 'linear-gradient(90deg, #0284c7, #00e5a3)';
+                                @endphp
+                                <div class="dp-kanban-progress-track">
+                                    <div class="dp-kanban-progress-bar" style="width: {{ $progress }}%; background: {{ $progressGrad }};"></div>
+                                </div>
+
+                                {{-- Selector de Fase --}}
+                                <form action="{{ route('proyectos.kanban.update', $proyecto) }}" method="POST" class="dp-kanban-card-footer">
+                                    @csrf
+                                    @method('PATCH')
+                                    <label class="dp-kanban-select-label">
+                                        Mover a fase
+                                    </label>
+                                    <select 
+                                        name="estado_kanban"
+                                        onchange="this.form.submit()"
+                                        class="dp-kanban-select"
                                     >
-                                        <x-heroicon-o-pencil-square class="w-4 h-4" />
-                                    </a>
-                                </div>
+                                        <option value="por_hacer" {{ ($proyecto->estado_kanban === 'por_hacer' || (empty($proyecto->estado_kanban) && $proyecto->estado === 'borrador')) ? 'selected' : '' }}>
+                                            📋 Por Hacer
+                                        </option>
+                                        <option value="en_progreso" {{ ($proyecto->estado_kanban === 'en_progreso' || (empty($proyecto->estado_kanban) && $proyecto->estado === 'en_progreso')) ? 'selected' : '' }}>
+                                            🔄 En Progreso
+                                        </option>
+                                        <option value="en_revision" {{ $proyecto->estado_kanban === 'en_revision' ? 'selected' : '' }}>
+                                            🔍 En Revisión
+                                        </option>
+                                        <option value="completado" {{ ($proyecto->estado_kanban === 'completado' || $proyecto->estado === 'completado') ? 'selected' : '' }}>
+                                            ✅ Completado
+                                        </option>
+                                    </select>
+                                </form>
                             </div>
+                        @endforeach
 
-                            <h4 class="font-semibold text-sm text-gray-900 dark:text-white mb-2 leading-snug">
-                                {{ $proyecto->nombre }}
-                            </h4>
-
-                            @if($proyecto->cliente)
-                                <p class="text-xs text-gray-600 dark:text-gray-400 mb-1 flex items-center gap-1 truncate">
-                                    <span class="text-gray-400">👤</span>
-                                    <span class="truncate">{{ $proyecto->cliente->nombre }}</span>
-                                </p>
-                            @endif
-
-                            @if($proyecto->responsable)
-                                <p class="text-xs text-gray-600 dark:text-gray-400 mb-1 flex items-center gap-1 truncate">
-                                    <span class="text-gray-400">💻</span>
-                                    <span class="truncate">{{ $proyecto->responsable->name }}</span>
-                                </p>
-                            @endif
-
-                            @if($proyecto->presupuesto_total > 0)
-                                <div class="text-xs font-mono font-semibold text-emerald-600 dark:text-emerald-400 mt-2 mb-2">
-                                    Presupuesto: ${{ number_format($proyecto->presupuesto_total, 2) }}
-                                </div>
-                            @endif
-
-                            {{-- Select para cambiar fase de seguimiento --}}
-                            <form action="{{ route('proyectos.kanban.update', $proyecto) }}" method="POST" class="mt-2.5 pt-2 border-t border-gray-100 dark:border-gray-700">
-                                @csrf
-                                @method('PATCH')
-                                <label class="block text-[10px] text-gray-500 dark:text-gray-400 font-medium mb-1">
-                                    Mover a fase:
-                                </label>
-                                <select 
-                                    name="estado_kanban"
-                                    onchange="this.form.submit()"
-                                    class="text-xs w-full py-1 px-2 rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-primary-500 focus:border-primary-500"
-                                >
-                                    <option value="por_hacer" {{ ($proyecto->estado_kanban === 'por_hacer' || (empty($proyecto->estado_kanban) && $proyecto->estado === 'borrador')) ? 'selected' : '' }}>
-                                        📋 Por Hacer
-                                    </option>
-                                    <option value="en_progreso" {{ ($proyecto->estado_kanban === 'en_progreso' || (empty($proyecto->estado_kanban) && $proyecto->estado === 'en_progreso')) ? 'selected' : '' }}>
-                                        🔄 En Progreso
-                                    </option>
-                                    <option value="en_revision" {{ $proyecto->estado_kanban === 'en_revision' ? 'selected' : '' }}>
-                                        🔍 En Revisión
-                                    </option>
-                                    <option value="completado" {{ ($proyecto->estado_kanban === 'completado' || $proyecto->estado === 'completado') ? 'selected' : '' }}>
-                                        ✅ Completado
-                                    </option>
-                                </select>
-                            </form>
-                        </div>
-                    @endforeach
-
-                    @if($column['proyectos']->count() === 0)
-                        <div class="h-32 border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-lg flex items-center justify-center text-xs text-gray-400 dark:text-gray-500">
-                            Sin proyectos en esta fase
-                        </div>
-                    @endif
+                        @if($column['proyectos']->count() === 0)
+                            <div class="dp-kanban-empty">
+                                <span style="font-size: 1.25rem; opacity: 0.5; margin-bottom: 0.35rem;">📦</span>
+                                <span>Sin proyectos en esta fase</span>
+                            </div>
+                        @endif
+                    </div>
                 </div>
-            </div>
-        @endforeach
+            @endforeach
+        </div>
     </div>
 </x-filament-panels::page>
