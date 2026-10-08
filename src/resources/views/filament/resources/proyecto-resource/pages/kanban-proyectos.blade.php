@@ -9,9 +9,6 @@
         .dp-kanban-toolbar {
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 1rem;
             margin-bottom: 0.5rem;
             padding-bottom: 1rem;
             border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -67,25 +64,6 @@
             background: rgba(255, 255, 255, 0.08);
             color: #94a3b8;
         }
-        .dp-kanban-btn-create {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 16px;
-            font-size: 13px;
-            font-weight: 700;
-            border-radius: 8px;
-            background: linear-gradient(135deg, #00e5a3 0%, #059669 100%) !important;
-            color: #022c22 !important;
-            text-decoration: none !important;
-            box-shadow: 0 4px 14px rgba(0, 229, 163, 0.25);
-            transition: all 0.15s;
-        }
-        .dp-kanban-btn-create:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 6px 18px rgba(0, 229, 163, 0.35);
-            color: #022c22 !important;
-        }
         .dp-kanban-layout {
             display: grid;
             grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -134,8 +112,8 @@
             $counts = $this->getCounts();
         @endphp
 
-        {{-- Toolbar con Selector de Filtros y Botón Nuevo Proyecto --}}
-        <div class="dp-kanban-toolbar" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+        {{-- Toolbar con Selector de Filtros --}}
+        <div class="dp-kanban-toolbar" style="display: flex; align-items: center; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
             <div class="dp-kanban-tabs-group" style="display: inline-flex; align-items: center; background: #0c1424; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 4px; gap: 4px;">
                 <button 
                     type="button"
@@ -173,17 +151,6 @@
                     </span>
                 </button>
             </div>
-
-            <a 
-                href="{{ \App\Filament\Resources\ProyectoResource::getUrl('create') }}"
-                class="dp-kanban-btn-create"
-                style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; font-size: 13px; font-weight: 700; border-radius: 8px; background: linear-gradient(135deg, #00e5a3 0%, #059669 100%); color: #022c22; text-decoration: none; box-shadow: 0 4px 14px rgba(0, 229, 163, 0.25);"
-            >
-                <svg style="width: 16px; height: 16px; display: inline-block; vertical-align: middle;" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                </svg>
-                <span>Nuevo Proyecto</span>
-            </a>
         </div>
 
         {{-- Tablero Kanban Grid (4 columnas horizontales) --}}
