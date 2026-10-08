@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Models\Proyecto;
+use Filament\Actions\Action;
 use Filament\Pages\Page;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -16,6 +17,17 @@ class SeguimientoProyectos extends Page
     protected static string $view = 'filament.pages.seguimiento-proyectos';
 
     public string $filtroTipo = 'todos';
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('nuevo_proyecto')
+                ->label('Nuevo Proyecto')
+                ->icon('heroicon-m-plus')
+                ->color('success')
+                ->url(\App\Filament\Resources\ProyectoResource::getUrl('create')),
+        ];
+    }
 
     public function setFiltro(string $tipo): void
     {

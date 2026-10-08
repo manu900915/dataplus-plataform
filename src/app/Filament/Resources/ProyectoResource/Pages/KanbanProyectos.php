@@ -4,6 +4,7 @@ namespace App\Filament\Resources\ProyectoResource\Pages;
 
 use App\Filament\Resources\ProyectoResource;
 use App\Models\Proyecto;
+use Filament\Actions\Action;
 use Filament\Resources\Pages\Page;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -22,6 +23,17 @@ class KanbanProyectos extends Page
     protected static ?int $navigationSort = 1;
 
     public string $filtroTipo = 'todos';
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('nuevo_proyecto')
+                ->label('Nuevo Proyecto')
+                ->icon('heroicon-m-plus')
+                ->color('success')
+                ->url(\App\Filament\Resources\ProyectoResource::getUrl('create')),
+        ];
+    }
 
     public function setFiltro(string $tipo): void
     {
