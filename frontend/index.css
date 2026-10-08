@@ -21,3 +21,25 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(148, 163, 184, 0.4);
 }
+
+/* Prevenir cursor de texto (caret) y selección en barra lateral */
+aside,
+aside *,
+nav,
+nav a,
+nav button,
+nav span {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  caret-color: transparent !important;
+}
+
+aside button:focus,
+aside button:focus-visible,
+aside a:focus,
+aside a:focus-visible {
+  outline: none;
+  box-shadow: none;
+}

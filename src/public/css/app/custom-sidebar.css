@@ -164,3 +164,70 @@
 .dash-root ::-webkit-scrollbar { width: 6px; height: 6px; }
 .dash-root ::-webkit-scrollbar-thumb { background: rgba(100,116,139,.4); border-radius: 999px; }
 .dash-root ::-webkit-scrollbar-track { background: transparent; }
+
+
+/* ============================================================
+   ANTI-CARET & USER-SELECT: PREVENIR CURSOR DE TEXTO EN EL MENÚ
+   ============================================================ */
+.fi-sidebar,
+.fi-sidebar *,
+.fi-sidebar-nav,
+.fi-sidebar-nav *,
+.fi-sidebar-header,
+.fi-sidebar-header *,
+.fi-sidebar-item,
+.fi-sidebar-item *,
+.fi-sidebar-item-button,
+.fi-sidebar-item-button *,
+.fi-sidebar-item-label,
+.fi-sidebar-group-label,
+.fi-sidebar-group-button {
+    -webkit-user-select: none !important;
+    -moz-user-select: none !important;
+    -ms-user-select: none !important;
+    user-select: none !important;
+    caret-color: transparent !important;
+    -webkit-user-modify: read-only !important;
+}
+
+.fi-sidebar-item-button,
+.fi-sidebar-nav a,
+.fi-sidebar-nav button,
+.fi-sidebar-group-button {
+    cursor: pointer !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    caret-color: transparent !important;
+    outline: none !important;
+}
+
+.fi-sidebar-item-button *,
+.fi-sidebar-nav a *,
+.fi-sidebar-nav button *,
+.fi-sidebar-item * {
+    cursor: pointer !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    caret-color: transparent !important;
+}
+
+.fi-sidebar-item-label,
+.fi-sidebar-group-label,
+.fi-sidebar-nav span {
+    pointer-events: none !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    caret-color: transparent !important;
+    cursor: pointer !important;
+}
+
+.fi-sidebar-nav a:focus,
+.fi-sidebar-nav a:focus-visible,
+.fi-sidebar-nav a:active,
+.fi-sidebar-item-button:focus,
+.fi-sidebar-item-button:focus-visible,
+.fi-sidebar-item-button:active {
+    outline: none !important;
+    box-shadow: none !important;
+    caret-color: transparent !important;
+}

@@ -138,26 +138,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   const Icon = item.icon;
                   const isActive = currentModule === item.id;
                   return (
-                    <button
+                                        <button
                       key={item.id}
                       onClick={() => onSelectModule(item.id)}
-                      className={`group flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-xs font-medium transition-all cursor-pointer ${
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        if (window.getSelection) {
+                          window.getSelection().removeAllRanges();
+                        }
+                      }}
+                      className={`group flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-xs font-medium transition-all cursor-pointer select-none outline-none focus:outline-none focus:ring-0 ${
                         isActive
-                          ? 'bg-sky-500/15 text-sky-300 font-semibold shadow-sm shadow-sky-500/5'
-                          : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+                          ? "bg-sky-500/15 text-sky-300 font-semibold shadow-sm shadow-sky-500/5"
+                          : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
                       }`}
+                      style={{ caretColor: "transparent" }}
                     >
-                      <div className="flex items-center gap-2.5">
+                      <div className="flex items-center gap-2.5 pointer-events-none select-none">
                         <Icon
-                          className={`h-4 w-4 transition-colors ${
-                            isActive ? 'text-sky-400' : 'text-slate-400 group-hover:text-slate-300'
+                          className={`h-4 w-4 transition-colors pointer-events-none ${
+                            isActive ? "text-sky-400" : "text-slate-400 group-hover:text-slate-300"
                           }`}
                         />
-                        <span>{item.label}</span>
+                        <span className="select-none pointer-events-none" style={{ caretColor: "transparent" }}>
+                          {item.label}
+                        </span>
                       </div>
                       {item.badge !== undefined && (
                         <span
-                          className={`flex h-4 min-w-4 items-center justify-center rounded-full px-1.5 text-[10px] font-mono font-semibold ${item.badgeColor}`}
+                          className={`flex h-4 min-w-4 items-center justify-center rounded-full px-1.5 text-[10px] font-mono font-semibold pointer-events-none select-none ${item.badgeColor}`}
                         >
                           {item.badge}
                         </span>
