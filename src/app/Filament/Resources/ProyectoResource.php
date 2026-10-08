@@ -16,16 +16,24 @@ use Filament\Forms\Set;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Support\HtmlString;
 
 class ProyectoResource extends Resource
 {
     protected static ?string $model = Proyecto::class;
+
     protected static ?string $navigationIcon = 'heroicon-o-briefcase';
+
     protected static ?string $navigationGroup = 'Proyectos';
+
     protected static ?string $navigationLabel = 'Proyectos';
+
     protected static ?string $modelLabel = 'Proyecto';
+
     protected static ?string $pluralModelLabel = 'Proyectos';
+
     protected static ?int $navigationSort = 2;
+
     protected static ?string $recordTitleAttribute = 'nombre';
 
     public static function form(Form $form): Form
@@ -93,7 +101,7 @@ class ProyectoResource extends Resource
                         Forms\Components\Select::make('estado_kanban')
                             ->label('Estado Kanban')
                             ->options([
-                                'por_hacer' => ' Por Hacer',
+                                'por_hacer' => '📋 Por Hacer',
                                 'en_progreso' => '🔄 En Progreso',
                                 'en_revision' => '🔍 En Revisión',
                                 'completado' => '✅ Completado',
@@ -135,7 +143,7 @@ class ProyectoResource extends Resource
 
                 // PRESUPUESTO - Solo visible si es Instalación
                 Forms\Components\Section::make('Presupuesto Detallado')
-                    ->description('Agregue las líneas de presupuesto organizadas por categorías')
+                    ->description('Agregue las líneas de presupuesto organizadas por categorías independientes')
                     ->visible(fn (Get $get) => $get('tipo_seguimiento') === 'instalacion' || blank($get('tipo_seguimiento')))
                     ->schema([
                         Forms\Components\Tabs::make('categorias')
@@ -143,29 +151,44 @@ class ProyectoResource extends Resource
                                 // TAB 1: EQUIPAMIENTO
                                 Forms\Components\Tabs\Tab::make('Equipamiento')
                                     ->icon('heroicon-o-cube')
-                                    ->badge(fn (Get $get) => count($get('lineasPresupuesto') ?? []) > 0 
-                                        ? collect($get('lineasPresupuesto'))->where('tipo_linea', 'equipamiento')->count() 
+                                    ->badge(fn (Get $get) => count($get('lineasEquipamiento') ?? []) > 0 
+                                        ? count($get('lineasEquipamiento')) 
                                         : null)
                                     ->schema([
                                         Forms\Components\Repeater::make('lineasEquipamiento')
-                                            ->relationship('lineasPresupuesto')
+                                            ->relationship('lineasEquipamiento')
                                             ->label(false)
                                             ->addActionLabel('Agregar Equipo')
                                             ->collapsible()
                                             ->itemLabel(fn (array $state): ?string =>
-                                                ($state['descripcion'] ?? 'Sin descripción') . ' - $' . number_format($state['subtotal'] ?? 0, 2)
+                                                ($state['descripcion'] ?? 'Sin descripción') . ' - $' . number_format((float) ($state['subtotal'] ?? ((float) ($state['cantidad'] ?? 1) * (float) ($state['costo_unitario'] ?? 0))), 2)
                                             )
                                             ->defaultItems(0)
+                                            ->mutateRelationshipDataBeforeCreateUsing(function (array $data): array {
+                                                $data['tipo_linea'] = 'equipamiento';
+                                                $cantidad = (float) ($data['cantidad'] ?? 1);
+                                                $costo = (float) ($data['costo_unitario'] ?? 0);
+                                                $data['subtotal'] = round($cantidad * $costo, 2);
+                                                return $data;
+                                            })
+                                            ->mutateRelationshipDataBeforeSaveUsing(function (array $data): array {
+                                                $data['tipo_linea'] = 'equipamiento';
+                                                $cantidad = (float) ($data['cantidad'] ?? 1);
+                                                $costo = (float) ($data['costo_unitario'] ?? 0);
+                                                $data['subtotal'] = round($cantidad * $costo, 2);
+                                                return $data;
+                                            })
                                             ->schema([
                                                 Forms\Components\Grid::make(3)
                                                     ->schema([
                                                         Forms\Components\Hidden::make('tipo_linea')
-                                                            ->default('equipamiento'),
+                                                            ->default('equipamiento')
+                                                            ->dehydrated(),
 
                                                         Forms\Components\Select::make('item_id')
                                                             ->label('Equipo del Inventario')
-                                                            ->options(fn () => 
-                                                                Item::whereHas('categoria', fn ($q) => 
+                                                            ->options(fn () =>
+                                                                Item::whereHas('categoria', fn ($q) =>
                                                                     $q->where('activo', true)
                                                                       ->whereIn('tipo', ['equipamiento', 'ambos']))
                                                                     ->orderBy('nombre')
@@ -176,12 +199,16 @@ class ProyectoResource extends Resource
                                                             ->preload()
                                                             ->placeholder('Seleccione un equipo...')
                                                             ->required()
-                                                            ->afterStateUpdated(function ($state, Set $set) {
+                                                            ->live()
+                                                            ->afterStateUpdated(function ($state, Set $set, Get $get) {
                                                                 if ($state) {
                                                                     $item = Item::find($state);
                                                                     if ($item) {
                                                                         $set('descripcion', $item->nombre);
-                                                                        $set('costo_unitario', $item->precio_unitario ?? 0);
+                                                                        $precio = (float) ($item->precio_unitario ?? 0);
+                                                                        $set('costo_unitario', $precio);
+                                                                        $cantidad = (float) ($get('cantidad') ?? 1);
+                                                                        $set('subtotal', round($cantidad * $precio, 2));
                                                                         $set('descontar_inventario', true);
                                                                     }
                                                                 }
@@ -201,7 +228,11 @@ class ProyectoResource extends Resource
                                                             ->default(1)
                                                             ->minValue(0.001)
                                                             ->required()
-                                                            ->live(debounce: 500),
+                                                            ->live(onBlur: true)
+                                                            ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                                                                $costo = (float) ($get('costo_unitario') ?? 0);
+                                                                $set('subtotal', round(((float) $state) * $costo, 2));
+                                                            }),
 
                                                         Forms\Components\TextInput::make('costo_unitario')
                                                             ->label('Costo Unitario')
@@ -209,117 +240,150 @@ class ProyectoResource extends Resource
                                                             ->prefix('$')
                                                             ->default(0)
                                                             ->required()
-                                                            ->live(debounce: 500),
+                                                            ->live(onBlur: true)
+                                                            ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                                                                $cantidad = (float) ($get('cantidad') ?? 1);
+                                                                $set('subtotal', round($cantidad * ((float) $state), 2));
+                                                            }),
 
                                                         Forms\Components\TextInput::make('subtotal')
                                                             ->label('Subtotal')
                                                             ->numeric()
                                                             ->prefix('$')
-                                                            ->disabled()
-                                                            ->dehydrated(false),
+                                                            ->readOnly()
+                                                            ->dehydrated()
+                                                            ->default(0),
 
                                                         Forms\Components\Toggle::make('descontar_inventario')
                                                             ->label('Descontar del inventario')
                                                             ->default(true),
                                                     ]),
-                                            ])
-                                            ->afterStateUpdated(function ($state, Set $set) {
-                                                if (is_array($state)) {
-                                                    foreach ($state as $index => $linea) {
-                                                        $cantidad = (float) ($linea['cantidad'] ?? 1);
-                                                        $costo = (float) ($linea['costo_unitario'] ?? 0);
-                                                        $state[$index]['subtotal'] = $cantidad * $costo;
-                                                    }
-                                                }
-                                            }),
+                                            ]),
                                     ]),
 
                                 // TAB 2: MANO DE OBRA
                                 Forms\Components\Tabs\Tab::make('Mano de Obra')
                                     ->icon('heroicon-o-user-group')
-                                    ->badge(fn (Get $get) => count($get('lineasPresupuesto') ?? []) > 0 
-                                        ? collect($get('lineasPresupuesto'))->where('tipo_linea', 'mano_obra')->count() 
+                                    ->badge(fn (Get $get) => count($get('lineasManoObra') ?? []) > 0 
+                                        ? count($get('lineasManoObra')) 
                                         : null)
                                     ->schema([
                                         Forms\Components\Repeater::make('lineasManoObra')
-                                            ->relationship('lineasPresupuesto')
+                                            ->relationship('lineasManoObra')
                                             ->label(false)
                                             ->addActionLabel('Agregar Mano de Obra')
                                             ->collapsible()
                                             ->itemLabel(fn (array $state): ?string =>
-                                                ($state['descripcion'] ?? 'Sin descripción') . ' - $' . number_format($state['subtotal'] ?? 0, 2)
+                                                ($state['descripcion'] ?? 'Sin descripción') . ' - $' . number_format((float) ($state['subtotal'] ?? ((float) ($state['cantidad'] ?? 1) * (float) ($state['costo_unitario'] ?? 0))), 2)
                                             )
                                             ->defaultItems(0)
+                                            ->mutateRelationshipDataBeforeCreateUsing(function (array $data): array {
+                                                $data['tipo_linea'] = 'mano_obra';
+                                                $data['item_id'] = null;
+                                                $data['descontar_inventario'] = false;
+                                                $cantidad = (float) ($data['cantidad'] ?? 1);
+                                                $costo = (float) ($data['costo_unitario'] ?? 0);
+                                                $data['subtotal'] = round($cantidad * $costo, 2);
+                                                return $data;
+                                            })
+                                            ->mutateRelationshipDataBeforeSaveUsing(function (array $data): array {
+                                                $data['tipo_linea'] = 'mano_obra';
+                                                $data['item_id'] = null;
+                                                $data['descontar_inventario'] = false;
+                                                $cantidad = (float) ($data['cantidad'] ?? 1);
+                                                $costo = (float) ($data['costo_unitario'] ?? 0);
+                                                $data['subtotal'] = round($cantidad * $costo, 2);
+                                                return $data;
+                                            })
                                             ->schema([
                                                 Forms\Components\Hidden::make('tipo_linea')
-                                                    ->default('mano_obra'),
+                                                    ->default('mano_obra')
+                                                    ->dehydrated(),
 
                                                 Forms\Components\TextInput::make('descripcion')
-                                                    ->label('Descripción del Servicio')
+                                                    ->label('Descripción del Servicio / Mano de Obra')
                                                     ->required()
                                                     ->maxLength(255)
-                                                    ->placeholder('Ej: Instalación de cámaras, Cableado...'),
+                                                    ->placeholder('Ej: Instalación y configuración de cámaras, Cableado estructurado...'),
 
-                                                Forms\Components\TextInput::make('cantidad')
-                                                    ->label('Cantidad')
-                                                    ->numeric()
-                                                    ->default(1)
-                                                    ->minValue(0.001)
-                                                    ->required()
-                                                    ->live(debounce: 500),
+                                                Forms\Components\Grid::make(3)
+                                                    ->schema([
+                                                        Forms\Components\TextInput::make('cantidad')
+                                                            ->label('Cantidad / Horas / Días')
+                                                            ->numeric()
+                                                            ->default(1)
+                                                            ->minValue(0.001)
+                                                            ->required()
+                                                            ->live(onBlur: true)
+                                                            ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                                                                $costo = (float) ($get('costo_unitario') ?? 0);
+                                                                $set('subtotal', round(((float) $state) * $costo, 2));
+                                                            }),
 
-                                                Forms\Components\TextInput::make('costo_unitario')
-                                                    ->label('Costo Unitario')
-                                                    ->numeric()
-                                                    ->prefix('$')
-                                                    ->default(0)
-                                                    ->required()
-                                                    ->live(debounce: 500),
+                                                        Forms\Components\TextInput::make('costo_unitario')
+                                                            ->label('Costo Unitario / Tarifa')
+                                                            ->numeric()
+                                                            ->prefix('$')
+                                                            ->default(0)
+                                                            ->required()
+                                                            ->live(onBlur: true)
+                                                            ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                                                                $cantidad = (float) ($get('cantidad') ?? 1);
+                                                                $set('subtotal', round($cantidad * ((float) $state), 2));
+                                                            }),
 
-                                                Forms\Components\TextInput::make('subtotal')
-                                                    ->label('Subtotal')
-                                                    ->numeric()
-                                                    ->prefix('$')
-                                                    ->disabled()
-                                                    ->dehydrated(false),
-                                            ])
-                                            ->afterStateUpdated(function ($state, Set $set) {
-                                                if (is_array($state)) {
-                                                    foreach ($state as $index => $linea) {
-                                                        $cantidad = (float) ($linea['cantidad'] ?? 1);
-                                                        $costo = (float) ($linea['costo_unitario'] ?? 0);
-                                                        $state[$index]['subtotal'] = $cantidad * $costo;
-                                                    }
-                                                }
-                                            }),
+                                                        Forms\Components\TextInput::make('subtotal')
+                                                            ->label('Subtotal')
+                                                            ->numeric()
+                                                            ->prefix('$')
+                                                            ->readOnly()
+                                                            ->dehydrated()
+                                                            ->default(0),
+                                                    ]),
+                                            ]),
                                     ]),
 
                                 // TAB 3: MATERIALES
                                 Forms\Components\Tabs\Tab::make('Materiales')
                                     ->icon('heroicon-o-archive-box')
-                                    ->badge(fn (Get $get) => count($get('lineasPresupuesto') ?? []) > 0 
-                                        ? collect($get('lineasPresupuesto'))->where('tipo_linea', 'material')->count() 
+                                    ->badge(fn (Get $get) => count($get('lineasMateriales') ?? []) > 0 
+                                        ? count($get('lineasMateriales')) 
                                         : null)
                                     ->schema([
                                         Forms\Components\Repeater::make('lineasMateriales')
-                                            ->relationship('lineasPresupuesto')
+                                            ->relationship('lineasMateriales')
                                             ->label(false)
                                             ->addActionLabel('Agregar Material')
                                             ->collapsible()
                                             ->itemLabel(fn (array $state): ?string =>
-                                                ($state['descripcion'] ?? 'Sin descripción') . ' - $' . number_format($state['subtotal'] ?? 0, 2)
+                                                ($state['descripcion'] ?? 'Sin descripción') . ' - $' . number_format((float) ($state['subtotal'] ?? ((float) ($state['cantidad'] ?? 1) * (float) ($state['costo_unitario'] ?? 0))), 2)
                                             )
                                             ->defaultItems(0)
+                                            ->mutateRelationshipDataBeforeCreateUsing(function (array $data): array {
+                                                $data['tipo_linea'] = 'material';
+                                                $cantidad = (float) ($data['cantidad'] ?? 1);
+                                                $costo = (float) ($data['costo_unitario'] ?? 0);
+                                                $data['subtotal'] = round($cantidad * $costo, 2);
+                                                return $data;
+                                            })
+                                            ->mutateRelationshipDataBeforeSaveUsing(function (array $data): array {
+                                                $data['tipo_linea'] = 'material';
+                                                $cantidad = (float) ($data['cantidad'] ?? 1);
+                                                $costo = (float) ($data['costo_unitario'] ?? 0);
+                                                $data['subtotal'] = round($cantidad * $costo, 2);
+                                                return $data;
+                                            })
                                             ->schema([
                                                 Forms\Components\Grid::make(3)
                                                     ->schema([
                                                         Forms\Components\Hidden::make('tipo_linea')
-                                                            ->default('material'),
+                                                            ->default('material')
+                                                            ->dehydrated(),
 
                                                         Forms\Components\Select::make('item_id')
                                                             ->label('Material del Inventario')
-                                                            ->options(fn () => 
-                                                                Item::whereHas('categoria', fn ($q) => 
+                                                            ->options(fn () =>
+                                                                Item::whereHas('categoria', fn ($q) =>
                                                                     $q->where('activo', true)
                                                                       ->whereIn('tipo', ['material', 'ambos']))
                                                                     ->orderBy('nombre')
@@ -329,12 +393,16 @@ class ProyectoResource extends Resource
                                                             ->searchable()
                                                             ->preload()
                                                             ->placeholder('Seleccione un material...')
-                                                            ->afterStateUpdated(function ($state, Set $set) {
+                                                            ->live()
+                                                            ->afterStateUpdated(function ($state, Set $set, Get $get) {
                                                                 if ($state) {
                                                                     $item = Item::find($state);
                                                                     if ($item) {
                                                                         $set('descripcion', $item->nombre);
-                                                                        $set('costo_unitario', $item->precio_unitario ?? 0);
+                                                                        $precio = (float) ($item->precio_unitario ?? 0);
+                                                                        $set('costo_unitario', $precio);
+                                                                        $cantidad = (float) ($get('cantidad') ?? 1);
+                                                                        $set('subtotal', round($cantidad * $precio, 2));
                                                                         $set('descontar_inventario', true);
                                                                     }
                                                                 }
@@ -354,7 +422,11 @@ class ProyectoResource extends Resource
                                                             ->default(1)
                                                             ->minValue(0.001)
                                                             ->required()
-                                                            ->live(debounce: 500),
+                                                            ->live(onBlur: true)
+                                                            ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                                                                $costo = (float) ($get('costo_unitario') ?? 0);
+                                                                $set('subtotal', round(((float) $state) * $costo, 2));
+                                                            }),
 
                                                         Forms\Components\TextInput::make('costo_unitario')
                                                             ->label('Costo Unitario')
@@ -362,149 +434,189 @@ class ProyectoResource extends Resource
                                                             ->prefix('$')
                                                             ->default(0)
                                                             ->required()
-                                                            ->live(debounce: 500),
+                                                            ->live(onBlur: true)
+                                                            ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                                                                $cantidad = (float) ($get('cantidad') ?? 1);
+                                                                $set('subtotal', round($cantidad * ((float) $state), 2));
+                                                            }),
 
                                                         Forms\Components\TextInput::make('subtotal')
                                                             ->label('Subtotal')
                                                             ->numeric()
                                                             ->prefix('$')
-                                                            ->disabled()
-                                                            ->dehydrated(false),
+                                                            ->readOnly()
+                                                            ->dehydrated()
+                                                            ->default(0),
 
                                                         Forms\Components\Toggle::make('descontar_inventario')
                                                             ->label('Descontar del inventario')
                                                             ->default(true),
                                                     ]),
-                                            ])
-                                            ->afterStateUpdated(function ($state, Set $set) {
-                                                if (is_array($state)) {
-                                                    foreach ($state as $index => $linea) {
-                                                        $cantidad = (float) ($linea['cantidad'] ?? 1);
-                                                        $costo = (float) ($linea['costo_unitario'] ?? 0);
-                                                        $state[$index]['subtotal'] = $cantidad * $costo;
-                                                    }
-                                                }
-                                            }),
+                                            ]),
                                     ]),
 
                                 // TAB 4: TRANSPORTE
                                 Forms\Components\Tabs\Tab::make('Transporte')
                                     ->icon('heroicon-o-truck')
-                                    ->badge(fn (Get $get) => count($get('lineasPresupuesto') ?? []) > 0 
-                                        ? collect($get('lineasPresupuesto'))->where('tipo_linea', 'transporte')->count() 
+                                    ->badge(fn (Get $get) => count($get('lineasTransporte') ?? []) > 0 
+                                        ? count($get('lineasTransporte')) 
                                         : null)
                                     ->schema([
                                         Forms\Components\Repeater::make('lineasTransporte')
-                                            ->relationship('lineasPresupuesto')
+                                            ->relationship('lineasTransporte')
                                             ->label(false)
                                             ->addActionLabel('Agregar Transporte')
                                             ->collapsible()
                                             ->itemLabel(fn (array $state): ?string =>
-                                                ($state['descripcion'] ?? 'Sin descripción') . ' - $' . number_format($state['subtotal'] ?? 0, 2)
+                                                ($state['descripcion'] ?? 'Sin descripción') . ' - $' . number_format((float) ($state['subtotal'] ?? ((float) ($state['cantidad'] ?? 1) * (float) ($state['costo_unitario'] ?? 0))), 2)
                                             )
                                             ->defaultItems(0)
+                                            ->mutateRelationshipDataBeforeCreateUsing(function (array $data): array {
+                                                $data['tipo_linea'] = 'transporte';
+                                                $data['item_id'] = null;
+                                                $data['descontar_inventario'] = false;
+                                                $cantidad = (float) ($data['cantidad'] ?? 1);
+                                                $costo = (float) ($data['costo_unitario'] ?? 0);
+                                                $data['subtotal'] = round($cantidad * $costo, 2);
+                                                return $data;
+                                            })
+                                            ->mutateRelationshipDataBeforeSaveUsing(function (array $data): array {
+                                                $data['tipo_linea'] = 'transporte';
+                                                $data['item_id'] = null;
+                                                $data['descontar_inventario'] = false;
+                                                $cantidad = (float) ($data['cantidad'] ?? 1);
+                                                $costo = (float) ($data['costo_unitario'] ?? 0);
+                                                $data['subtotal'] = round($cantidad * $costo, 2);
+                                                return $data;
+                                            })
                                             ->schema([
                                                 Forms\Components\Hidden::make('tipo_linea')
-                                                    ->default('transporte'),
+                                                    ->default('transporte')
+                                                    ->dehydrated(),
 
                                                 Forms\Components\TextInput::make('descripcion')
                                                     ->label('Descripción')
                                                     ->required()
                                                     ->maxLength(255)
-                                                    ->placeholder('Ej: Transporte de materiales, Movilización...'),
+                                                    ->placeholder('Ej: Transporte de materiales, Movilización de brigada...'),
 
-                                                Forms\Components\TextInput::make('cantidad')
-                                                    ->label('Cantidad')
-                                                    ->numeric()
-                                                    ->default(1)
-                                                    ->minValue(0.001)
-                                                    ->required()
-                                                    ->live(debounce: 500),
+                                                Forms\Components\Grid::make(3)
+                                                    ->schema([
+                                                        Forms\Components\TextInput::make('cantidad')
+                                                            ->label('Viajes / Cantidad')
+                                                            ->numeric()
+                                                            ->default(1)
+                                                            ->minValue(0.001)
+                                                            ->required()
+                                                            ->live(onBlur: true)
+                                                            ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                                                                $costo = (float) ($get('costo_unitario') ?? 0);
+                                                                $set('subtotal', round(((float) $state) * $costo, 2));
+                                                            }),
 
-                                                Forms\Components\TextInput::make('costo_unitario')
-                                                    ->label('Costo Unitario')
-                                                    ->numeric()
-                                                    ->prefix('$')
-                                                    ->default(0)
-                                                    ->required()
-                                                    ->live(debounce: 500),
+                                                        Forms\Components\TextInput::make('costo_unitario')
+                                                            ->label('Costo por Viaje')
+                                                            ->numeric()
+                                                            ->prefix('$')
+                                                            ->default(0)
+                                                            ->required()
+                                                            ->live(onBlur: true)
+                                                            ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                                                                $cantidad = (float) ($get('cantidad') ?? 1);
+                                                                $set('subtotal', round($cantidad * ((float) $state), 2));
+                                                            }),
 
-                                                Forms\Components\TextInput::make('subtotal')
-                                                    ->label('Subtotal')
-                                                    ->numeric()
-                                                    ->prefix('$')
-                                                    ->disabled()
-                                                    ->dehydrated(false),
-                                            ])
-                                            ->afterStateUpdated(function ($state, Set $set) {
-                                                if (is_array($state)) {
-                                                    foreach ($state as $index => $linea) {
-                                                        $cantidad = (float) ($linea['cantidad'] ?? 1);
-                                                        $costo = (float) ($linea['costo_unitario'] ?? 0);
-                                                        $state[$index]['subtotal'] = $cantidad * $costo;
-                                                    }
-                                                }
-                                            }),
+                                                        Forms\Components\TextInput::make('subtotal')
+                                                            ->label('Subtotal')
+                                                            ->numeric()
+                                                            ->prefix('$')
+                                                            ->readOnly()
+                                                            ->dehydrated()
+                                                            ->default(0),
+                                                    ]),
+                                            ]),
                                     ]),
 
                                 // TAB 5: ALIMENTACIÓN
                                 Forms\Components\Tabs\Tab::make('Alimentación')
                                     ->icon('heroicon-o-beaker')
-                                    ->badge(fn (Get $get) => count($get('lineasPresupuesto') ?? []) > 0 
-                                        ? collect($get('lineasPresupuesto'))->where('tipo_linea', 'alimentacion')->count() 
+                                    ->badge(fn (Get $get) => count($get('lineasAlimentacion') ?? []) > 0 
+                                        ? count($get('lineasAlimentacion')) 
                                         : null)
                                     ->schema([
                                         Forms\Components\Repeater::make('lineasAlimentacion')
-                                            ->relationship('lineasPresupuesto')
+                                            ->relationship('lineasAlimentacion')
                                             ->label(false)
                                             ->addActionLabel('Agregar Alimentación')
                                             ->collapsible()
                                             ->itemLabel(fn (array $state): ?string =>
-                                                ($state['descripcion'] ?? 'Sin descripción') . ' - $' . number_format($state['subtotal'] ?? 0, 2)
+                                                ($state['descripcion'] ?? 'Sin descripción') . ' - $' . number_format((float) ($state['subtotal'] ?? ((float) ($state['cantidad'] ?? 1) * (float) ($state['costo_unitario'] ?? 0))), 2)
                                             )
                                             ->defaultItems(0)
+                                            ->mutateRelationshipDataBeforeCreateUsing(function (array $data): array {
+                                                $data['tipo_linea'] = 'alimentacion';
+                                                $data['item_id'] = null;
+                                                $data['descontar_inventario'] = false;
+                                                $cantidad = (float) ($data['cantidad'] ?? 1);
+                                                $costo = (float) ($data['costo_unitario'] ?? 0);
+                                                $data['subtotal'] = round($cantidad * $costo, 2);
+                                                return $data;
+                                            })
+                                            ->mutateRelationshipDataBeforeSaveUsing(function (array $data): array {
+                                                $data['tipo_linea'] = 'alimentacion';
+                                                $data['item_id'] = null;
+                                                $data['descontar_inventario'] = false;
+                                                $cantidad = (float) ($data['cantidad'] ?? 1);
+                                                $costo = (float) ($data['costo_unitario'] ?? 0);
+                                                $data['subtotal'] = round($cantidad * $costo, 2);
+                                                return $data;
+                                            })
                                             ->schema([
                                                 Forms\Components\Hidden::make('tipo_linea')
-                                                    ->default('alimentacion'),
+                                                    ->default('alimentacion')
+                                                    ->dehydrated(),
 
                                                 Forms\Components\TextInput::make('descripcion')
                                                     ->label('Descripción')
                                                     ->required()
                                                     ->maxLength(255)
-                                                    ->placeholder('Ej: Almuerzo (3 técnicos), Desayuno...'),
+                                                    ->placeholder('Ej: Almuerzo (3 técnicos), Dieta de campo...'),
 
-                                                Forms\Components\TextInput::make('cantidad')
-                                                    ->label('Días / Cantidad')
-                                                    ->numeric()
-                                                    ->default(1)
-                                                    ->minValue(1)
-                                                    ->required()
-                                                    ->live(debounce: 500),
+                                                Forms\Components\Grid::make(3)
+                                                    ->schema([
+                                                        Forms\Components\TextInput::make('cantidad')
+                                                            ->label('Raciones / Días')
+                                                            ->numeric()
+                                                            ->default(1)
+                                                            ->minValue(1)
+                                                            ->required()
+                                                            ->live(onBlur: true)
+                                                            ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                                                                $costo = (float) ($get('costo_unitario') ?? 0);
+                                                                $set('subtotal', round(((float) $state) * $costo, 2));
+                                                            }),
 
-                                                Forms\Components\TextInput::make('costo_unitario')
-                                                    ->label('Costo por Día')
-                                                    ->numeric()
-                                                    ->prefix('$')
-                                                    ->default(0)
-                                                    ->required()
-                                                    ->live(debounce: 500),
+                                                        Forms\Components\TextInput::make('costo_unitario')
+                                                            ->label('Costo por Ración / Día')
+                                                            ->numeric()
+                                                            ->prefix('$')
+                                                            ->default(0)
+                                                            ->required()
+                                                            ->live(onBlur: true)
+                                                            ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                                                                $cantidad = (float) ($get('cantidad') ?? 1);
+                                                                $set('subtotal', round($cantidad * ((float) $state), 2));
+                                                            }),
 
-                                                Forms\Components\TextInput::make('subtotal')
-                                                    ->label('Subtotal')
-                                                    ->numeric()
-                                                    ->prefix('$')
-                                                    ->disabled()
-                                                    ->dehydrated(false),
-                                            ])
-                                            ->afterStateUpdated(function ($state, Set $set) {
-                                                if (is_array($state)) {
-                                                    foreach ($state as $index => $linea) {
-                                                        $cantidad = (float) ($linea['cantidad'] ?? 1);
-                                                        $costo = (float) ($linea['costo_unitario'] ?? 0);
-                                                        $state[$index]['subtotal'] = $cantidad * $costo;
-                                                    }
-                                                }
-                                            }),
+                                                        Forms\Components\TextInput::make('subtotal')
+                                                            ->label('Subtotal')
+                                                            ->numeric()
+                                                            ->prefix('$')
+                                                            ->readOnly()
+                                                            ->dehydrated()
+                                                            ->default(0),
+                                                    ]),
+                                            ]),
                                     ]),
                             ])
                             ->columnSpanFull(),
@@ -516,12 +628,28 @@ class ProyectoResource extends Resource
                             ->label('Notas')
                             ->rows(3),
 
-                        Forms\Components\TextInput::make('presupuesto_total')
-                            ->label('Presupuesto Total')
-                            ->numeric()
-                            ->prefix('$')
-                            ->disabled()
-                            ->dehydrated(false)
+                        Forms\Components\Placeholder::make('resumen_presupuesto')
+                            ->label('Resumen Estimado del Presupuesto')
+                            ->content(function (Get $get): HtmlString {
+                                $calc = fn ($items) => collect($items ?? [])->sum(fn ($i) => ((float) ($i['cantidad'] ?? 0)) * ((float) ($i['costo_unitario'] ?? 0)));
+                                $eq = $calc($get('lineasEquipamiento'));
+                                $mo = $calc($get('lineasManoObra'));
+                                $mat = $calc($get('lineasMateriales'));
+                                $tr = $calc($get('lineasTransporte'));
+                                $al = $calc($get('lineasAlimentacion'));
+                                $tot = $eq + $mo + $mat + $tr + $al;
+
+                                $html = "<div class='text-xs space-y-1 font-mono text-gray-700 dark:text-gray-300'>
+                                    <div>Equipamiento: <strong class='text-primary-600'>$" . number_format($eq, 2) . "</strong></div>
+                                    <div>Mano de Obra: <strong class='text-primary-600'>$" . number_format($mo, 2) . "</strong></div>
+                                    <div>Materiales: <strong class='text-primary-600'>$" . number_format($mat, 2) . "</strong></div>
+                                    <div>Transporte: <strong class='text-primary-600'>$" . number_format($tr, 2) . "</strong></div>
+                                    <div>Alimentación: <strong class='text-primary-600'>$" . number_format($al, 2) . "</strong></div>
+                                    <div class='pt-2 border-t border-gray-200 dark:border-gray-700 font-bold text-sm text-emerald-600 dark:text-emerald-400'>Total Estimado: $" . number_format($tot, 2) . "</div>
+                                </div>";
+
+                                return new HtmlString($html);
+                            })
                             ->visible(fn (Get $get) => $get('tipo_seguimiento') === 'instalacion' || blank($get('tipo_seguimiento'))),
                     ]),
             ]);
@@ -653,7 +781,6 @@ class ProyectoResource extends Resource
                     ->openUrlInNewTab(),
 
                 Tables\Actions\EditAction::make(),
-                
                 Tables\Actions\DeleteAction::make(),
             ])
             ->bulkActions([

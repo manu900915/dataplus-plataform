@@ -26,6 +26,7 @@ export const PresupuestoModal: React.FC<PresupuestoModalProps> = ({
   onSave,
 }) => {
   const [lineas, setLineas] = useState<LineaPresupuesto[]>(proyecto.lineas_presupuesto || []);
+  const [activeTab, setActiveTab] = useState<'todos' | BudgetLineType>('todos');
   const [selectedItemId, setSelectedItemId] = useState<string>('');
   const [tipoLinea, setTipoLinea] = useState<BudgetLineType>('equipamiento');
   const [descripcion, setDescripcion] = useState<string>('');
@@ -40,8 +41,16 @@ export const PresupuestoModal: React.FC<PresupuestoModalProps> = ({
     if (found) {
       setDescripcion(found.nombre);
       setCostoUnitario(found.precio_unitario);
-      setTipoLinea(found.es_equipamiento ? 'equipamiento' : 'material');
+      const tipo = found.es_equipamiento ? 'equipamiento' : 'material';
+      setTipoLinea(tipo);
       setDescontarInventario(true);
+    }
+  };
+
+  const handleTabChange = (tab: 'todos' | BudgetLineType) => {
+    setActiveTab(tab);
+    if (tab !== 'todos') {
+      setTipoLinea(tab);
     }
   };
 
@@ -73,6 +82,12 @@ export const PresupuestoModal: React.FC<PresupuestoModalProps> = ({
   const handleRemoveLinea = (id: string) => {
     setLineas(lineas.filter(l => l.id !== id));
   };
+
+  const displayedLineas = activeTab === 'todos'
+    ? lineas
+    : lineas.filter(l => l.tipo_linea === activeTab);
+
+  const getCountByTipo = (tipo: BudgetLineType) => lineas.filter(l => l.tipo_linea === tipo).length;
 
   const totalCalculado = lineas.reduce((acc, l) => acc + l.subtotal, 0);
 
@@ -246,70 +261,178 @@ export const PresupuestoModal: React.FC<PresupuestoModalProps> = ({
             </div>
           </form>
 
-          {/* Table of Lines */}
-          <div className="rounded-xl border border-slate-800 bg-slate-950/60 overflow-hidden">
-            <table className="w-full text-left text-xs">
-              <thead className="border-b border-slate-800 bg-slate-900/80 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                <tr>
-                  <th className="px-4 py-3">Tipo</th>
-                  <th className="px-4 py-3">Descripción</th>
-                  <th className="px-4 py-3 text-right">Cant.</th>
-                  <th className="px-4 py-3 text-right">Costo Unit.</th>
-                  <th className="px-4 py-3 text-right">Subtotal</th>
-                  <th className="px-4 py-3 text-center">Inv.</th>
-                  <th className="px-4 py-3 text-center">Acción</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/80 text-slate-200">
-                {lineas.length > 0 ? (
-                  lineas.map((linea) => (
-                    <tr key={linea.id} className="hover:bg-slate-900/40">
-                      <td className="px-4 py-3">
-                        <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold uppercase border ${getTipoBadgeColor(linea.tipo_linea)}`}>
-                          {linea.tipo_linea.replace('_', ' ')}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-medium">
-                        {linea.descripcion}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono">
-                        {linea.cantidad}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono">
-                        ${linea.costo_unitario.toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono font-bold text-teal-400">
-                        ${linea.subtotal.toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {linea.descontar_inventario ? (
-                          <span className="inline-flex items-center text-[10px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded">
-                            Sí
+          {/* Category Tabs & Table */}
+          <div className="space-y-3">
+            {/* Tabs Filter */}
+            <div className="flex items-center gap-1.5 overflow-x-auto border-b border-slate-800 pb-2 text-xs">
+              <button
+                type="button"
+                onClick={() => handleTabChange('todos')}
+                className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  activeTab === 'todos'
+                    ? 'bg-teal-500 text-slate-950 font-bold'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <span>Todas</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                  activeTab === 'todos' ? 'bg-teal-700/30 text-slate-950 font-mono font-bold' : 'bg-slate-800 text-slate-400'
+                }`}>
+                  {lineas.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleTabChange('equipamiento')}
+                className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  activeTab === 'equipamiento'
+                    ? 'bg-teal-500 text-slate-950 font-bold'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <span>Equipamiento</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                  activeTab === 'equipamiento' ? 'bg-teal-700/30 text-slate-950 font-mono font-bold' : 'bg-slate-800 text-slate-400'
+                }`}>
+                  {getCountByTipo('equipamiento')}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleTabChange('mano_obra')}
+                className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  activeTab === 'mano_obra'
+                    ? 'bg-teal-500 text-slate-950 font-bold'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <span>Mano de Obra</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                  activeTab === 'mano_obra' ? 'bg-teal-700/30 text-slate-950 font-mono font-bold' : 'bg-slate-800 text-slate-400'
+                }`}>
+                  {getCountByTipo('mano_obra')}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleTabChange('material')}
+                className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  activeTab === 'material'
+                    ? 'bg-teal-500 text-slate-950 font-bold'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <span>Materiales</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                  activeTab === 'material' ? 'bg-teal-700/30 text-slate-950 font-mono font-bold' : 'bg-slate-800 text-slate-400'
+                }`}>
+                  {getCountByTipo('material')}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleTabChange('transporte')}
+                className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  activeTab === 'transporte'
+                    ? 'bg-teal-500 text-slate-950 font-bold'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <span>Transporte</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                  activeTab === 'transporte' ? 'bg-teal-700/30 text-slate-950 font-mono font-bold' : 'bg-slate-800 text-slate-400'
+                }`}>
+                  {getCountByTipo('transporte')}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleTabChange('alimentacion')}
+                className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  activeTab === 'alimentacion'
+                    ? 'bg-teal-500 text-slate-950 font-bold'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <span>Alimentación</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                  activeTab === 'alimentacion' ? 'bg-teal-700/30 text-slate-950 font-mono font-bold' : 'bg-slate-800 text-slate-400'
+                }`}>
+                  {getCountByTipo('alimentacion')}
+                </span>
+              </button>
+            </div>
+
+            {/* Table of Lines */}
+            <div className="rounded-xl border border-slate-800 bg-slate-950/60 overflow-hidden">
+              <table className="w-full text-left text-xs">
+                <thead className="border-b border-slate-800 bg-slate-900/80 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                  <tr>
+                    <th className="px-4 py-3">Tipo</th>
+                    <th className="px-4 py-3">Descripción</th>
+                    <th className="px-4 py-3 text-right">Cant.</th>
+                    <th className="px-4 py-3 text-right">Costo Unit.</th>
+                    <th className="px-4 py-3 text-right">Subtotal</th>
+                    <th className="px-4 py-3 text-center">Inv.</th>
+                    <th className="px-4 py-3 text-center">Acción</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/80 text-slate-200">
+                  {displayedLineas.length > 0 ? (
+                    displayedLineas.map((linea) => (
+                      <tr key={linea.id} className="hover:bg-slate-900/40">
+                        <td className="px-4 py-3">
+                          <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold uppercase border ${getTipoBadgeColor(linea.tipo_linea)}`}>
+                            {linea.tipo_linea.replace('_', ' ')}
                           </span>
-                        ) : (
-                          <span className="text-slate-500 text-[10px]">-</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <button
-                          onClick={() => handleRemoveLinea(linea.id)}
-                          className="text-slate-500 hover:text-rose-400 p-1 rounded transition-colors cursor-pointer"
-                          title="Eliminar línea"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        </td>
+                        <td className="px-4 py-3 font-medium">
+                          {linea.descripcion}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono">
+                          {linea.cantidad}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono">
+                          ${linea.costo_unitario.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono font-bold text-teal-400">
+                          ${linea.subtotal.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {linea.descontar_inventario ? (
+                            <span className="inline-flex items-center text-[10px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded">
+                              Sí
+                            </span>
+                          ) : (
+                            <span className="text-slate-500 text-[10px]">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            onClick={() => handleRemoveLinea(linea.id)}
+                            className="text-slate-500 hover:text-rose-400 p-1 rounded transition-colors cursor-pointer"
+                            title="Eliminar línea"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                        No hay conceptos en la categoría {activeTab === 'todos' ? 'seleccionada' : activeTab} aún.
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
-                      No hay líneas presupuestadas para este proyecto aún.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
