@@ -13,9 +13,11 @@ use App\Models\Proyecto;
 use App\Models\Servicio;
 use App\Models\SolicitudServicio;
 use App\Models\User;
+use App\Models\SuscripcionGestionRemota;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class Dashboard extends Page
 {
@@ -29,7 +31,7 @@ class Dashboard extends Page
      */
     public function getData(): array
     {
-        return Cache::remember('dashboard:real_modules:v2', now()->addMinutes(1), function () {
+        return Cache::remember('dashboard:real_modules:v3', now()->addMinutes(1), function () {
             // ─── CONSOLIDACIÓN FINANCIERA (DINERO GENERADO POR CUALQUIER CONCEPTO) ───
             $presupuestoObras = (float) Proyecto::sum('presupuesto_total');
             $solicitudesAprobadasMonto = (float) SolicitudServicio::whereIn('estado', ['Aprobada', 'Convertida_Proyecto'])
@@ -221,69 +223,70 @@ class Dashboard extends Page
             }
 
             // ─── 6. GESTIÓN REMOTA FACTURACIÓN & COBRANZAS ───
-             = 0;
-             = 0.0;
-             = 0.0;
-             = 0.0;
-             = 0.0;
-             = 0.0;
-             = 0.0;
-             = 0;
-             = [];
+            $grSubsTotal = 0;
+            $grRecaudadoCup = 0.0;
+            $grRecaudadoUsd = 0.0;
+            $grPendienteCup = 0.0;
+            $grPendienteUsd = 0.0;
+            $grDeudaCup = 0.0;
+            $grDeudaUsd = 0.0;
+            $grDeudoresCount = 0;
+            $grDeudoresList = [];
 
-            if (\Illuminate\Support\Facades\Schema::hasTable('suscripciones_gestion_remota')) {
-                 = \App\Models\SuscripcionGestionRemota::where('activo', true)->get();
-                 = ->count();
-                foreach ( as ) {
-                     = (float) ->monto_mensual + (float) ->deuda_acumulada;
-                    if (->tiene_deuda || ->deuda_acumulada > 0) {
-                        ++;
+            if (Schema::hasTable('suscripciones_gestion_remota')) {
+                $grSubs = SuscripcionGestionRemota::where('activo', true)->get();
+                $grSubsTotal = $grSubs->count();
+                foreach ($grSubs as $sub) {
+                    $tot = (float) $sub->monto_mensual + (float) $sub->deuda_acumulada;
+                    if ($sub->tiene_deuda || $sub->deuda_acumulada > 0) {
+                        $grDeudoresCount++;
                     }
-                    if (->moneda === 'USD') {
-                         += (float) ->deuda_acumulada;
-                        if (->estado_cobro === 'cobrado') {
-                             += (float) ->monto_mensual;
+                    if ($sub->moneda === 'USD') {
+                        $grDeudaUsd += (float) $sub->deuda_acumulada;
+                        if ($sub->estado_cobro === 'cobrado') {
+                            $grRecaudadoUsd += (float) $sub->monto_mensual;
                         } else {
-                             += ;
+                            $grPendienteUsd += $tot;
                         }
                     } else {
-                         += (float) ->deuda_acumulada;
-                        if (->estado_cobro === 'cobrado') {
-                             += (float) ->monto_mensual;
+                        $grDeudaCup += (float) $sub->deuda_acumulada;
+                        if ($sub->estado_cobro === 'cobrado') {
+                            $grRecaudadoCup += (float) $sub->monto_mensual;
                         } else {
-                             += ;
+                            $grPendienteCup += $tot;
                         }
                     }
                 }
 
-                 = \App\Models\SuscripcionGestionRemota::where('activo', true)
-                    ->where(function () {
-                        ->where('tiene_deuda', true)->orWhere('deuda_acumulada', '>', 0);
+                $grDeudoresList = SuscripcionGestionRemota::where('activo', true)
+                    ->where(function ($q) {
+                        $q->where('tiene_deuda', true)->orWhere('deuda_acumulada', '>', 0);
                     })
                     ->orderBy('deuda_acumulada', 'desc')
                     ->take(5)
                     ->get()
-                    ->map(fn () => [
-                        'codigo' => ->codigo,
-                        'cliente' => ->cliente_nombre,
-                        'moneda' => ->moneda,
-                        'deuda' => (float) ->deuda_acumulada,
-                        'meses' => ->meses_deuda_count,
-                        'telefono' => ->cliente_telefono,
+                    ->map(fn ($s) => [
+                        'codigo' => $s->codigo,
+                        'cliente' => $s->cliente_nombre,
+                        'moneda' => $s->moneda,
+                        'deuda' => (float) $s->deuda_acumulada,
+                        'meses' => $s->meses_deuda_count,
+                        'telefono' => $s->cliente_telefono,
                     ])->all();
             }
 
             return [
                 // Gestión Remota Facturación
-                'gr_subs_total'            => ,
-                'gr_recaudado_cup'         => ,
-                'gr_recaudado_usd'         => ,
-                'gr_pendiente_cup'         => ,
-                'gr_pendiente_usd'         => ,
-                'gr_deuda_cup'             => ,
-                'gr_deuda_usd'             => ,
-                'gr_deudores_count'        => ,
-                'gr_deudores_list'         => ,
+                'gr_subs_total'            => $grSubsTotal,
+                'gr_recaudado_cup'         => $grRecaudadoCup,
+                'gr_recaudado_usd'         => $grRecaudadoUsd,
+                'gr_pendiente_cup'         => $grPendienteCup,
+                'gr_pendiente_usd'         => $grPendienteUsd,
+                'gr_deuda_cup'             => $grDeudaCup,
+                'gr_deuda_usd'             => $grDeudaUsd,
+                'gr_deudores_count'        => $grDeudoresCount,
+                'gr_deudores_list'         => $grDeudoresList,
+
                 // Consolidación Financiera (Dinero por cualquier concepto)
                 'dinero_generado_total'    => $dineroGeneradoTotal,
                 'presupuesto_total'        => $presupuestoObras,
