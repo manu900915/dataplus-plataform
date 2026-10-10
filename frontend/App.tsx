@@ -61,6 +61,34 @@ import { CategoriasItemView } from './components/CategoriasItemView';
 import { UsuariosView } from './components/UsuariosView';
 
 export const App: React.FC = () => {
+  // Prevenir que quede cursor de texto o foco parpadeante en palabras o botones
+  useEffect(() => {
+    const handleMouseDown = (e: MouseEvent) => {
+      const isInput = (e.target as HTMLElement)?.closest("input, textarea, [contenteditable='true']");
+      if (!isInput && window.getSelection) {
+        window.getSelection()?.removeAllRanges();
+      }
+    };
+    const handleClick = (e: MouseEvent) => {
+      const isInput = (e.target as HTMLElement)?.closest("input, textarea, [contenteditable='true']");
+      if (!isInput) {
+        if (window.getSelection) {
+          window.getSelection()?.removeAllRanges();
+        }
+        const clickable = (e.target as HTMLElement)?.closest("a, button");
+        if (clickable) {
+          (clickable as HTMLElement).blur();
+        }
+      }
+    };
+    document.addEventListener("mousedown", handleMouseDown, true);
+    document.addEventListener("click", handleClick, true);
+    return () => {
+      document.removeEventListener("mousedown", handleMouseDown, true);
+      document.removeEventListener("click", handleClick, true);
+    };
+  }, []);
+
   const [currentModule, setCurrentModule] = useState<string>('dashboard');
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [editingBudgetFromKanban, setEditingBudgetFromKanban] = useState<Proyecto | null>(null);

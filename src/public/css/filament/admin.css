@@ -1,3 +1,33 @@
+
+/* ============================================================
+   GLOBAL ANTI-CARET: CERO CURSOR DE TEXTO FUERA DE INPUTS
+   Elimina cualquier cursor parpadeante o de escritura en
+   palabras como "proyecto", "proyectos", títulos y menús.
+   ============================================================ */
+*:not(input):not(textarea):not([contenteditable="true"]):not([contenteditable=""]) {
+    caret-color: transparent !important;
+}
+
+h1, h2, h3, h4, h5, h6,
+.fi-header-heading,
+.fi-header-subheading,
+.fi-breadcrumbs,
+.fi-breadcrumbs *,
+.fi-ta-header-cell,
+.fi-ta-header-cell *,
+.fi-topbar h1,
+.fi-topbar span,
+.dp-kanban-col-title,
+.dp-kanban-card-title,
+.dp-kanban-tab,
+.dp-kanban-tab * {
+    -webkit-user-select: none !important;
+    -moz-user-select: none !important;
+    -ms-user-select: none !important;
+    user-select: none !important;
+    caret-color: transparent !important;
+}
+
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
 
 /* ============================================================

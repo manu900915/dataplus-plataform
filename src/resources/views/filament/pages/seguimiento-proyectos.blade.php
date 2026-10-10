@@ -1,5 +1,17 @@
 <x-filament-panels::page>
     <style>
+        *:not(input):not(textarea):not(select) {
+            caret-color: transparent !important;
+        }
+        .dp-kanban-root {
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        .dp-kanban-tab span, .dp-kanban-col-title, .dp-kanban-card-title {
+            pointer-events: none;
+            caret-color: transparent !important;
+        }
+
         .dp-kanban-root {
             width: 100%;
             display: flex;
