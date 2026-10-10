@@ -264,3 +264,72 @@ export interface UserAccount {
   phone?: string;
   created_at: string;
 }
+
+export type Moneda = 'CUP' | 'USD';
+export type MetodoPagoServicio = 'Transferencia' | 'Efectivo';
+export type EstadoCobroServicio = 'Al_Dia' | 'Pendiente' | 'En_Mora' | 'Pago_Parcial';
+
+export interface SuscripcionServicio {
+  id: string;
+  codigo: string;
+  cliente_id: string;
+  cliente_nombre: string;
+  cliente_telefono?: string;
+  cliente_email?: string;
+  servicio_id?: string;
+  nombre_servicio: string;
+  tipo_solucion?: string;
+  sim_numero?: string;
+  moneda: Moneda;
+  tarifa_mensual: number;
+  dia_limite_pago: number; // Por defecto 15 (primeros 15 días del mes)
+  activo: boolean;
+  fecha_inicio: string;
+  notas?: string;
+  // Estado de Deuda y Cobro
+  tiene_deuda: boolean;
+  meses_deuda_count: number;
+  meses_deuda_detalle: string[]; // Ej. ["Agosto 2026", "Septiembre 2026"]
+  deuda_acumulada: number;
+  monto_a_cobrar: number; // deuda_acumulada + tarifa_mensual mes adelantado
+  estado_cobro_mes_actual: EstadoCobroServicio;
+  ultimo_pago_fecha?: string;
+  ultimo_pago_monto?: number;
+  ultimo_pago_metodo?: MetodoPagoServicio;
+  ultimo_pago_transaccion?: string;
+}
+
+export interface RegistroPagoServicio {
+  id: string;
+  codigo_pago: string;
+  suscripcion_id: string;
+  cliente_id: string;
+  cliente_nombre: string;
+  cliente_telefono?: string;
+  servicio_nombre: string;
+  mes_periodo: string; // Ej. "2026-10"
+  mes_nombre_legible: string; // Ej. "Octubre 2026"
+  moneda: Moneda;
+  tarifa_servicio: number;
+  deuda_previa: number;
+  meses_deuda_previos: number;
+  meses_deuda_liquidados?: string[];
+  monto_total_exigible: number; // deuda_previa + tarifa_servicio
+  monto_pagado: number;
+  saldo_restante: number;
+  fecha_pago: string; // YYYY-MM-DD
+  dia_pago: number; // Día del mes en que pagó
+  pago_a_tiempo: boolean; // Si día <= 15
+  metodo_pago: MetodoPagoServicio;
+  // Transferencia:
+  plataforma_transferencia?: string; // Transfermóvil, EnZona, Zelle, TropiPay, etc.
+  numero_transaccion?: string;
+  comprobante_imagen_url?: string;
+  comprobante_nombre?: string;
+  // Efectivo:
+  efectivo_quien_recibe?: string;
+  efectivo_quien_entrega?: string;
+  notas?: string;
+  registrado_por: string;
+  created_at: string;
+}

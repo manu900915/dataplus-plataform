@@ -28,6 +28,7 @@ interface SidebarProps {
   onSelectModule: (module: string) => void;
   openIncidenciasCount: number;
   lowStockCount: number;
+  deudoresCount?: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -35,6 +36,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectModule,
   openIncidenciasCount,
   lowStockCount,
+  deudoresCount = 0,
 }) => {
   const navSections = [
     {
@@ -83,7 +85,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: 'Finanzas',
       items: [
-        { id: 'finanzas', label: 'Ventas y Gastos', icon: ShoppingCart }
+        { 
+          id: 'finanzas', 
+          label: 'Facturación Servicios (GR)', 
+          icon: Radio,
+          badge: deudoresCount > 0 ? deudoresCount : undefined,
+          badgeColor: 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+        },
+        { id: 'finanzas_ventas', label: 'Ventas y Gastos', icon: ShoppingCart }
       ]
     },
     {

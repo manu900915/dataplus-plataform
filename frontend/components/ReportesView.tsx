@@ -18,13 +18,15 @@ import {
   Wrench,
   Clock
 } from 'lucide-react';
-import { Proyecto, Incidencia, ItemInventario, Almacen } from '../types';
+import { Proyecto, Incidencia, ItemInventario, Almacen, SuscripcionServicio, RegistroPagoServicio } from '../types';
 
 interface ReportesViewProps {
   proyectos: Proyecto[];
   incidencias: Incidencia[];
   items: ItemInventario[];
   almacenes: Almacen[];
+  suscripciones?: SuscripcionServicio[];
+  pagosServicio?: RegistroPagoServicio[];
 }
 
 export const ReportesView: React.FC<ReportesViewProps> = ({
@@ -32,6 +34,8 @@ export const ReportesView: React.FC<ReportesViewProps> = ({
   incidencias,
   items,
   almacenes,
+  suscripciones = [],
+  pagosServicio = [],
 }) => {
   const [periodo, setPeriodo] = useState<'diario' | 'semanal' | 'mensual' | 'anual'>('mensual');
   const [selectedTecnico, setSelectedTecnico] = useState<string>('todos');
@@ -120,10 +124,12 @@ export const ReportesView: React.FC<ReportesViewProps> = ({
   // Exportar a CSV
   const handleExportCSV = () => {
     const rows = [
-      ['Modulo', 'Codigo', 'Nombre/Titulo', 'Estado', 'Monto/Valor'],
+      ['Modulo', 'Codigo', 'Nombre/Titulo', 'Estado/Metodo', 'Monto/Valor'],
       ...proyectos.map(p => ['Proyecto', p.codigo, p.nombre, p.estado, p.presupuesto_total.toString()]),
       ...incidencias.map(i => ['Incidencia', i.codigo, i.titulo, i.estado, (i.costo_estimado || 0).toString()]),
-      ...items.map(it => ['Inventario', it.codigo, it.nombre, `Stock: ${it.stock_actual}`, ((it.stock_actual || 0) * (it.precio_unitario || 0)).toString()])
+      ...items.map(it => ['Inventario', it.codigo, it.nombre, `Stock: ${it.stock_actual}`, ((it.stock_actual || 0) * (it.precio_unitario || 0)).toString()]),
+      ...suscripciones.map(s => ['Gestion_Remota', s.codigo, s.cliente_nombre, s.estado_cobro_mes_actual, `${s.moneda} ${s.monto_a_cobrar}`]),
+      ...pagosServicio.map(pg => ['Pago_Servicio', pg.codigo_pago, pg.cliente_nombre, `${pg.metodo_pago} (${pg.fecha_pago})`, `${pg.moneda} ${pg.monto_pagado}`])
     ];
     const csvContent = 'data:text/csv;charset=utf-8,' + rows.map(e => e.join(',')).join('\n');
     const encodedUri = encodeURI(csvContent);

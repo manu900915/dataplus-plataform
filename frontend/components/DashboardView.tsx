@@ -34,7 +34,9 @@ import {
   Contrato, 
   Venta, 
   Gasto, 
-  UserAccount 
+  UserAccount,
+  SuscripcionServicio,
+  RegistroPagoServicio
 } from '../types';
 
 interface DashboardViewProps {
@@ -49,6 +51,8 @@ interface DashboardViewProps {
   ventas?: Venta[];
   gastos?: Gasto[];
   usuarios?: UserAccount[];
+  suscripciones?: SuscripcionServicio[];
+  pagosServicio?: RegistroPagoServicio[];
   onNavigate: (module: string) => void;
   onQuickRestock: (item: ItemInventario) => void;
 }
@@ -65,6 +69,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   ventas = [],
   gastos = [],
   usuarios = [],
+  suscripciones = [],
+  pagosServicio = [],
   onNavigate,
   onQuickRestock,
 }) => {
@@ -546,7 +552,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
               <span className="text-xs font-semibold text-slate-400">Ventas Cobradas</span>
               <p className="text-2xl font-bold text-emerald-400 mt-2">${totalVentas.toLocaleString()} CUP</p>
-              <p className="text-[11px] text-slate-400 mt-1">Ingresos efectivos registrados</p>
+              <p className="text-[11px] text-slate-400 mt-1">Ingresos de obras ejecutadas</p>
             </div>
 
             <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
@@ -558,7 +564,142 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
               <span className="text-xs font-semibold text-slate-400">Margen Operativo</span>
               <p className="text-2xl font-bold text-sky-400 mt-2">${(totalVentas - totalGastos).toLocaleString()} CUP</p>
-              <p className="text-[11px] text-slate-400 mt-1">Balance positivo</p>
+              <p className="text-[11px] text-slate-400 mt-1">Balance neto</p>
+            </div>
+          </div>
+
+          {/* ================= SECCIÓN GESTIÓN REMOTA EN DASHBOARD ================= */}
+          <div className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900/90 to-slate-950 p-6 shadow-sm space-y-5">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-800/80 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white shadow-md shadow-sky-500/20">
+                  <Radio className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    Facturación de Gestión Remota · Mes Adelantado
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      Plazo: Días 1 al 15
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Control de mensualidades recurrentes, comprobantes por transferencia y cobranza activa.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => onNavigate('finanzas')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs transition-colors cursor-pointer"
+              >
+                Abrir Facturación de Servicios →
+              </button>
+            </div>
+
+            {/* Micro KPIs de Gestión Remota */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800">
+                <span className="text-[11px] font-semibold text-slate-400">Recaudado este Mes</span>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <p className="text-lg font-bold font-mono text-emerald-400">
+                    ${pagosServicio.filter(p => p.fecha_pago.startsWith('2026-10') && p.moneda === 'CUP').reduce((a, b) => a + b.monto_pagado, 0).toLocaleString()} CUP
+                  </p>
+                  <span className="text-slate-600">|</span>
+                  <p className="text-lg font-bold font-mono text-sky-400">
+                    ${pagosServicio.filter(p => p.fecha_pago.startsWith('2026-10') && p.moneda === 'USD').reduce((a, b) => a + b.monto_pagado, 0)} USD
+                  </p>
+                </div>
+                <p className="text-[10px] text-emerald-400 mt-1 flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3" /> Cobros verificados
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800">
+                <span className="text-[11px] font-semibold text-slate-400">Plazo Primeros 15 Días</span>
+                <p className="text-lg font-bold text-white mt-1">
+                  Día 10 del mes
+                </p>
+                <p className="text-[10px] text-amber-400 mt-1 flex items-center gap-1">
+                  <Clock className="h-3 w-3" /> Quedan 5 días para pagar sin mora
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-950/70 border border-rose-500/20 bg-rose-950/10">
+                <span className="text-[11px] font-semibold text-rose-300">Clientes con Deuda / Mora</span>
+                <p className="text-lg font-bold font-mono text-rose-400 mt-1">
+                  {suscripciones.filter(s => s.tiene_deuda).length} clientes en mora
+                </p>
+                <p className="text-[10px] text-rose-400 mt-1">
+                  Requieren gestión de cobranza
+                </p>
+              </div>
+            </div>
+
+            {/* Dos columnas: Mayores deudores & Pagos de la semana */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2">
+              {/* Columna 1: Mayores deudores */}
+              <div className="p-4 rounded-xl border border-slate-800 bg-slate-950/60 space-y-3">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <AlertTriangle className="h-3.5 w-3.5 text-rose-400" />
+                    Mayores Deudores de Gestión Remota
+                  </h4>
+                  <button
+                    onClick={() => onNavigate('finanzas')}
+                    className="text-[11px] text-rose-400 hover:text-rose-300 font-semibold"
+                  >
+                    Ver todos →
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {suscripciones.filter(s => s.tiene_deuda).slice(0, 3).map((sub) => (
+                    <div key={sub.id} className="p-2.5 rounded-lg border border-rose-500/20 bg-rose-950/20 flex items-center justify-between text-xs">
+                      <div>
+                        <p className="font-semibold text-white">{sub.cliente_nombre}</p>
+                        <p className="text-[10px] text-slate-400 font-mono">
+                          {sub.meses_deuda_count} meses ({sub.meses_deuda_detalle.join(', ') || 'Octubre'})
+                        </p>
+                      </div>
+                      <span className="font-mono font-bold text-rose-400 text-xs">
+                        {sub.moneda === 'USD' ? `$${sub.monto_a_cobrar} USD` : `$${sub.monto_a_cobrar.toLocaleString()} CUP`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Columna 2: Pagos registrados en la semana */}
+              <div className="p-4 rounded-xl border border-slate-800 bg-slate-950/60 space-y-3">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5 text-emerald-400" />
+                    Pagos Recibidos en la Semana
+                  </h4>
+                  <button
+                    onClick={() => onNavigate('finanzas')}
+                    className="text-[11px] text-emerald-400 hover:text-emerald-300 font-semibold"
+                  >
+                    Ver historial →
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {pagosServicio.slice(0, 3).map((p) => (
+                    <div key={p.id} className="p-2.5 rounded-lg border border-slate-800 bg-slate-900/50 flex items-center justify-between text-xs">
+                      <div>
+                        <p className="font-semibold text-white">{p.cliente_nombre}</p>
+                        <p className="text-[10px] text-slate-400">
+                          {p.fecha_pago} · {p.metodo_pago}{p.numero_transaccion ? ` (${p.numero_transaccion})` : ''}
+                        </p>
+                      </div>
+                      <span className="font-mono font-bold text-emerald-400 text-xs">
+                        +{p.moneda === 'USD' ? `$${p.monto_pagado} USD` : `$${p.monto_pagado.toLocaleString()} CUP`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -566,13 +707,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <DollarSign className="h-4 w-4 text-emerald-400" />
-                Últimos Movimientos Financieros
+                Ventas y Gastos Operativos de Obras
               </h3>
               <button
                 onClick={() => onNavigate('finanzas')}
                 className="text-xs text-sky-400 hover:text-sky-300 font-semibold cursor-pointer"
               >
-                Abrir módulo de Finanzas →
+                Abrir Ventas & Gastos →
               </button>
             </div>
 

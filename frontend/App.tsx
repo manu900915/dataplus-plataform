@@ -14,7 +14,9 @@ import {
   Venta,
   Gasto,
   CategoriaItem,
-  UserAccount
+  UserAccount,
+  SuscripcionServicio,
+  RegistroPagoServicio
 } from './types';
 import { 
   INITIAL_CLIENTES, 
@@ -32,6 +34,8 @@ import {
   INITIAL_GASTOS,
   INITIAL_CATEGORIAS_ITEM,
   INITIAL_USUARIOS,
+  INITIAL_SUSCRIPCIONES_SERVICIO,
+  INITIAL_PAGOS_SERVICIO,
   LDAP_DIRECTORY_USERS,
   loadFromStorage, 
   saveToStorage 
@@ -140,6 +144,12 @@ export const App: React.FC = () => {
   const [usuarios, setUsuarios] = useState<UserAccount[]>(() => 
     loadFromStorage('usuarios', INITIAL_USUARIOS)
   );
+  const [suscripciones, setSuscripciones] = useState<SuscripcionServicio[]>(() => 
+    loadFromStorage('suscripciones_servicio', INITIAL_SUSCRIPCIONES_SERVICIO)
+  );
+  const [pagosServicio, setPagosServicio] = useState<RegistroPagoServicio[]>(() => 
+    loadFromStorage('pagos_servicio', INITIAL_PAGOS_SERVICIO)
+  );
 
   // Sync to storage
   useEffect(() => saveToStorage('clientes', clientes), [clientes]);
@@ -157,12 +167,43 @@ export const App: React.FC = () => {
   useEffect(() => saveToStorage('gastos', gastos), [gastos]);
   useEffect(() => saveToStorage('categorias_item', categoriasItem), [categoriasItem]);
   useEffect(() => saveToStorage('usuarios', usuarios), [usuarios]);
+  useEffect(() => saveToStorage('suscripciones_servicio', suscripciones), [suscripciones]);
+  useEffect(() => saveToStorage('pagos_servicio', pagosServicio), [pagosServicio]);
 
   // Derived Alerts
   const lowStockItems = items.filter(i => i.stock_actual <= i.stock_minimo);
   const openIncidencias = incidencias.filter(
     i => i.estado !== 'Resuelta' && i.estado !== 'Cerrada' && i.estado !== 'Cancelada'
   );
+  const deudoresCount = suscripciones.filter(s => s.tiene_deuda || s.deuda_acumulada > 0 || s.meses_deuda_count > 0).length;
+
+  // Handlers for Facturación de Servicios
+  const handleAddPagoServicio = (nuevo: Omit<RegistroPagoServicio, 'id' | 'codigo_pago' | 'created_at'>) => {
+    const codeNumber = pagosServicio.length + 1;
+    const code = `PAG-2026-${String(codeNumber).padStart(4, '0')}`;
+    const newPago: RegistroPagoServicio = {
+      ...nuevo,
+      id: `pag-${Date.now()}`,
+      codigo_pago: code,
+      created_at: new Date().toISOString()
+    };
+    setPagosServicio([newPago, ...pagosServicio]);
+  };
+
+  const handleAddSuscripcion = (nueva: Omit<SuscripcionServicio, 'id' | 'codigo'>) => {
+    const codeNumber = suscripciones.length + 1;
+    const code = `SUB-${String(codeNumber).padStart(3, '0')}`;
+    const newSub: SuscripcionServicio = {
+      ...nueva,
+      id: `sub-${Date.now()}`,
+      codigo: code
+    };
+    setSuscripciones([...suscripciones, newSub]);
+  };
+
+  const handleUpdateSuscripcion = (actualizada: SuscripcionServicio) => {
+    setSuscripciones(suscripciones.map(s => s.id === actualizada.id ? actualizada : s));
+  };
 
   // Handlers for Proyectos
   const handleAddProyecto = (nuevo: Proyecto) => {
@@ -327,6 +368,7 @@ export const App: React.FC = () => {
         onSelectModule={setCurrentModule}
         openIncidenciasCount={openIncidencias.length}
         lowStockCount={lowStockItems.length}
+        deudoresCount={deudoresCount}
       />
 
       {/* Main Content Area */}
@@ -356,6 +398,8 @@ export const App: React.FC = () => {
                 ventas={ventas}
                 gastos={gastos}
                 usuarios={usuarios}
+                suscripciones={suscripciones}
+                pagosServicio={pagosServicio}
                 onNavigate={setCurrentModule}
                 onQuickRestock={(item) => {
                   setQuickRestockItem(item);
@@ -461,13 +505,19 @@ export const App: React.FC = () => {
               />
             )}
 
-            {currentModule === 'finanzas' && (
+            {(currentModule === 'finanzas' || currentModule === 'finanzas_ventas') && (
               <FinanzasView
                 ventas={ventas}
                 gastos={gastos}
                 clientes={clientes}
+                suscripciones={suscripciones}
+                pagosServicio={pagosServicio}
                 onAddVenta={(v) => setVentas([...ventas, { ...v, id: `vta-${Date.now()}`, codigo: `VTA-${String(ventas.length + 1).padStart(3, '0')}` }])}
                 onAddGasto={(g) => setGastos([...gastos, { ...g, id: `gst-${Date.now()}`, codigo: `GST-${String(gastos.length + 1).padStart(3, '0')}` }])}
+                onAddPagoServicio={handleAddPagoServicio}
+                onAddSuscripcion={handleAddSuscripcion}
+                onUpdateSuscripcion={handleUpdateSuscripcion}
+                initialTab={currentModule === 'finanzas_ventas' ? 'ventas' : 'facturacion'}
               />
             )}
 
@@ -477,6 +527,8 @@ export const App: React.FC = () => {
                 incidencias={incidencias}
                 items={items}
                 almacenes={almacenes}
+                suscripciones={suscripciones}
+                pagosServicio={pagosServicio}
               />
             )}
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { 
   Columns3, 
   ChevronLeft, 
@@ -10,8 +10,7 @@ import {
   CheckCircle2, 
   Layers, 
   Calculator,
-  Plus,
-  Filter
+  Plus
 } from 'lucide-react';
 import { Proyecto, KanbanStatus } from '../types';
 
@@ -26,8 +25,6 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
   onUpdateStatus,
   onOpenBudget,
 }) => {
-  const [tipoFilter, setTipoFilter] = useState<'todos' | 'instalacion' | 'investigacion'>('todos');
-
   const columns: { id: KanbanStatus; title: string; color: string; badgeBg: string; borderColor: string }[] = [
     { 
       id: 'por_hacer', 
@@ -61,34 +58,19 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
 
   const statusOrder: KanbanStatus[] = ['por_hacer', 'en_progreso', 'en_revision', 'completado'];
 
-  const getEffectiveStatus = (proyecto: Proyecto): KanbanStatus => {
-    if (proyecto.estado === 'completado' || proyecto.estado_kanban === 'completado') return 'completado';
-    if (proyecto.estado_kanban === 'en_revision') return 'en_revision';
-    if (proyecto.estado_kanban === 'en_progreso' || proyecto.estado === 'en_progreso') return 'en_progreso';
-    return proyecto.estado_kanban || 'por_hacer';
-  };
-
   const moveLeft = (proyecto: Proyecto) => {
-    const current = getEffectiveStatus(proyecto);
-    const currentIndex = statusOrder.indexOf(current);
+    const currentIndex = statusOrder.indexOf(proyecto.estado_kanban || 'por_hacer');
     if (currentIndex > 0) {
       onUpdateStatus(proyecto.id, statusOrder[currentIndex - 1]);
     }
   };
 
   const moveRight = (proyecto: Proyecto) => {
-    const current = getEffectiveStatus(proyecto);
-    const currentIndex = statusOrder.indexOf(current);
+    const currentIndex = statusOrder.indexOf(proyecto.estado_kanban || 'por_hacer');
     if (currentIndex < statusOrder.length - 1) {
       onUpdateStatus(proyecto.id, statusOrder[currentIndex + 1]);
     }
   };
-
-  const filteredProyectos = proyectos.filter(p => {
-    if (tipoFilter === 'instalacion') return p.tipo_seguimiento === 'instalacion' || !p.tipo_seguimiento;
-    if (tipoFilter === 'investigacion') return p.tipo_seguimiento === 'investigacion';
-    return true;
-  });
 
   return (
     <div className="space-y-6">
@@ -96,53 +78,19 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
         <div>
           <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
             <Columns3 className="h-5 w-5 text-teal-400" />
-            Tablero Kanban — Seguimiento de Proyectos
+            Tablero Kanban — Seguimiento de Proyectos I+D & Obras
           </h2>
           <p className="text-xs text-slate-400">
-            Supervise todas las obras, instalaciones y proyectos I+D en tiempo real.
+            Organice el avance operacional mediante flujo visual entre fases.
           </p>
-        </div>
-
-        {/* Filter buttons */}
-        <div className="flex items-center gap-2 bg-slate-900/80 p-1 rounded-xl border border-slate-800 text-xs">
-          <button
-            onClick={() => setTipoFilter('todos')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
-              tipoFilter === 'todos'
-                ? 'bg-teal-500 text-slate-950 font-bold shadow-sm'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Todos ({proyectos.length})
-          </button>
-          <button
-            onClick={() => setTipoFilter('instalacion')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
-              tipoFilter === 'instalacion'
-                ? 'bg-teal-500 text-slate-950 font-bold shadow-sm'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Instalaciones ({proyectos.filter(p => p.tipo_seguimiento === 'instalacion' || !p.tipo_seguimiento).length})
-          </button>
-          <button
-            onClick={() => setTipoFilter('investigacion')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
-              tipoFilter === 'investigacion'
-                ? 'bg-teal-500 text-slate-950 font-bold shadow-sm'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            I+D ({proyectos.filter(p => p.tipo_seguimiento === 'investigacion').length})
-          </button>
         </div>
       </div>
 
       {/* Kanban Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
         {columns.map((column) => {
-          const colProyectos = filteredProyectos.filter(
-            p => getEffectiveStatus(p) === column.id
+          const colProyectos = proyectos.filter(
+            p => (p.estado_kanban || 'por_hacer') === column.id
           );
 
           return (
@@ -153,12 +101,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
               {/* Column Header */}
               <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
                 <span className={`text-xs font-bold ${column.color}`}>
-                  {{
-                    por_hacer: '📋 Por Hacer',
-                    en_progreso: '🔄 En Progreso',
-                    en_revision: '🔍 En Revisión',
-                    completado: '✅ Completado'
-                  }[column.id]}
+                  {column.title}
                 </span>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${column.badgeBg}`}>
                   {colProyectos.length}
@@ -168,8 +111,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
               {/* Cards Container */}
               <div className="flex-1 space-y-3 overflow-y-auto">
                 {colProyectos.map((proyecto) => {
-                  const effective = getEffectiveStatus(proyecto);
-                  const currentIndex = statusOrder.indexOf(effective);
+                  const currentIndex = statusOrder.indexOf(proyecto.estado_kanban || 'por_hacer');
                   const canMoveLeft = currentIndex > 0;
                   const canMoveRight = currentIndex < statusOrder.length - 1;
 
@@ -180,11 +122,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                     >
                       <div className="flex items-center justify-between text-[11px] mb-1.5">
                         <span className="font-mono font-semibold text-teal-400">{proyecto.codigo}</span>
-                        <div className="flex items-center gap-1">
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
-                            {proyecto.tipo_seguimiento === 'investigacion' ? 'I+D' : 'Instalación'}
-                          </span>
-                        </div>
+                        <span className="text-[10px] text-slate-400">{proyecto.tipo_proyecto_nombre}</span>
                       </div>
 
                       <h4 className="text-xs font-bold text-white leading-snug mb-2">
@@ -201,7 +139,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                       <div className="flex items-center justify-between text-[11px] text-slate-400 my-2 pt-2 border-t border-slate-900">
                         <div className="flex items-center gap-1 text-slate-300">
                           <User className="h-3 w-3 text-slate-400" />
-                          <span className="truncate max-w-[90px]">{proyecto.responsable_nombre ? proyecto.responsable_nombre.split(' ')[0] : 'Sin asignar'}</span>
+                          <span className="truncate max-w-[90px]">{proyecto.responsable_nombre.split(' ')[0]}</span>
                         </div>
                         <div className="font-mono font-bold text-white text-xs">
                           ${proyecto.presupuesto_total.toLocaleString('en-US', { minimumFractionDigits: 0 })}
@@ -211,8 +149,8 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                       {/* Progress Bar */}
                       <div className="w-full bg-slate-900 rounded-full h-1.5 overflow-hidden mb-3">
                         <div
-                          className={`h-1.5 rounded-full ${effective === 'completado' ? 'bg-emerald-400' : 'bg-teal-400'}`}
-                          style={{ width: `${effective === 'completado' ? 100 : (proyecto.progreso || 0)}%` }}
+                          className="bg-teal-400 h-1.5 rounded-full"
+                          style={{ width: `${proyecto.progreso}%` }}
                         />
                       </div>
 
@@ -226,6 +164,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                         >
                           <ChevronLeft className="h-3.5 w-3.5" />
                         </button>
+
                         <button
                           onClick={() => onOpenBudget(proyecto)}
                           className="flex items-center gap-1 text-[10px] font-medium text-teal-400 hover:text-teal-300 bg-teal-500/10 hover:bg-teal-500/20 px-2 py-0.5 rounded border border-teal-500/20 cursor-pointer"
@@ -233,6 +172,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           <Calculator className="h-2.5 w-2.5" />
                           <span>Presupuesto</span>
                         </button>
+
                         <button
                           onClick={() => moveRight(proyecto)}
                           disabled={!canMoveRight}

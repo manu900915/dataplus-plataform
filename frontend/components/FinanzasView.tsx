@@ -13,26 +13,40 @@ import {
   Clock, 
   ArrowUpRight, 
   ArrowDownLeft,
-  X 
+  X,
+  Radio
 } from 'lucide-react';
-import { Venta, Gasto, Cliente } from '../types';
+import { Venta, Gasto, Cliente, SuscripcionServicio, RegistroPagoServicio } from '../types';
+import { FacturacionServiciosView } from './FacturacionServiciosView';
 
 interface FinanzasViewProps {
   ventas: Venta[];
   gastos: Gasto[];
   clientes: Cliente[];
+  suscripciones?: SuscripcionServicio[];
+  pagosServicio?: RegistroPagoServicio[];
   onAddVenta: (v: Omit<Venta, 'id' | 'codigo'>) => void;
   onAddGasto: (g: Omit<Gasto, 'id' | 'codigo'>) => void;
+  onAddPagoServicio?: (pago: Omit<RegistroPagoServicio, 'id' | 'codigo_pago' | 'created_at'>) => void;
+  onAddSuscripcion?: (sub: Omit<SuscripcionServicio, 'id' | 'codigo'>) => void;
+  onUpdateSuscripcion?: (sub: SuscripcionServicio) => void;
+  initialTab?: 'facturacion' | 'ventas' | 'gastos';
 }
 
 export const FinanzasView: React.FC<FinanzasViewProps> = ({
   ventas,
   gastos,
   clientes,
+  suscripciones = [],
+  pagosServicio = [],
   onAddVenta,
   onAddGasto,
+  onAddPagoServicio,
+  onAddSuscripcion,
+  onUpdateSuscripcion,
+  initialTab = 'facturacion'
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'ventas' | 'gastos'>('ventas');
+  const [activeSubTab, setActiveSubTab] = useState<'facturacion' | 'ventas' | 'gastos'>(initialTab);
   const [searchTerm, setSearchTerm] = useState('');
   const [isVentaModalOpen, setIsVentaModalOpen] = useState(false);
   const [isGastoModalOpen, setIsGastoModalOpen] = useState(false);
@@ -160,34 +174,57 @@ export const FinanzasView: React.FC<FinanzasViewProps> = ({
         </div>
       </div>
 
-      {/* Tabs Ventas vs Gastos */}
-      <div className="border-b border-slate-800 flex gap-4">
+      {/* Tabs Facturación vs Ventas vs Gastos */}
+      <div className="border-b border-slate-800 flex gap-4 overflow-x-auto">
+        <button
+          onClick={() => setActiveSubTab('facturacion')}
+          className={`pb-3 text-xs font-bold transition-colors cursor-pointer border-b-2 flex items-center gap-2 whitespace-nowrap ${
+            activeSubTab === 'facturacion'
+              ? 'border-sky-500 text-sky-400'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Radio className="h-4 w-4" />
+          Facturación de Servicios ({suscripciones.length})
+          {suscripciones.some(s => s.tiene_deuda) && (
+            <span className="h-2 w-2 rounded-full bg-rose-500"></span>
+          )}
+        </button>
         <button
           onClick={() => setActiveSubTab('ventas')}
-          className={`pb-3 text-xs font-bold transition-colors cursor-pointer border-b-2 flex items-center gap-2 ${
+          className={`pb-3 text-xs font-bold transition-colors cursor-pointer border-b-2 flex items-center gap-2 whitespace-nowrap ${
             activeSubTab === 'ventas'
               ? 'border-emerald-500 text-emerald-400'
               : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
           <ShoppingCart className="h-4 w-4" />
-          Registro de Ventas ({ventas.length})
+          Ventas y Obras ({ventas.length})
         </button>
         <button
           onClick={() => setActiveSubTab('gastos')}
-          className={`pb-3 text-xs font-bold transition-colors cursor-pointer border-b-2 flex items-center gap-2 ${
+          className={`pb-3 text-xs font-bold transition-colors cursor-pointer border-b-2 flex items-center gap-2 whitespace-nowrap ${
             activeSubTab === 'gastos'
               ? 'border-rose-500 text-rose-400'
               : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
           <CreditCard className="h-4 w-4" />
-          Registro de Gastos ({gastos.length})
+          Gastos Operativos ({gastos.length})
         </button>
       </div>
 
       {/* Subtab Content */}
-      {activeSubTab === 'ventas' ? (
+      {activeSubTab === 'facturacion' ? (
+        <FacturacionServiciosView
+          suscripciones={suscripciones}
+          pagos={pagosServicio}
+          clientes={clientes}
+          onAddPago={onAddPagoServicio || (() => {})}
+          onAddSuscripcion={onAddSuscripcion || (() => {})}
+          onUpdateSuscripcion={onUpdateSuscripcion || (() => {})}
+        />
+      ) : activeSubTab === 'ventas' ? (
         <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/50 shadow-sm">
           <table className="w-full text-left text-xs text-slate-300">
             <thead className="bg-slate-950/80 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800">
