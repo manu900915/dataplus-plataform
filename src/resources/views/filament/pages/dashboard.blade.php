@@ -8,6 +8,7 @@
             'proyectos'      => ['label' => 'Proyectos & Obras',         'icon' => 'heroicon-o-briefcase'],
             'inventario'     => ['label' => 'Inventario & Almacén',      'icon' => 'heroicon-o-archive-box'],
             'clientes'       => ['label' => 'Clientes & Sedes',          'icon' => 'heroicon-o-building-office-2'],
+            'finanzas'       => ['label' => 'Finanzas & Cobranzas (GR)', 'icon' => 'heroicon-o-banknotes'],
             'administracion' => ['label' => 'Administración',            'icon' => 'heroicon-o-shield-check'],
         ];
     @endphp
@@ -1117,4 +1118,97 @@
             </div>
         </div>
     </div>
+
+        {{-- ============================================================
+             TAB 6: FINANZAS & FACTURACIÓN DE GESTIÓN REMOTA
+             ============================================================ --}}
+        <div x-show="activeTab === 'finanzas'" x-cloak style="display: block;">
+            <div class="space-y-6">
+                {{-- Banner de Plazo y Mes Adelantado --}}
+                <div class="rounded-2xl border border-sky-500/30 bg-gradient-to-r from-sky-950/80 via-slate-900 to-indigo-950/80 p-5 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                                Gestión Remota · Mes Adelantado
+                            </span>
+                            <span class="text-xs text-slate-400">Cobro primeros 15 días del mes</span>
+                        </div>
+                        <h3 class="text-lg font-bold text-white mt-1.5">Liquidación de Mensualidades (Octubre 2026)</h3>
+                    </div>
+                    <a href="{{ url('/admin/facturacion-servicios') }}" 
+                       class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs shadow-lg shadow-sky-600/30 transition-all">
+                        <x-heroicon-m-arrow-top-right-on-square class="h-4 w-4" />
+                        <span>Abrir Módulo de Facturación</span>
+                    </a>
+                </div>
+
+                {{-- Métricas de Finanzas GR --}}
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-md border-l-4 border-l-emerald-500">
+                        <span class="text-xs font-semibold text-slate-400">Recaudado Octubre (CUP)</span>
+                        <div class="text-2xl font-black text-white font-mono mt-1.5">
+                            ${{ number_format($data['gr_recaudado_cup'] ?? 0, 2) }}
+                        </div>
+                        <span class="text-[11px] text-amber-400 mt-1 block">Pendiente: ${{ number_format($data['gr_pendiente_cup'] ?? 0, 2) }}</span>
+                    </div>
+
+                    <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-md border-l-4 border-l-blue-500">
+                        <span class="text-xs font-semibold text-slate-400">Recaudado Octubre (USD)</span>
+                        <div class="text-2xl font-black text-white font-mono mt-1.5">
+                            ${{ number_format($data['gr_recaudado_usd'] ?? 0, 2) }}
+                        </div>
+                        <span class="text-[11px] text-amber-400 mt-1 block">Pendiente: ${{ number_format($data['gr_pendiente_usd'] ?? 0, 2) }}</span>
+                    </div>
+
+                    <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-md border-l-4 border-l-rose-500">
+                        <span class="text-xs font-semibold text-slate-400">Deuda Acumulada</span>
+                        <div class="text-xl font-bold text-rose-400 font-mono mt-1.5">
+                            ${{ number_format($data['gr_deuda_cup'] ?? 0, 0) }} CUP / ${{ number_format($data['gr_deuda_usd'] ?? 0, 0) }} USD
+                        </div>
+                        <span class="text-[11px] text-rose-300 mt-1 block">{{ $data['gr_deudores_count'] ?? 0 }} clientes con atraso</span>
+                    </div>
+
+                    <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-md border-l-4 border-l-sky-500">
+                        <span class="text-xs font-semibold text-slate-400">Parque Activo</span>
+                        <div class="text-2xl font-black text-white font-mono mt-1.5">
+                            {{ $data['gr_subs_total'] ?? 0 }} <span class="text-xs font-normal text-slate-400">routers</span>
+                        </div>
+                        <span class="text-[11px] text-emerald-400 mt-1 block">Soporte & monitorización 4G</span>
+                    </div>
+                </div>
+
+                {{-- Mayores Deudores Listado --}}
+                @if(!empty($data['gr_deudores_list']))
+                    <div class="rounded-2xl border border-rose-900/40 bg-slate-900/70 p-5 shadow-lg">
+                        <div class="flex items-center justify-between mb-4">
+                            <h4 class="text-sm font-bold text-rose-300 flex items-center gap-2">
+                                <x-heroicon-o-exclamation-triangle class="h-5 w-5 text-rose-400" />
+                                Clientes con Mayor Deuda Acumulada
+                            </h4>
+                            <a href="{{ url('/admin/facturacion-servicios') }}" class="text-xs text-sky-400 hover:text-sky-300 font-semibold">
+                                Ver todos en Finanzas →
+                            </a>
+                        </div>
+                        <div class="divide-y divide-slate-800/80">
+                            @foreach($data['gr_deudores_list'] as $deudor)
+                                <div class="py-3 flex items-center justify-between">
+                                    <div>
+                                        <div class="font-bold text-white text-xs">{{ $deudor['cliente'] }}</div>
+                                        <div class="text-[11px] text-slate-400 mt-0.5">
+                                            Código: <span class="font-mono text-sky-400">{{ $deudor['codigo'] }}</span> · {{ $deudor['meses'] }} meses atrasados
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <span class="font-mono font-bold text-rose-400 text-sm">
+                                            ${{ number_format($deudor['deuda'], 2) }} {{ $deudor['moneda'] }}
+                                        </span>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+            </div>
+        </div>
+
 </x-filament-panels::page>

@@ -220,7 +220,70 @@ class Dashboard extends Page
                 $tecnicosTotal = $usuariosTotal;
             }
 
+            // ─── 6. GESTIÓN REMOTA FACTURACIÓN & COBRANZAS ───
+             = 0;
+             = 0.0;
+             = 0.0;
+             = 0.0;
+             = 0.0;
+             = 0.0;
+             = 0.0;
+             = 0;
+             = [];
+
+            if (\Illuminate\Support\Facades\Schema::hasTable('suscripciones_gestion_remota')) {
+                 = \App\Models\SuscripcionGestionRemota::where('activo', true)->get();
+                 = ->count();
+                foreach ( as ) {
+                     = (float) ->monto_mensual + (float) ->deuda_acumulada;
+                    if (->tiene_deuda || ->deuda_acumulada > 0) {
+                        ++;
+                    }
+                    if (->moneda === 'USD') {
+                         += (float) ->deuda_acumulada;
+                        if (->estado_cobro === 'cobrado') {
+                             += (float) ->monto_mensual;
+                        } else {
+                             += ;
+                        }
+                    } else {
+                         += (float) ->deuda_acumulada;
+                        if (->estado_cobro === 'cobrado') {
+                             += (float) ->monto_mensual;
+                        } else {
+                             += ;
+                        }
+                    }
+                }
+
+                 = \App\Models\SuscripcionGestionRemota::where('activo', true)
+                    ->where(function () {
+                        ->where('tiene_deuda', true)->orWhere('deuda_acumulada', '>', 0);
+                    })
+                    ->orderBy('deuda_acumulada', 'desc')
+                    ->take(5)
+                    ->get()
+                    ->map(fn () => [
+                        'codigo' => ->codigo,
+                        'cliente' => ->cliente_nombre,
+                        'moneda' => ->moneda,
+                        'deuda' => (float) ->deuda_acumulada,
+                        'meses' => ->meses_deuda_count,
+                        'telefono' => ->cliente_telefono,
+                    ])->all();
+            }
+
             return [
+                // Gestión Remota Facturación
+                'gr_subs_total'            => ,
+                'gr_recaudado_cup'         => ,
+                'gr_recaudado_usd'         => ,
+                'gr_pendiente_cup'         => ,
+                'gr_pendiente_usd'         => ,
+                'gr_deuda_cup'             => ,
+                'gr_deuda_usd'             => ,
+                'gr_deudores_count'        => ,
+                'gr_deudores_list'         => ,
                 // Consolidación Financiera (Dinero por cualquier concepto)
                 'dinero_generado_total'    => $dineroGeneradoTotal,
                 'presupuesto_total'        => $presupuestoObras,
