@@ -8,24 +8,37 @@
         $reporteTemporal = $this->getDatosReporteTemporal();
     @endphp
 
-    <style>
+        <style>
         [x-cloak] { display: none !important; }
         .dp-fact-wrap {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            color: #f1f5f9;
+            color: #ffffff;
             width: 100%;
         }
-        .dp-stat-card {
-            background: linear-gradient(145deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.7));
-            border: 1px solid #334155;
-            border-radius: 1rem;
-            padding: 1.25rem 1.5rem;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-            transition: all 0.2s ease;
+        /* Forzar campos de formulario oscuros frente a Filament/Tailwind Forms */
+        .dp-modal-input {
+            background-color: #09090b !important;
+            color: #ffffff !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            border-radius: 0.5rem !important;
+            padding: 0.5rem 0.75rem !important;
+            width: 100% !important;
         }
-        .dp-stat-card:hover {
-            border-color: #0284c7;
-            transform: translateY(-2px);
+        .dp-modal-input:focus {
+            border-color: #ffffff !important;
+            outline: none !important;
+            box-shadow: 0 0 0 1px #ffffff !important;
+        }
+        .dp-modal-input option {
+            background-color: #09090b !important;
+            color: #ffffff !important;
+        }
+        /* Tarjetas de métricas consistentes con el diseño oscuro */
+        .dp-stat-card-clean {
+            background-color: #000000 !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            border-radius: 0.75rem !important;
+            padding: 1rem 1.25rem !important;
         }
     </style>
 
@@ -85,61 +98,61 @@
 
         {{-- ─── 2. TARJETAS DE MÉTRICAS GLOBALES (CUP Y USD) ─── --}}
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="dp-stat-card border-l-4 border-l-emerald-500">
-                <div class="flex items-center justify-between text-slate-400 text-xs font-semibold mb-2">
+            <div class="dp-stat-card-clean">
+                <div class="flex items-center justify-between text-white/70 text-xs font-semibold mb-1.5">
                     <span>Recaudado Octubre (CUP)</span>
-                    <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono">CUP</span>
+                    <span class="px-2 py-0.5 rounded border border-white/20 text-white font-mono text-[10px]">CUP</span>
                 </div>
                 <div class="text-2xl font-black text-white font-mono">
                     ${{ number_format($metricas['recaudado_cup'], 2) }}
                 </div>
-                <div class="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
-                    <span>Pendiente:</span>
-                    <span class="text-amber-400 font-mono font-semibold">${{ number_format($metricas['pendiente_cup'], 2) }}</span>
+                <div class="text-[11px] text-white/60 mt-1.5 flex items-center justify-between">
+                    <span>Pendiente del mes:</span>
+                    <span class="text-white font-mono font-semibold">${{ number_format($metricas['pendiente_cup'], 2) }}</span>
                 </div>
             </div>
 
-            <div class="dp-stat-card border-l-4 border-l-blue-500">
-                <div class="flex items-center justify-between text-slate-400 text-xs font-semibold mb-2">
+            <div class="dp-stat-card-clean">
+                <div class="flex items-center justify-between text-white/70 text-xs font-semibold mb-1.5">
                     <span>Recaudado Octubre (USD)</span>
-                    <span class="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono">USD</span>
+                    <span class="px-2 py-0.5 rounded border border-white/20 text-white font-mono text-[10px]">USD</span>
                 </div>
                 <div class="text-2xl font-black text-white font-mono">
                     ${{ number_format($metricas['recaudado_usd'], 2) }}
                 </div>
-                <div class="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
-                    <span>Pendiente:</span>
-                    <span class="text-amber-400 font-mono font-semibold">${{ number_format($metricas['pendiente_usd'], 2) }}</span>
+                <div class="text-[11px] text-white/60 mt-1.5 flex items-center justify-between">
+                    <span>Pendiente del mes:</span>
+                    <span class="text-white font-mono font-semibold">${{ number_format($metricas['pendiente_usd'], 2) }}</span>
                 </div>
             </div>
 
-            <div class="dp-stat-card border-l-4 border-l-rose-500">
-                <div class="flex items-center justify-between text-slate-400 text-xs font-semibold mb-2">
+            <div class="dp-stat-card-clean">
+                <div class="flex items-center justify-between text-white/70 text-xs font-semibold mb-1.5">
                     <span>Deuda Acumulada</span>
-                    <span class="px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 font-mono">En Mora</span>
+                    <span class="px-2 py-0.5 rounded border border-white/20 text-white font-mono text-[10px]">En Mora</span>
                 </div>
                 <div class="flex items-baseline gap-2">
-                    <span class="text-xl font-bold text-rose-400 font-mono">${{ number_format($metricas['deuda_cup'], 0) }} CUP</span>
-                    <span class="text-slate-500">/</span>
-                    <span class="text-lg font-bold text-rose-300 font-mono">${{ number_format($metricas['deuda_usd'], 0) }} USD</span>
+                    <span class="text-xl font-bold text-white font-mono">${{ number_format($metricas['deuda_cup'], 0) }} CUP</span>
+                    <span class="text-white/40">/</span>
+                    <span class="text-lg font-bold text-white font-mono">${{ number_format($metricas['deuda_usd'], 0) }} USD</span>
                 </div>
-                <div class="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
+                <div class="text-[11px] text-white/60 mt-1.5 flex items-center justify-between">
                     <span>Clientes con Deuda:</span>
-                    <span class="text-rose-400 font-bold">{{ $metricas['total_deudores'] }} de {{ $metricas['total_clientes'] }}</span>
+                    <span class="text-white font-bold">{{ $metricas['total_deudores'] }} de {{ $metricas['total_clientes'] }}</span>
                 </div>
             </div>
 
-            <div class="dp-stat-card border-l-4 border-l-sky-500">
-                <div class="flex items-center justify-between text-slate-400 text-xs font-semibold mb-2">
+            <div class="dp-stat-card-clean">
+                <div class="flex items-center justify-between text-white/70 text-xs font-semibold mb-1.5">
                     <span>Parque Gestión Remota</span>
-                    <span class="px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 font-mono">4G LTE</span>
+                    <span class="px-2 py-0.5 rounded border border-white/20 text-white font-mono text-[10px]">4G LTE</span>
                 </div>
                 <div class="text-2xl font-black text-white font-mono">
-                    {{ $metricas['total_clientes'] }} <span class="text-xs font-normal text-slate-400">Suscripciones</span>
+                    {{ $metricas['total_clientes'] }} <span class="text-xs font-normal text-white/60">Suscripciones</span>
                 </div>
-                <div class="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
+                <div class="text-[11px] text-white/60 mt-1.5 flex items-center justify-between">
                     <span>Cobros al día:</span>
-                    <span class="text-emerald-400 font-semibold">{{ $metricas['total_clientes'] - $metricas['total_deudores'] }} cuentas</span>
+                    <span class="text-white font-semibold">{{ $metricas['total_clientes'] - $metricas['total_deudores'] }} cuentas (50%)</span>
                 </div>
             </div>
         </div>
@@ -582,76 +595,193 @@
             </div>
         @endif
 
-        {{-- ─── TAB 4: REPORTE TEMPORAL ─── --}}
+        {{-- ─── TAB 4: REPORTE TEMPORAL CON GRÁFICA DE LÍNEAS ─── --}}
         @if($activeTab === 'reporte')
-            <div class="space-y-4">
-                <div class="flex flex-col sm:flex-row items-center justify-between bg-slate-900/80 p-4 rounded-xl border border-slate-800 gap-3">
+            <div class="rounded-xl border border-white/20 bg-black p-5 sm:p-6 space-y-6">
+                {{-- Encabezado del Reporte --}}
+                <div class="flex flex-col sm:flex-row items-center justify-between pb-4 border-b border-white/15 gap-3">
                     <div>
-                        <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                            <x-heroicon-o-presentation-chart-line class="h-5 w-5 text-sky-400" />
-                            Estado y Evolución Temporal de Pagos (Gestión Remota)
+                        <h3 class="text-base font-bold text-white flex items-center gap-2">
+                            <x-heroicon-o-presentation-chart-line class="h-5 w-5 text-white" />
+                            <span>Evolución Temporal & Comparativa de Recaudación (2026)</span>
                         </h3>
-                        <p class="text-xs text-slate-400 mt-0.5">
-                            Comparativa de facturación cobrada vs. saldos pendientes según periodicidad.
+                        <p class="text-xs text-white/70 mt-0.5">
+                            Línea continua de recaudación histórica y cumplimiento de metas del servicio.
                         </p>
                     </div>
 
-                    <div class="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs">
+                    {{-- Selector de Periodicidad --}}
+                    <div class="flex items-center p-1 bg-black rounded-xl border border-white/20 text-xs">
                         <button 
                             wire:click="$set('periodoReporte', 'mensual')"
-                            class="px-3 py-1.5 rounded-lg font-semibold cursor-pointer {{ $periodoReporte === 'mensual' ? 'bg-sky-600 text-white' : 'text-slate-400 hover:text-white' }}">
+                            class="px-3.5 py-1.5 rounded-lg font-bold cursor-pointer transition-all {{ $periodoReporte === 'mensual' ? 'border border-white/30 bg-white/15 text-white' : 'text-white/60 hover:text-white' }}">
                             Mensual
                         </button>
                         <button 
                             wire:click="$set('periodoReporte', 'trimestral')"
-                            class="px-3 py-1.5 rounded-lg font-semibold cursor-pointer {{ $periodoReporte === 'trimestral' ? 'bg-sky-600 text-white' : 'text-slate-400 hover:text-white' }}">
+                            class="px-3.5 py-1.5 rounded-lg font-bold cursor-pointer transition-all {{ $periodoReporte === 'trimestral' ? 'border border-white/30 bg-white/15 text-white' : 'text-white/60 hover:text-white' }}">
                             Trimestral
                         </button>
                         <button 
                             wire:click="$set('periodoReporte', 'semestral')"
-                            class="px-3 py-1.5 rounded-lg font-semibold cursor-pointer {{ $periodoReporte === 'semestral' ? 'bg-sky-600 text-white' : 'text-slate-400 hover:text-white' }}">
+                            class="px-3.5 py-1.5 rounded-lg font-bold cursor-pointer transition-all {{ $periodoReporte === 'semestral' ? 'border border-white/30 bg-white/15 text-white' : 'text-white/60 hover:text-white' }}">
                             Semestral
                         </button>
                         <button 
                             wire:click="$set('periodoReporte', 'anual')"
-                            class="px-3 py-1.5 rounded-lg font-semibold cursor-pointer {{ $periodoReporte === 'anual' ? 'bg-sky-600 text-white' : 'text-slate-400 hover:text-white' }}">
+                            class="px-3.5 py-1.5 rounded-lg font-bold cursor-pointer transition-all {{ $periodoReporte === 'anual' ? 'border border-white/30 bg-white/15 text-white' : 'text-white/60 hover:text-white' }}">
                             Anual
                         </button>
                     </div>
                 </div>
 
-                <div class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/70 shadow-lg">
-                    <table class="w-full text-left text-xs text-slate-300">
-                        <thead class="bg-slate-950/80 text-[11px] font-semibold uppercase tracking-wider text-slate-400 border-b border-slate-800">
+                {{-- GRÁFICA DE LÍNEAS SVG RESPONSIVA --}}
+                <div class="rounded-xl border border-white/15 bg-black p-5 space-y-4">
+                    {{-- Leyenda de la gráfica --}}
+                    <div class="flex flex-wrap items-center justify-between gap-3 text-xs border-b border-white/10 pb-3">
+                        <div class="flex items-center gap-6">
+                            <div class="flex items-center gap-2">
+                                <span class="w-5 h-[3px] bg-white rounded-full"></span>
+                                <span class="text-white font-semibold">Recaudación CUP (Línea Continua)</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="w-5 h-[2px] border-b-2 border-dashed border-sky-400"></span>
+                                <span class="text-sky-300">Recaudación USD</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="w-5 h-[1.5px] border-b border-dotted border-white/40"></span>
+                                <span class="text-white/60">Meta Exigible (~$24,500 CUP)</span>
+                            </div>
+                        </div>
+                        <div class="text-[11px] font-mono text-white/70">
+                            Ejercicio Fiscal 2026 · Período Actual: Octubre
+                        </div>
+                    </div>
+
+                    {{-- Render del Line Chart SVG --}}
+                    @php
+                        $filas = $reporteTemporal['filas'] ?? [];
+                        $cantPuntos = max(count($filas), 1);
+                        $svgW = 860;
+                        $svgH = 220;
+                        $padX = 50;
+                        $padY = 30;
+                        $innerW = $svgW - ($padX * 2);
+                        $innerH = $svgH - ($padY * 2);
+                        $maxCUP = 28000;
+                        $metaY = $svgH - $padY - ((24500 / $maxCUP) * $innerH);
+
+                        $puntos = [];
+                        foreach ($filas as $idx => $f) {
+                            $x = $padX + ($idx / max($cantPuntos - 1, 1)) * $innerW;
+                            $monto = floatval($f['cup_cobrado'] ?? 0);
+                            $y = $svgH - $padY - (($monto / $maxCUP) * $innerH);
+                            $puntos[] = [
+                                'x' => $x,
+                                'y' => $y,
+                                'periodo' => $f['periodo'] ?? '',
+                                'cup' => $monto,
+                                'usd' => $f['usd_cobrado'] ?? 0,
+                                'cumplimiento' => $f['cumplimiento'] ?? '0%'
+                            ];
+                        }
+
+                        // Construir path bezier suave
+                        $pathLine = '';
+                        if (count($puntos) > 0) {
+                            $pathLine = 'M ' . $puntos[0]['x'] . ' ' . $puntos[0]['y'];
+                            for ($i = 0; $i < count($puntos) - 1; $i++) {
+                                $p0 = $puntos[$i];
+                                $p1 = $puntos[$i + 1];
+                                $cx = $p0['x'] + ($p1['x'] - $p0['x']) / 2;
+                                $pathLine .= " C {$cx} {$p0['y']}, {$cx} {$p1['y']}, {$p1['x']} {$p1['y']}";
+                            }
+                        }
+                        $areaLine = count($puntos) > 0 
+                            ? $pathLine . ' L ' . $puntos[count($puntos)-1]['x'] . ' ' . ($svgH - $padY) . ' L ' . $puntos[0]['x'] . ' ' . ($svgH - $padY) . ' Z'
+                            : '';
+                    @endphp
+
+                    <div class="w-full overflow-x-auto">
+                        <svg viewBox="0 0 {{ $svgW }} {{ $svgH }}" class="w-full min-w-[650px] h-60 overflow-visible">
+                            <defs>
+                                <linearGradient id="bladeAreaGradient" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stop-color="#ffffff" stop-opacity="0.2" />
+                                    <stop offset="100%" stop-color="#ffffff" stop-opacity="0.0" />
+                                </linearGradient>
+                            </defs>
+
+                            {{-- Líneas guía horizontales --}}
+                            @foreach([0, 7000, 14000, 21000, 28000] as $gridVal)
+                                @php $gy = $svgH - $padY - (($gridVal / $maxCUP) * $innerH); @endphp
+                                <line x1="{{ $padX }}" y1="{{ $gy }}" x2="{{ $svgW - $padX }}" y2="{{ $gy }}" stroke="rgba(255, 255, 255, 0.08)" stroke-dasharray="3 3" />
+                                <text x="{{ $padX - 8 }}" y="{{ $gy + 3 }}" fill="rgba(255, 255, 255, 0.4)" font-size="10" font-family="monospace" text-anchor="end">${{ $gridVal / 1000 }}k</text>
+                            @endforeach
+
+                            {{-- Línea de Meta mensual --}}
+                            <line x1="{{ $padX }}" y1="{{ $metaY }}" x2="{{ $svgW - $padX }}" y2="{{ $metaY }}" stroke="rgba(255, 255, 255, 0.35)" stroke-dasharray="4 4" stroke-width="1.5" />
+                            <text x="{{ $svgW - $padX + 5 }}" y="{{ $metaY + 3 }}" fill="rgba(255, 255, 255, 0.5)" font-size="9" font-family="monospace">Meta</text>
+
+                            {{-- Área sombreada --}}
+                            @if($areaLine)
+                                <path d="{{ $areaLine }}" fill="url(#bladeAreaGradient)" />
+                            @endif
+
+                            {{-- Línea continua de recaudación --}}
+                            @if($pathLine)
+                                <path d="{{ $pathLine }}" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                            @endif
+
+                            {{-- Puntos interactivos con etiquetas --}}
+                            @foreach($puntos as $pt)
+                                @php $isActual = str_contains($pt['periodo'], 'Octubre') || str_contains($pt['periodo'], 'Q4') || str_contains($pt['periodo'], '2do Semestre'); @endphp
+                                <g class="cursor-pointer group">
+                                    <line x1="{{ $pt['x'] }}" y1="{{ $pt['y'] }}" x2="{{ $pt['x'] }}" y2="{{ $svgH - $padY }}" stroke="{{ $isActual ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.06)' }}" stroke-dasharray="2 2" />
+                                    <circle cx="{{ $pt['x'] }}" cy="{{ $pt['y'] }}" r="{{ $isActual ? '5.5' : '4' }}" fill="{{ $pt['cup'] > 0 ? '#ffffff' : '#18181b' }}" stroke="{{ $isActual ? '#38bdf8' : '#ffffff' }}" stroke-width="{{ $isActual ? '2' : '1.5' }}" />
+                                    <text x="{{ $pt['x'] }}" y="{{ $svgH - $padY + 16 }}" fill="{{ $isActual ? '#ffffff' : 'rgba(255, 255, 255, 0.6)' }}" font-size="10" font-weight="{{ $isActual ? 'bold' : 'normal' }}" font-family="monospace" text-anchor="middle">
+                                        {{ mb_substr(explode(' ', $pt['periodo'])[0], 0, 3) }}
+                                    </text>
+                                </g>
+                            @endforeach
+                        </svg>
+                    </div>
+
+                    <div class="flex justify-between items-center text-[11px] text-white/60 px-2 pt-2 border-t border-white/10">
+                        <span>Inicio de Ejercicio Fiscal</span>
+                        <span>Curva de Recaudación en Línea Continua · Plataforma DataPlus</span>
+                        <span>Fin de Ejercicio Fiscal</span>
+                    </div>
+                </div>
+
+                {{-- Tabla complementaria de desglose --}}
+                <div class="overflow-x-auto rounded-xl border border-white/15 bg-black">
+                    <table class="w-full text-left text-xs text-white">
+                        <thead class="bg-black text-[10px] font-semibold uppercase tracking-wider text-white/70 border-b border-white/15">
                             <tr>
                                 <th class="px-4 py-3">Periodo</th>
                                 <th class="px-4 py-3 text-right">Recaudado (CUP)</th>
                                 <th class="px-4 py-3 text-right">Recaudado (USD)</th>
-                                <th class="px-4 py-3 text-right">Deuda Pendiente (CUP)</th>
-                                <th class="px-4 py-3 text-right">Deuda Pendiente (USD)</th>
+                                <th class="px-4 py-3 text-right">Deuda Pendiente</th>
                                 <th class="px-4 py-3 text-center">Cumplimiento</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-800">
+                        <tbody class="divide-y divide-white/10">
                             @foreach($reporteTemporal['filas'] as $fila)
-                                <tr class="hover:bg-slate-800/40 transition-colors">
+                                <tr class="hover:bg-white/[0.02] transition-colors">
                                     <td class="px-4 py-3 font-bold text-white whitespace-nowrap">
                                         {{ $fila['periodo'] }}
                                     </td>
-                                    <td class="px-4 py-3 text-right font-mono font-semibold text-emerald-400 whitespace-nowrap">
-                                        ${{ number_format($fila['cup_cobrado'], 2) }}
+                                    <td class="px-4 py-3 text-right font-mono font-semibold text-white whitespace-nowrap">
+                                        ${{ number_format($fila['cup_cobrado'], 2) }} CUP
                                     </td>
-                                    <td class="px-4 py-3 text-right font-mono font-semibold text-blue-400 whitespace-nowrap">
-                                        ${{ number_format($fila['usd_cobrado'], 2) }}
+                                    <td class="px-4 py-3 text-right font-mono font-semibold text-white whitespace-nowrap">
+                                        ${{ number_format($fila['usd_cobrado'], 2) }} USD
                                     </td>
-                                    <td class="px-4 py-3 text-right font-mono text-rose-400 whitespace-nowrap">
-                                        ${{ number_format($fila['cup_deuda'], 2) }}
-                                    </td>
-                                    <td class="px-4 py-3 text-right font-mono text-rose-400 whitespace-nowrap">
-                                        ${{ number_format($fila['usd_deuda'], 2) }}
+                                    <td class="px-4 py-3 text-right font-mono text-white/70 whitespace-nowrap">
+                                        ${{ number_format($fila['cup_deuda'], 0) }} CUP
                                     </td>
                                     <td class="px-4 py-3 text-center whitespace-nowrap">
-                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-sky-500/10 text-sky-300 border border-sky-500/20">
+                                        <span class="px-2 py-0.5 rounded border border-white/20 text-[10px] font-bold font-mono text-white">
                                             {{ $fila['cumplimiento'] }}
                                         </span>
                                     </td>
@@ -663,10 +793,16 @@
             </div>
         @endif
 
-        {{-- ─── MODAL 1: REGISTRAR PAGO ─── --}}
+        {{-- ─── MODAL 1: REGISTRAR PAGO ─── --}}}
         @if($modalPagoOpen)
-            <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 overflow-y-auto">
-                <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg p-6 shadow-2xl relative text-left">
+            <div 
+                x-data 
+                x-on:click.self="$wire.set('modalPagoOpen', false)" 
+                x-on:keydown.escape.window="$wire.set('modalPagoOpen', false)"
+                class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto cursor-pointer">
+                <div 
+                    x-on:click.stop 
+                    class="bg-zinc-950 border border-white/20 rounded-2xl w-full max-w-lg p-6 shadow-2xl relative text-left my-8 cursor-default text-white">
                     <div class="flex items-center justify-between pb-3 border-b border-slate-800">
                         <div class="flex items-center gap-2">
                             <x-heroicon-o-credit-card class="h-6 w-6 text-emerald-400" />
@@ -787,8 +923,14 @@
 
         {{-- ─── MODAL 2: VISOR DE COMPROBANTE DE WHATSAPP ─── --}}
         @if($modalVisorOpen && $comprobanteActual)
-            <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-                <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl relative text-left">
+            <div 
+                x-data 
+                x-on:click.self="$wire.set('modalVisorOpen', false)" 
+                x-on:keydown.escape.window="$wire.set('modalVisorOpen', false)"
+                class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto cursor-pointer">
+                <div 
+                    x-on:click.stop 
+                    class="bg-zinc-950 border border-white/20 rounded-2xl w-full max-w-md p-6 shadow-2xl relative text-left my-8 cursor-default text-white">
                     <div class="flex items-center justify-between pb-3 border-b border-slate-800">
                         <div class="flex items-center gap-2">
                             <x-heroicon-o-document-magnifying-glass class="h-6 w-6 text-sky-400" />
@@ -837,8 +979,14 @@
 
         {{-- ─── MODAL 3: RECIBO OFICIAL DATAPLUS ─── --}}
         @if($modalReciboOpen && $reciboActual)
-            <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-                <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg p-6 shadow-2xl relative text-left">
+            <div 
+                x-data 
+                x-on:click.self="$wire.set('modalReciboOpen', false)" 
+                x-on:keydown.escape.window="$wire.set('modalReciboOpen', false)"
+                class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto cursor-pointer">
+                <div 
+                    x-on:click.stop 
+                    class="bg-zinc-950 border border-white/20 rounded-2xl w-full max-w-lg p-6 shadow-2xl relative text-left my-8 cursor-default text-white">
                     <div class="flex items-center justify-between pb-3 border-b border-slate-800">
                         <div class="flex items-center gap-2">
                             <x-heroicon-o-receipt-percent class="h-6 w-6 text-sky-400" />
@@ -914,103 +1062,118 @@
 
         {{-- ─── MODAL 4: NUEVA SUSCRIPCIÓN ─── --}}
         @if($modalNuevaSubOpen)
-            <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-                <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg p-6 shadow-2xl relative text-left">
-                    <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+            <div 
+                x-data 
+                x-on:click.self="$wire.set('modalNuevaSubOpen', false)" 
+                x-on:keydown.escape.window="$wire.set('modalNuevaSubOpen', false)"
+                class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto cursor-pointer">
+                <div 
+                    x-on:click.stop
+                    class="bg-zinc-950 border border-white/20 rounded-2xl w-full max-w-lg p-6 shadow-2xl relative text-left my-8 cursor-default text-white">
+                    <div class="flex items-center justify-between pb-3 border-b border-white/15">
                         <div class="flex items-center gap-2">
-                            <x-heroicon-o-plus-circle class="h-6 w-6 text-sky-400" />
+                            <x-heroicon-o-plus-circle class="h-6 w-6 text-white" />
                             <h3 class="text-base font-bold text-white">Nueva Suscripción de Gestión Remota</h3>
                         </div>
-                        <button wire:click="$set('modalNuevaSubOpen', false)" class="text-slate-400 hover:text-white cursor-pointer">
+                        <button 
+                            wire:click="$set('modalNuevaSubOpen', false)" 
+                            type="button"
+                            class="text-white/60 hover:text-white cursor-pointer p-1 rounded-lg">
                             <x-heroicon-m-x-mark class="h-5 w-5" />
                         </button>
                     </div>
 
-                    <div class="mt-4 space-y-3 text-xs">
+                    <div class="mt-4 space-y-3.5 text-xs">
                         <div>
-                            <label class="block text-slate-400 font-semibold mb-1">Nombre del Cliente / Negocio *</label>
+                            <label class="block text-white/70 font-semibold mb-1">Nombre del Cliente / Negocio *</label>
                             <input 
                                 wire:model="newSubClienteNombre" 
                                 type="text" 
                                 placeholder="Ej: Hostal Miramar o Juan Pérez"
-                                class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:border-sky-500" />
+                                class="dp-modal-input" 
+                                style="background-color: #09090b !important; color: #ffffff !important; border: 1px solid rgba(255, 255, 255, 0.2) !important;" />
                         </div>
 
                         <div class="grid grid-cols-2 gap-3">
                             <div>
-                                <label class="block text-slate-400 font-semibold mb-1">Teléfono Móvil (WhatsApp)</label>
+                                <label class="block text-white/70 font-semibold mb-1">Teléfono Móvil (WhatsApp)</label>
                                 <input 
                                     wire:model="newSubClienteTelefono" 
                                     type="text" 
                                     placeholder="+53 5200 0000"
-                                    class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono focus:border-sky-500" />
+                                    class="dp-modal-input font-mono" 
+                                    style="background-color: #09090b !important; color: #ffffff !important; border: 1px solid rgba(255, 255, 255, 0.2) !important;" />
                             </div>
                             <div>
-                                <label class="block text-slate-400 font-semibold mb-1">Número SIM Card</label>
+                                <label class="block text-white/70 font-semibold mb-1">Número SIM Card</label>
                                 <input 
                                     wire:model="newSubSim" 
                                     type="text" 
                                     placeholder="535XXXXXXX"
-                                    class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono focus:border-sky-500" />
+                                    class="dp-modal-input font-mono" 
+                                    style="background-color: #09090b !important; color: #ffffff !important; border: 1px solid rgba(255, 255, 255, 0.2) !important;" />
                             </div>
                         </div>
 
                         <div>
-                            <label class="block text-slate-400 font-semibold mb-1">Solución de Gestión Remota</label>
+                            <label class="block text-white/70 font-semibold mb-1">Solución de Gestión Remota</label>
                             <input 
                                 wire:model="newSubSolucion" 
                                 type="text" 
                                 placeholder="Ej: Router 4G LTE Huawei B310 o MikroTik"
-                                class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:border-sky-500" />
+                                class="dp-modal-input" 
+                                style="background-color: #09090b !important; color: #ffffff !important; border: 1px solid rgba(255, 255, 255, 0.2) !important;" />
                         </div>
 
                         <div class="grid grid-cols-2 gap-3">
                             <div>
-                                <label class="block text-slate-400 font-semibold mb-1">Moneda de Cobro</label>
+                                <label class="block text-white/70 font-semibold mb-1">Moneda de Cobro</label>
                                 <select 
                                     wire:model="newSubMoneda" 
-                                    class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white font-bold focus:border-sky-500">
+                                    class="dp-modal-input font-bold"
+                                    style="background-color: #09090b !important; color: #ffffff !important; border: 1px solid rgba(255, 255, 255, 0.2) !important;">
                                     <option value="CUP">CUP (Pesos Cubanos)</option>
                                     <option value="USD">USD (Dólares)</option>
                                 </select>
                             </div>
                             <div>
-                                <label class="block text-slate-400 font-semibold mb-1">Tarifa Mensual</label>
+                                <label class="block text-white/70 font-semibold mb-1">Tarifa Mensual</label>
                                 <input 
                                     wire:model="newSubMonto" 
                                     type="number" 
                                     step="0.01" 
-                                    class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono font-bold focus:border-sky-500" />
+                                    class="dp-modal-input font-mono font-bold" 
+                                    style="background-color: #09090b !important; color: #ffffff !important; border: 1px solid rgba(255, 255, 255, 0.2) !important;" />
                             </div>
                         </div>
 
                         <div>
-                            <label class="block text-slate-400 font-semibold mb-1">Notas / Observaciones</label>
+                            <label class="block text-white/70 font-semibold mb-1">Notas / Observaciones</label>
                             <textarea 
                                 wire:model="newSubNotas" 
                                 rows="2" 
                                 placeholder="Condiciones especiales o notas..."
-                                class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:border-sky-500"></textarea>
+                                class="dp-modal-input" 
+                                style="background-color: #09090b !important; color: #ffffff !important; border: 1px solid rgba(255, 255, 255, 0.2) !important;"></textarea>
                         </div>
                     </div>
 
-                    <div class="mt-6 flex justify-end gap-3 pt-3 border-t border-slate-800">
+                    <div class="mt-6 flex justify-end gap-3 pt-3 border-t border-white/15">
                         <button 
-                            wire:click="$set('modalNuevaSubOpen', false)"
+                            wire:click="$set('modalNuevaSubOpen', false)" 
                             type="button" 
-                            class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs cursor-pointer">
+                            class="px-4 py-2 rounded-xl border border-white/20 bg-black text-white/70 hover:text-white font-semibold text-xs cursor-pointer">
                             Cancelar
                         </button>
                         <button 
-                            wire:click="crearSuscripcion"
+                            wire:click="crearSuscripcion" 
                             type="button" 
-                            class="px-5 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow-lg shadow-sky-600/30 cursor-pointer">
+                            class="px-5 py-2 rounded-xl border border-white/30 bg-white text-black font-bold text-xs hover:bg-white/90 shadow-md cursor-pointer">
                             Guardar Suscripción
                         </button>
                     </div>
                 </div>
             </div>
         @endif
-
     </div>
 </x-filament-panels::page>

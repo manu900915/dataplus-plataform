@@ -804,64 +804,220 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
             </div>
           </div>
 
-          {/* VISTA MENSUAL: GRÁFICO DE BARRAS LIMPIO SOBRE FONDO OSCURO */}
+          {/* VISTA MENSUAL: GRÁFICO DE LÍNEAS INTERACTIVO (LINE CHART) */}
           {periodoReporte === 'mensual' && (() => {
-            const maxCUP = 26000;
+            const data = reportesPeriodos.datosMensuales;
+            const maxVal = 28000;
+            const width = 860;
+            const height = 240;
+            const padX = 50;
+            const padY = 30;
+            const innerW = width - padX * 2;
+            const innerH = height - padY * 2;
+
+            // Coordenadas calculadas para la línea continua
+            const points = data.map((d, i) => {
+              const x = padX + (i / (data.length - 1)) * innerW;
+              const y = height - padY - (d.cupCobrado / maxVal) * innerH;
+              return { x, y, ...d };
+            });
+
+            // Generador de curva suave SVG
+            const makePath = (pts: { x: number; y: number }[]) => {
+              if (pts.length === 0) return '';
+              let path = `M ${pts[0].x} ${pts[0].y}`;
+              for (let i = 0; i < pts.length - 1; i++) {
+                const p0 = pts[i];
+                const p1 = pts[i + 1];
+                const cp1x = p0.x + (p1.x - p0.x) / 2;
+                const cp1y = p0.y;
+                const cp2x = p0.x + (p1.x - p0.x) / 2;
+                const cp2y = p1.y;
+                path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p1.x} ${p1.y}`;
+              }
+              return path;
+            };
+
+            const linePath = makePath(points);
+            const areaPath = `${linePath} L ${points[points.length - 1].x} ${height - padY} L ${points[0].x} ${height - padY} Z`;
+            const metaY = height - padY - (24500 / maxVal) * innerH;
 
             return (
               <div className="space-y-6">
-                {/* Visualización gráfica de barras */}
-                <div className="rounded-xl border border-white/15 bg-black p-5 space-y-4">
-                  <div className="h-60 w-full flex items-end gap-2 sm:gap-4 pt-6 pb-2 px-2 border-b border-white/15">
-                    {reportesPeriodos.datosMensuales.map((m) => {
-                      const heightCUP = maxCUP > 0 ? Math.round((m.cupCobrado / maxCUP) * 100) : 0;
-                      const isOctubre = m.key === '10';
-
-                      return (
-                        <div key={m.key} className="flex-1 flex flex-col items-center h-full justify-end group relative">
-                          {/* Tooltip flotante */}
-                          <div className="opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none absolute -top-14 z-20 whitespace-nowrap rounded-lg bg-zinc-900 border border-white/20 px-2.5 py-1.5 text-[10px] text-white shadow-xl">
-                            <p className="font-bold">{m.nombre}</p>
-                            <p className="font-mono text-white/90">${m.cupCobrado.toLocaleString()} CUP</p>
-                            {m.usdCobrado > 0 && <p className="font-mono text-white/90">${m.usdCobrado} USD</p>}
-                            <p className="text-white/60">{m.cumplimiento}% recaudado</p>
-                          </div>
-
-                          {/* Barra de progreso */}
-                          <div className="w-full max-w-[28px] flex items-end justify-center h-full relative">
-                            {/* Meta proyectada */}
-                            <div 
-                              className="absolute bottom-0 w-full rounded-t border-t border-dashed border-white/30 bg-white/[0.03]"
-                              style={{ height: '94%' }}
-                            />
-                            {/* Barra real */}
-                            <div
-                              className={`w-full rounded-t transition-all duration-500 ${
-                                m.cupCobrado > 0
-                                  ? isOctubre
-                                    ? 'bg-white shadow-sm'
-                                    : 'bg-white/80'
-                                  : 'bg-white/10 h-1'
-                              }`}
-                              style={{ height: `${Math.max(4, heightCUP)}%` }}
-                            />
-                          </div>
-
-                          {/* Nombre del mes */}
-                          <div className="mt-2 text-center">
-                            <span className={`block text-[10px] font-mono ${isOctubre ? 'text-white font-extrabold underline' : 'text-white/60'}`}>
-                              {m.nombre.slice(0, 3)}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
+                {/* Visualización gráfica de líneas */}
+                <div className="rounded-xl border border-white/15 bg-black p-5 sm:p-6 space-y-4">
+                  {/* Leyenda de la gráfica */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 text-xs border-b border-white/10 pb-3">
+                    <div className="flex items-center gap-6">
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-[3px] bg-white rounded-full"></span>
+                        <span className="text-white font-semibold">Recaudación CUP (Línea Continua)</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-[2px] border-b-2 border-dashed border-sky-400"></span>
+                        <span className="text-sky-300">Recaudación USD</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-[1.5px] border-b border-dotted border-white/40"></span>
+                        <span className="text-white/60">Meta Exigible (~$24,500 CUP)</span>
+                      </div>
+                    </div>
+                    <div className="text-[11px] font-mono text-white/70">
+                      Total 2026: <strong className="text-white">${reportesPeriodos.anual.totalAnualCUP.toLocaleString()} CUP</strong>
+                    </div>
                   </div>
 
-                  <div className="flex justify-between items-center text-[11px] text-white/60 px-2">
-                    <span>$0 CUP</span>
-                    <span>Ejercicio Fiscal 2026 (Octubre en curso)</span>
-                    <span>Meta mensual ~$24,500 CUP</span>
+                  {/* Canvas SVG del Gráfico de Líneas */}
+                  <div className="w-full overflow-x-auto">
+                    <svg viewBox={`0 0 ${width} ${height}`} className="w-full min-w-[650px] h-64 overflow-visible">
+                      <defs>
+                        <linearGradient id="cupAreaGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.22" />
+                          <stop offset="100%" stopColor="#ffffff" stopOpacity="0.00" />
+                        </linearGradient>
+                      </defs>
+
+                      {/* Líneas guía horizontales de fondo */}
+                      {[0, 7000, 14000, 21000, 28000].map((val) => {
+                        const y = height - padY - (val / maxVal) * innerH;
+                        return (
+                          <g key={val}>
+                            <line
+                              x1={padX}
+                              y1={y}
+                              x2={width - padX}
+                              y2={y}
+                              stroke="rgba(255, 255, 255, 0.08)"
+                              strokeDasharray="3 3"
+                            />
+                            <text
+                              x={padX - 8}
+                              y={y + 3}
+                              fill="rgba(255, 255, 255, 0.4)"
+                              fontSize="10"
+                              fontFamily="monospace"
+                              textAnchor="end"
+                            >
+                              ${val / 1000}k
+                            </text>
+                          </g>
+                        );
+                      })}
+
+                      {/* Línea horizontal de Meta mensual */}
+                      <line
+                        x1={padX}
+                        y1={metaY}
+                        x2={width - padX}
+                        y2={metaY}
+                        stroke="rgba(255, 255, 255, 0.35)"
+                        strokeDasharray="4 4"
+                        strokeWidth="1.5"
+                      />
+                      <text
+                        x={width - padX + 5}
+                        y={metaY + 3}
+                        fill="rgba(255, 255, 255, 0.5)"
+                        fontSize="9"
+                        fontFamily="monospace"
+                      >
+                        Meta
+                      </text>
+
+                      {/* Área sombreada bajo la línea de CUP */}
+                      <path d={areaPath} fill="url(#cupAreaGradient)" />
+
+                      {/* Línea principal trazada de recaudación CUP */}
+                      <path
+                        d={linePath}
+                        fill="none"
+                        stroke="#ffffff"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+
+                      {/* Puntos y etiquetas interactivas de cada mes */}
+                      {points.map((p) => {
+                        const isOct = p.key === '10';
+                        return (
+                          <g key={p.key} className="group cursor-pointer">
+                            {/* Línea vertical tenue al punto */}
+                            <line
+                              x1={p.x}
+                              y1={p.y}
+                              x2={p.x}
+                              y2={height - padY}
+                              stroke={isOct ? "rgba(255, 255, 255, 0.3)" : "rgba(255, 255, 255, 0.06)"}
+                              strokeDasharray="2 2"
+                            />
+
+                            {/* Círculo del punto de la línea */}
+                            <circle
+                              cx={p.x}
+                              cy={p.y}
+                              r={isOct ? "5.5" : "4"}
+                              fill={p.cupCobrado > 0 ? "#ffffff" : "#18181b"}
+                              stroke={isOct ? "#38bdf8" : "#ffffff"}
+                              strokeWidth={isOct ? "2" : "1.5"}
+                              className="transition-all duration-200 group-hover:r-7"
+                            />
+
+                            {/* Tooltip flotante SVG */}
+                            <g className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none">
+                              <rect
+                                x={p.x - 48}
+                                y={p.y - 42}
+                                width="96"
+                                height="34"
+                                rx="6"
+                                fill="#09090b"
+                                stroke="rgba(255, 255, 255, 0.25)"
+                                strokeWidth="1"
+                              />
+                              <text
+                                x={p.x}
+                                y={p.y - 28}
+                                fill="#ffffff"
+                                fontSize="10"
+                                fontWeight="bold"
+                                textAnchor="middle"
+                              >
+                                {p.nombre.slice(0, 3)}: ${p.cupCobrado.toLocaleString()}
+                              </text>
+                              <text
+                                x={p.x}
+                                y={p.y - 14}
+                                fill="#a1a1aa"
+                                fontSize="9"
+                                textAnchor="middle"
+                              >
+                                {p.cumplimiento}% meta
+                              </text>
+                            </g>
+
+                            {/* Etiqueta del Mes en el eje X */}
+                            <text
+                              x={p.x}
+                              y={height - padY + 16}
+                              fill={isOct ? "#ffffff" : "rgba(255, 255, 255, 0.6)"}
+                              fontSize="10"
+                              fontWeight={isOct ? "bold" : "normal"}
+                              fontFamily="monospace"
+                              textAnchor="middle"
+                            >
+                              {p.nombre.slice(0, 3)}
+                            </text>
+                          </g>
+                        );
+                      })}
+                    </svg>
+                  </div>
+
+                  <div className="flex justify-between items-center text-[11px] text-white/60 px-2 pt-2 border-t border-white/10">
+                    <span>Enero 2026</span>
+                    <span>Curva de Recaudación Anual · Línea de Tendencia Continua</span>
+                    <span>Diciembre 2026</span>
                   </div>
                 </div>
 
