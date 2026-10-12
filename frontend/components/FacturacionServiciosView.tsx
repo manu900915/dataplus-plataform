@@ -443,7 +443,7 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
       </div>
 
       {/* ================= BANNER RECTANGULAR PRINCIPAL (IDÉNTICO A IMAGEN 1) ================= */}
-      <div className="rounded-xl border border-white/20 bg-black p-4 sm:p-5 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+      <div className="rounded-2xl border border-sky-500/30 bg-gradient-to-r from-sky-950/70 via-slate-900 to-indigo-950/70 p-5 shadow-xl flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
         {/* Lado izquierdo: Periodo y norma operativa */}
         <div className="flex items-center gap-4">
           <div className="h-10 w-10 rounded-full border border-white/20 flex items-center justify-center shrink-0 text-white">
@@ -467,7 +467,7 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
         {/* Lado derecho: Tarjetas redondeadas + Botón Nueva Suscripción */}
         <div className="flex flex-wrap items-center gap-3 shrink-0">
           {/* Tarjeta: Día del mes actual */}
-          <div className="rounded-xl border border-white/20 px-4 py-2.5 bg-black min-w-[130px] text-center">
+          <div className="rounded-xl border border-slate-800 px-4 py-2 bg-slate-950/90 min-w-[120px] text-center">
             <div className="text-xs font-semibold text-white/90">Día del mes actual</div>
             <div className="text-sm font-bold text-white mt-0.5 font-mono">
               <span className="text-lg font-extrabold text-white">{diaActual}</span>
@@ -476,7 +476,7 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
           </div>
 
           {/* Tarjeta: Plazo en Curso */}
-          <div className="rounded-xl border border-white/20 px-4 py-2.5 bg-black min-w-[140px] text-center">
+          <div className="rounded-xl border border-amber-500/30 px-4 py-2 bg-amber-500/10 min-w-[130px] text-center">
             <div className="text-xs font-semibold text-white/90">Plazo en Curso</div>
             <div className="text-xs font-mono font-bold text-white mt-1">
               {diasRestantes} días restantes
@@ -489,7 +489,7 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
               setSubClienteId(clientes[0]?.id || '');
               setIsSubModalOpen(true);
             }}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white hover:text-white/80 transition-colors cursor-pointer whitespace-nowrap ml-1"
+            className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-500 rounded-xl shadow-lg shadow-sky-600/30 transition-all cursor-pointer whitespace-nowrap ml-1"
           >
             <span className="text-sm font-light">+</span>
             <span>Nueva Suscripción</span>
@@ -576,7 +576,7 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
                 placeholder="Buscar por cliente, código, SIM..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full rounded-xl border border-white/20 bg-black px-4 py-2 text-xs text-white placeholder:text-white/50 focus:border-white focus:outline-none"
+                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-white placeholder:text-slate-500 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 focus:outline-none"
               />
             </div>
 
@@ -618,10 +618,10 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
           </div>
 
           {/* TABLA PRINCIPAL (IDÉNTICA A IMAGEN 2) */}
-          <div className="overflow-hidden rounded-xl border border-white/20 bg-black">
+          <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/80 shadow-md">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs text-white">
-                <thead className="border-b border-white/20 bg-black text-[11px] font-semibold text-white">
+                <thead className="border-b border-slate-800 bg-slate-950/80 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                   <tr>
                     <th className="py-3 px-4">Código</th>
                     <th className="py-3 px-4">Cliente / Teléfono</th>
@@ -633,7 +633,7 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
                     <th className="py-3 px-4 text-center">Acciones</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/15 bg-black">
+                <tbody className="divide-y divide-slate-800/80">
                   {filteredSubs.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="py-8 text-center text-white/50">
@@ -1190,7 +1190,7 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
                       setPagoEfectivoEntrega(sub.cliente_nombre);
                     }
                   }}
-                  className="w-full rounded-xl border border-white/20 bg-black px-3 py-2 text-xs text-white focus:border-white focus:outline-none"
+                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-xs text-white focus:border-sky-500 focus:ring-1 focus:ring-sky-500 focus:outline-none"
                 >
                   {suscripciones.map(s => (
                     <option key={s.id} value={s.id}>
@@ -1241,7 +1241,7 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
                     required
                     value={pagoFecha}
                     onChange={(e) => setPagoFecha(e.target.value)}
-                    className="w-full rounded-xl border border-white/20 bg-black px-3 py-2 text-xs text-white focus:border-white focus:outline-none"
+                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-xs text-white focus:border-sky-500 focus:ring-1 focus:ring-sky-500 focus:outline-none"
                   />
                 </div>
               </div>
@@ -1422,7 +1422,7 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
                 <select
                   value={subClienteId}
                   onChange={(e) => setSubClienteId(e.target.value)}
-                  className="w-full rounded-xl border border-white/20 bg-black px-3 py-2 text-xs text-white focus:border-white focus:outline-none"
+                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-xs text-white focus:border-sky-500 focus:ring-1 focus:ring-sky-500 focus:outline-none"
                 >
                   {clientes.map(c => (
                     <option key={c.id} value={c.id}>{c.nombre} ({c.codigo})</option>
@@ -1437,7 +1437,7 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
                   required
                   value={subNombreServicio}
                   onChange={(e) => setSubNombreServicio(e.target.value)}
-                  className="w-full rounded-xl border border-white/20 bg-black px-3 py-2 text-xs text-white focus:border-white focus:outline-none"
+                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-xs text-white focus:border-sky-500 focus:ring-1 focus:ring-sky-500 focus:outline-none"
                 />
               </div>
 
@@ -1449,7 +1449,7 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
                     value={subTipoSolucion}
                     onChange={(e) => setSubTipoSolucion(e.target.value)}
                     placeholder="Router 4G Huawei B310"
-                    className="w-full rounded-xl border border-white/20 bg-black px-3 py-2 text-xs text-white focus:border-white focus:outline-none"
+                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-xs text-white focus:border-sky-500 focus:ring-1 focus:ring-sky-500 focus:outline-none"
                   />
                 </div>
                 <div>
@@ -1470,7 +1470,7 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
                   <select
                     value={subMoneda}
                     onChange={(e) => setSubMoneda(e.target.value as Moneda)}
-                    className="w-full rounded-xl border border-white/20 bg-black px-3 py-2 text-xs text-white focus:border-white focus:outline-none"
+                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-xs text-white focus:border-sky-500 focus:ring-1 focus:ring-sky-500 focus:outline-none"
                   >
                     <option value="CUP">CUP</option>
                     <option value="USD">USD</option>
