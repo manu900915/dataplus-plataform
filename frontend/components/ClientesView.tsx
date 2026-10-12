@@ -60,6 +60,18 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
     (c.telefono && c.telefono.includes(searchTerm))
   );
 
+  // Escape to close modals
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowClientModal(false);
+        setTargetClienteForUb(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const handleCreateCliente = (e: React.FormEvent) => {
     e.preventDefault();
     if (!nombre) return;
@@ -308,8 +320,8 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
 
       {/* Modal: New Client */}
       {showClientModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden">
+        <div onClick={() => setShowClientModal(false)} className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 bg-slate-950/60">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <Users2 className="h-4 w-4 text-teal-400" />
@@ -457,8 +469,8 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
 
       {/* Modal: Add Location */}
       {targetClienteForUb && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden">
+        <div onClick={() => setTargetClienteForUb(null)} className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 bg-slate-950/60">
               <div>
                 <h3 className="text-base font-bold text-white flex items-center gap-2">

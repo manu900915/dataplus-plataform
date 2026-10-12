@@ -59,8 +59,8 @@ export const SearchModal: React.FC<SearchModalProps> = ({
   const hasResults = matchingProyectos.length > 0 || matchingIncidencias.length > 0 || matchingItems.length > 0 || matchingClientes.length > 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-slate-950/80 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden">
+    <div onClick={onClose} className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-slate-950/80 p-4 backdrop-blur-sm">
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-2xl rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden">
         {/* Search Input Box */}
         <div className="flex items-center px-4 border-b border-slate-800 bg-slate-950/70">
           <Search className="h-5 w-5 text-teal-400 mr-3" />

@@ -102,6 +102,17 @@ export const PresupuestoModal: React.FC<PresupuestoModalProps> = ({
     onClose();
   };
 
+  // Escape to close
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const getTipoBadgeColor = (tipo: BudgetLineType) => {
     switch (tipo) {
       case 'equipamiento': return 'bg-teal-500/10 text-teal-400 border-teal-500/20';
@@ -113,8 +124,8 @@ export const PresupuestoModal: React.FC<PresupuestoModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
-      <div className="flex flex-col w-full max-w-4xl max-h-[90vh] rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden">
+    <div onClick={onClose} className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm cursor-pointer">
+      <div onClick={(e) => e.stopPropagation()} className="flex flex-col w-full max-w-4xl max-h-[90vh] rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden cursor-default">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 bg-slate-950/60">
           <div>

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
+  Radio,
   Calendar, 
   CreditCard, 
   Receipt, 
@@ -15,8 +16,13 @@ import {
   Check, 
   AlertCircle,
   Clock,
-  Radio,
-  FileText
+  CheckCircle2,
+  AlertTriangle,
+  Search,
+  Filter,
+  DollarSign,
+  ArrowUpRight,
+  ExternalLink
 } from 'lucide-react';
 import { 
   SuscripcionServicio, 
@@ -44,14 +50,10 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
   onAddSuscripcion,
   onUpdateSuscripcion
 }) => {
-  // Pestañas principales idénticas a la imagen:
-  // 1: Control de Cobros Mensuales
-  // 2: Pagaron esta Semana
-  // 3: Mayores Deudores
-  // 4: Reporte Temporal (Año/Sem/Trim/Mes)
+  // Pestañas principales de control
   const [activeTab, setActiveTab] = useState<'cobros' | 'semana' | 'deudores' | 'reporte'>('cobros');
   
-  // Filtros
+  // Filtros de búsqueda
   const [searchTerm, setSearchTerm] = useState('');
   const [filtroMoneda, setFiltroMoneda] = useState<'Todas' | 'CUP' | 'USD'>('Todas');
   const [filtroEstado, setFiltroEstado] = useState<'Todos' | 'Cobrados' | 'Pendientes' | 'En Mora'>('Todos');
@@ -63,7 +65,7 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
   const [reciboModalData, setReciboModalData] = useState<RegistroPagoServicio | null>(null);
   const [copiedReceipt, setCopiedReceipt] = useState(false);
 
-  // Formulario de Pago
+  // Formulario de Cobro
   const [pagoSubId, setPagoSubId] = useState<string>('');
   const [pagoMonto, setPagoMonto] = useState<number>(3500);
   const [pagoMoneda, setPagoMoneda] = useState<Moneda>('CUP');
@@ -87,16 +89,14 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
   const [subTarifa, setSubTarifa] = useState<number>(3500);
   const [subNotas, setSubNotas] = useState<string>('');
 
-  // Filtro temporal del Reporte
+  // Filtro temporal para el reporte gráfico
   const [periodoReporte, setPeriodoReporte] = useState<'mensual' | 'trimestral' | 'semestral' | 'anual'>('mensual');
-
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Parámetros de tiempo exactos según la imagen:
-  // "Día del mes actual: 11 / 15" y "Plazo en Curso: 4 días restantes"
+  // Parámetros de la norma operativa
   const diaActual = 11;
   const diasLimite = 15;
-  const diasRestantes = Math.max(0, diasLimite - diaActual); // 4
+  const diasRestantes = Math.max(0, diasLimite - diaActual);
 
   // Cerrar modales con tecla Escape
   useEffect(() => {
@@ -112,12 +112,12 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Suscripción seleccionada para pagar
+  // Suscripción seleccionada actualmente para cobro
   const selectedSub = useMemo(() => {
     return suscripciones.find(s => s.id === pagoSubId) || suscripciones[0];
   }, [pagoSubId, suscripciones]);
 
-  // Selección de suscripción para cobrar
+  // Abrir modal de cobro para una suscripción
   const handleSelectSubForPago = (sub: SuscripcionServicio) => {
     setPagoSubId(sub.id);
     setPagoMoneda(sub.moneda);
@@ -130,13 +130,12 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
     setIsPagoModalOpen(true);
   };
 
-  // Ver recibo de un cliente pagado
+  // Ver recibo digital de una suscripción pagada
   const handleVerRecibo = (sub: SuscripcionServicio) => {
     const pagoExistente = pagos.find(p => p.suscripcion_id === sub.id || p.cliente_nombre === sub.cliente_nombre);
     if (pagoExistente) {
       setReciboModalData(pagoExistente);
     } else {
-      // Crear objeto de recibo verificado al vuelo
       setReciboModalData({
         id: `rec-${sub.id}`,
         codigo_pago: `PAG-2026-000${sub.codigo.replace(/\D/g, '') || '1'}`,
@@ -166,7 +165,7 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
     }
   };
 
-  // Carga de archivo de comprobante
+  // Carga de archivo de imagen para comprobante
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -181,7 +180,7 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
     }
   };
 
-  // Generar muestra de comprobante si no tiene captura
+  // Generar muestra de comprobante Transfermóvil
   const handleGenerateSampleVoucher = () => {
     if (!selectedSub) return;
     const op = pagoNumTransaccion || `TRF-${Math.floor(1000000 + Math.random() * 9000000)}`;
@@ -191,7 +190,7 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
     setPagoComprobanteNombre(`comprobante_whatsapp_${selectedSub.cliente_nombre.toLowerCase().replace(/\s+/g, '_')}.png`);
   };
 
-  // Guardar cobro
+  // Guardar cobro realizado
   const handleSavePago = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedSub) return;
@@ -239,7 +238,6 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
       registrado_por: 'Enmanuel Caraballo'
     });
 
-    // Actualizar suscripción
     const updatedSub: SuscripcionServicio = {
       ...selectedSub,
       tiene_deuda: saldoRestante > 0,
@@ -254,56 +252,56 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
       ultimo_pago_transaccion: pagoMetodo === 'Transferencia' ? pagoNumTransaccion : 'Efectivo'
     };
     onUpdateSuscripcion(updatedSub);
+
     setIsPagoModalOpen(false);
   };
 
-  // Crear suscripción
+  // Crear nueva suscripción
   const handleSaveSuscripcion = (e: React.FormEvent) => {
     e.preventDefault();
-    const cli = clientes.find(c => c.id === subClienteId);
-    const cliNombre = cli ? cli.nombre : 'Cliente DataPlus';
-    const cliTel = cli?.telefono || '+53 5 281 9021';
+    const cli = clientes.find(c => c.id === subClienteId) || clientes[0];
+    if (!cli) return;
 
     onAddSuscripcion({
-      cliente_id: subClienteId || `cli-${Date.now()}`,
-      cliente_nombre: cliNombre,
-      cliente_telefono: cliTel,
+      cliente_id: cli.id,
+      cliente_nombre: cli.nombre,
+      cliente_telefono: cli.telefono,
       nombre_servicio: subNombreServicio,
       tipo_solucion: subTipoSolucion,
       sim_numero: subSimNumero,
       moneda: subMoneda,
       tarifa_mensual: subTarifa,
-      dia_limite_pago: 15,
-      activo: true,
-      fecha_inicio: new Date().toISOString().split('T')[0],
-      notas: subNotas,
-      tiene_deuda: false,
+      deuda_acumulada: 0,
       meses_deuda_count: 0,
       meses_deuda_detalle: [],
-      deuda_acumulada: 0,
+      tiene_deuda: false,
       monto_a_cobrar: subTarifa,
-      estado_cobro_mes_actual: 'Pendiente'
+      estado_cobro_mes_actual: 'Pendiente',
+      activo: true,
+      notas: subNotas
     });
+
     setIsSubModalOpen(false);
   };
 
-  // Enviar mensaje de WhatsApp
+  // Recordatorio por WhatsApp
   const handleOpenWhatsAppReminder = (sub: SuscripcionServicio) => {
-    const telefonoLimpio = (sub.cliente_telefono || '').replace(/[^\d]/g, '');
-    const mesesTexto = sub.meses_deuda_detalle.length > 0 ? sub.meses_deuda_detalle.join(', ') : 'Octubre 2026';
+    const tel = sub.cliente_telefono || '5350000000';
+    const telefonoLimpio = tel.replace(/\D/g, '');
     const montoTexto = sub.moneda === 'USD' ? `$${sub.monto_a_cobrar} USD` : `$${sub.monto_a_cobrar.toLocaleString()} CUP`;
     
     const mensaje = encodeURIComponent(
-      `Hola ${sub.cliente_nombre}, le contactamos de DataPlus para recordarle el pago de su servicio mensual de ${sub.nombre_servicio}. ` +
+      `Estimado cliente *${sub.cliente_nombre}*,\n\n` +
+      `Le saludamos del equipo de *DataPlus Telecomunicaciones* respecto al servicio de *${sub.nombre_servicio}*.\n\n` +
       (sub.tiene_deuda 
-        ? `Actualmente presenta ${sub.meses_deuda_count} mes(es) pendiente(s) (${mesesTexto}). El monto total a liquidar con deuda acumulada es de ${montoTexto}. `
+        ? `Le informamos que actualmente presenta un saldo pendiente acumulado de ${montoTexto} correspondiente a meses anteriores y periodo en curso. `
         : `Le recordamos que el pago correspondiente a mes adelantado es de ${montoTexto} y debe efectuarse durante los primeros 15 días del mes. `) +
       `Por favor, recuerde enviar el comprobante de su transferencia a este chat una vez realizada. ¡Muchas gracias!`
     );
     window.open(`https://wa.me/${telefonoLimpio}?text=${mensaje}`, '_blank');
   };
 
-  // Copiar recibo
+  // Copiar recibo digital
   const handleCopyReceiptText = (p: RegistroPagoServicio) => {
     const texto = `*COMPROBANTE OFICIAL DE PAGO - DATAPLUS*\n` +
       `----------------------------------------\n` +
@@ -323,7 +321,7 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
     setTimeout(() => setCopiedReceipt(false), 2500);
   };
 
-  // Listas según pestaña
+  // Subconjuntos según pestañas
   const subsSemana = useMemo(() => {
     return suscripciones.filter(s => s.estado_cobro_mes_actual === 'Al_Dia' || s.ultimo_pago_fecha?.startsWith('2026-10'));
   }, [suscripciones]);
@@ -332,7 +330,6 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
     return suscripciones.filter(s => s.tiene_deuda || s.estado_cobro_mes_actual === 'En_Mora');
   }, [suscripciones]);
 
-  // Lista base según pestaña activa
   const baseSubs = useMemo(() => {
     if (activeTab === 'semana') return subsSemana;
     if (activeTab === 'deudores') return subsDeudores;
@@ -361,7 +358,32 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
     });
   }, [baseSubs, searchTerm, filtroMoneda, filtroEstado]);
 
-  // Cálculos para la evolución temporal y gráfica del Reporte
+  // Métricas agregadas del mes actual
+  const totalCobradoCUP = useMemo(() => {
+    return suscripciones
+      .filter(s => s.moneda === 'CUP' && s.estado_cobro_mes_actual === 'Al_Dia')
+      .reduce((acc, s) => acc + (s.ultimo_pago_monto || s.tarifa_mensual), 0);
+  }, [suscripciones]);
+
+  const metaCobroCUP = useMemo(() => {
+    return suscripciones
+      .filter(s => s.moneda === 'CUP')
+      .reduce((acc, s) => acc + s.tarifa_mensual, 0);
+  }, [suscripciones]);
+
+  const totalCobradoUSD = useMemo(() => {
+    return suscripciones
+      .filter(s => s.moneda === 'USD' && s.estado_cobro_mes_actual === 'Al_Dia')
+      .reduce((acc, s) => acc + (s.ultimo_pago_monto || s.tarifa_mensual), 0);
+  }, [suscripciones]);
+
+  const metaCobroUSD = useMemo(() => {
+    return suscripciones
+      .filter(s => s.moneda === 'USD')
+      .reduce((acc, s) => acc + s.tarifa_mensual, 0);
+  }, [suscripciones]);
+
+  // Cálculos de reportes temporales
   const reportesPeriodos = useMemo(() => {
     const meses = [
       { key: '01', nombre: 'Enero 2026', q: 'Q1', s: 'S1', cup: 21000, usd: 140, expCup: 24500 },
@@ -373,7 +395,7 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
       { key: '07', nombre: 'Julio 2026', q: 'Q3', s: 'S2', cup: 24500, usd: 135, expCup: 24500 },
       { key: '08', nombre: 'Agosto 2026', q: 'Q3', s: 'S2', cup: 20700, usd: 140, expCup: 24500 },
       { key: '09', nombre: 'Septiembre 2026', q: 'Q3', s: 'S2', cup: 16900, usd: 60, expCup: 24500 },
-      { key: '10', nombre: 'Octubre 2026', q: 'Q4', s: 'S2', cup: 7700, usd: 0, expCup: 24500 },
+      { key: '10', nombre: 'Octubre 2026', q: 'Q4', s: 'S2', cup: totalCobradoCUP || 7700, usd: totalCobradoUSD || 0, expCup: metaCobroCUP || 24500 },
       { key: '11', nombre: 'Noviembre 2026', q: 'Q4', s: 'S2', cup: 0, usd: 0, expCup: 24500 },
       { key: '12', nombre: 'Diciembre 2026', q: 'Q4', s: 'S2', cup: 0, usd: 0, expCup: 24500 },
     ];
@@ -386,7 +408,7 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
         usdCobrado: m.usd,
         cupExigible: m.expCup,
         cumplimiento,
-        totalOperaciones: m.cup > 0 ? (m.key === '10' ? 2 : 5) : 0
+        totalOperaciones: m.cup > 0 ? (m.key === '10' ? subsSemana.length : 5) : 0
       };
     });
 
@@ -431,213 +453,249 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
         cumplimientoGlobal
       }
     };
-  }, []);
+  }, [totalCobradoCUP, totalCobradoUSD, metaCobroCUP, subsSemana.length]);
 
   return (
-    <div className="space-y-6 font-sans text-white select-none">
-      {/* ================= TÍTULO PRINCIPAL (IDÉNTICO A IMAGEN 1) ================= */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-          Facturación de Gestión Remota & Servicios
-        </h1>
-      </div>
-
-      {/* ================= BANNER RECTANGULAR PRINCIPAL (IDÉNTICO A IMAGEN 1) ================= */}
-      <div className="rounded-2xl border border-sky-500/30 bg-gradient-to-r from-sky-950/70 via-slate-900 to-indigo-950/70 p-5 shadow-xl flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
-        {/* Lado izquierdo: Periodo y norma operativa */}
-        <div className="flex items-center gap-4">
-          <div className="h-10 w-10 rounded-full border border-white/20 flex items-center justify-center shrink-0 text-white">
-            <Calendar className="h-5 w-5 stroke-[1.5]" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2.5">
-              <span className="text-sm sm:text-base font-bold text-white tracking-tight">
-                Periodo de Cobro: Octubre 2026
-              </span>
-              <span className="px-2.5 py-0.5 rounded-full border border-white/30 text-[11px] font-medium text-white">
-                Mes Adelantado
-              </span>
-            </div>
-            <p className="text-xs text-white/70 mt-1">
-              Norma operativa: El servicio de Gestión Remota se liquida en los <strong className="text-white font-bold">primeros 15 días</strong> del mes en curso.
-            </p>
-          </div>
+    <div className="space-y-6">
+      {/* ================= ENCABEZADO OFICIAL DE FACTURACIÓN ================= */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+            <Radio className="h-5 w-5 text-sky-400" />
+            Facturación de Gestión Remota & Servicios
+          </h2>
+          <p className="text-xs text-slate-400">
+            Control de cobros mensuales, pólizas de conectividad, historial de pagos y reportes periódicos.
+          </p>
         </div>
 
-        {/* Lado derecho: Tarjetas redondeadas + Botón Nueva Suscripción */}
-        <div className="flex flex-wrap items-center gap-3 shrink-0">
-          {/* Tarjeta: Día del mes actual */}
-          <div className="rounded-xl border border-slate-800 px-4 py-2 bg-slate-950/90 min-w-[120px] text-center">
-            <div className="text-xs font-semibold text-white/90">Día del mes actual</div>
-            <div className="text-sm font-bold text-white mt-0.5 font-mono">
-              <span className="text-lg font-extrabold text-white">{diaActual}</span>
-              <span className="text-white/60 text-xs font-normal"> / {diasLimite}</span>
-            </div>
-          </div>
-
-          {/* Tarjeta: Plazo en Curso */}
-          <div className="rounded-xl border border-amber-500/30 px-4 py-2 bg-amber-500/10 min-w-[130px] text-center">
-            <div className="text-xs font-semibold text-white/90">Plazo en Curso</div>
-            <div className="text-xs font-mono font-bold text-white mt-1">
-              {diasRestantes} días restantes
-            </div>
-          </div>
-
-          {/* Botón: + Nueva Suscripción */}
+        <div className="flex items-center gap-2">
           <button
             onClick={() => {
               setSubClienteId(clientes[0]?.id || '');
               setIsSubModalOpen(true);
             }}
-            className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-500 rounded-xl shadow-lg shadow-sky-600/30 transition-all cursor-pointer whitespace-nowrap ml-1"
+            className="flex items-center gap-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold px-3 py-2 text-xs transition-all cursor-pointer"
           >
-            <span className="text-sm font-light">+</span>
-            <span>Nueva Suscripción</span>
+            <Plus className="h-4 w-4 text-sky-400" />
+            Nueva Suscripción
+          </button>
+
+          <button
+            onClick={() => {
+              const primerPendiente = suscripciones.find(s => s.estado_cobro_mes_actual !== 'Al_Dia') || suscripciones[0];
+              if (primerPendiente) {
+                handleSelectSubForPago(primerPendiente);
+              }
+            }}
+            className="flex items-center gap-1.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold px-4 py-2 text-xs transition-all shadow-md shadow-sky-500/20 cursor-pointer"
+          >
+            <CreditCard className="h-4 w-4 stroke-[2.5]" />
+            Registrar Cobro
           </button>
         </div>
       </div>
 
-      {/* ================= PESTAÑAS TIPO PÍLDORA (IDÉNTICO A IMAGEN 2) ================= */}
-      <div className="flex flex-wrap items-center gap-3">
-        {/* Tab 1: Control de Cobros Mensuales */}
+      {/* ================= TARJETAS KPI / ESTADO OPERATIVO ================= */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Tarjeta 1: Periodo & Norma Operativa */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-400">Periodo en Curso</span>
+            <div className="rounded-lg bg-sky-500/10 p-2 text-sky-400 border border-sky-500/20">
+              <Calendar className="h-4 w-4" />
+            </div>
+          </div>
+          <p className="text-xl font-bold text-white mt-2">Octubre 2026</p>
+          <div className="mt-1 flex items-center justify-between text-[11px]">
+            <span className="text-slate-400">Día {diaActual} de {diasLimite}</span>
+            <span className="rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 font-bold">
+              {diasRestantes} días restantes
+            </span>
+          </div>
+        </div>
+
+        {/* Tarjeta 2: Recaudación CUP */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-400">Recaudación CUP</span>
+            <div className="rounded-lg bg-emerald-500/10 p-2 text-emerald-400 border border-emerald-500/20">
+              <DollarSign className="h-4 w-4" />
+            </div>
+          </div>
+          <p className="text-xl font-bold text-emerald-400 mt-2">
+            ${totalCobradoCUP.toLocaleString()} CUP
+          </p>
+          <p className="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
+            <span>Meta: ${metaCobroCUP.toLocaleString()} CUP</span>
+            <span className="font-semibold text-slate-300">
+              {metaCobroCUP > 0 ? Math.round((totalCobradoCUP / metaCobroCUP) * 100) : 0}%
+            </span>
+          </p>
+        </div>
+
+        {/* Tarjeta 3: Recaudación USD */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-400">Recaudación USD</span>
+            <div className="rounded-lg bg-indigo-500/10 p-2 text-indigo-400 border border-indigo-500/20">
+              <CreditCard className="h-4 w-4" />
+            </div>
+          </div>
+          <p className="text-xl font-bold text-white mt-2">
+            ${totalCobradoUSD} USD
+          </p>
+          <p className="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
+            <span>Meta: ${metaCobroUSD} USD</span>
+            <span className="font-semibold text-slate-300">
+              {metaCobroUSD > 0 ? Math.round((totalCobradoUSD / metaCobroUSD) * 100) : 0}%
+            </span>
+          </p>
+        </div>
+
+        {/* Tarjeta 4: Estado de Clientes */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-400">Cumplimiento Global</span>
+            <div className="rounded-lg bg-sky-500/10 p-2 text-sky-400 border border-sky-500/20">
+              <CheckCircle2 className="h-4 w-4" />
+            </div>
+          </div>
+          <p className="text-xl font-bold text-white mt-2">
+            <span className="text-emerald-400">{subsSemana.length}</span> / <span className="text-slate-300">{suscripciones.length}</span> clientes
+          </p>
+          <p className="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
+            <span>En mora / Deuda:</span>
+            <span className={`font-semibold ${subsDeudores.length > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+              {subsDeudores.length}
+            </span>
+          </p>
+        </div>
+      </div>
+
+      {/* ================= PESTAÑAS PRINCIPALES DEL MÓDULO ================= */}
+      <div className="border-b border-slate-800 flex gap-4 overflow-x-auto">
         <button
           onClick={() => setActiveTab('cobros')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+          className={`pb-3 text-xs font-bold transition-colors cursor-pointer border-b-2 flex items-center gap-2 whitespace-nowrap ${
             activeTab === 'cobros'
-              ? 'border border-white/30 bg-black text-white shadow-sm'
-              : 'text-white/70 hover:text-white border border-transparent'
+              ? 'border-sky-500 text-sky-400'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
-          <div className="grid grid-cols-2 gap-0.5 w-3.5 h-3.5 border border-current p-0.5 rounded-sm">
-            <div className="bg-current rounded-[1px]"></div>
-            <div className="bg-current rounded-[1px]"></div>
-            <div className="bg-current rounded-[1px]"></div>
-            <div className="bg-current rounded-[1px]"></div>
-          </div>
-          <span>Control de Cobros Mensuales</span>
-          <span className="ml-1 text-xs font-mono">{suscripciones.length}</span>
+          <Receipt className="h-4 w-4" />
+          Control de Cobros Mensuales
+          <span className="ml-1 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300 font-mono">
+            {suscripciones.length}
+          </span>
         </button>
 
-        {/* Tab 2: Pagaron esta Semana */}
         <button
           onClick={() => setActiveTab('semana')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+          className={`pb-3 text-xs font-bold transition-colors cursor-pointer border-b-2 flex items-center gap-2 whitespace-nowrap ${
             activeTab === 'semana'
-              ? 'border border-white/30 bg-black text-white shadow-sm'
-              : 'text-white/70 hover:text-white border border-transparent'
+              ? 'border-emerald-500 text-emerald-400'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
-          <div className="h-3.5 w-3.5 rounded-full border border-current flex items-center justify-center text-[9px] font-bold">
-            ✓
-          </div>
-          <span>Pagaron esta Semana</span>
-          <span className="ml-1 text-xs font-mono">{subsSemana.length}</span>
+          <CheckCircle2 className="h-4 w-4" />
+          Pagaron esta Semana
+          <span className="ml-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-400 font-mono border border-emerald-500/20">
+            {subsSemana.length}
+          </span>
         </button>
 
-        {/* Tab 3: Mayores Deudores */}
         <button
           onClick={() => setActiveTab('deudores')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+          className={`pb-3 text-xs font-bold transition-colors cursor-pointer border-b-2 flex items-center gap-2 whitespace-nowrap ${
             activeTab === 'deudores'
-              ? 'border border-white/30 bg-black text-white shadow-sm'
-              : 'text-white/70 hover:text-white border border-transparent'
+              ? 'border-rose-500 text-rose-400'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
-          <span className="text-xs">⚠️</span>
-          <span>Mayores Deudores</span>
-          <span className="ml-1 text-xs font-mono">{subsDeudores.length}</span>
+          <AlertCircle className="h-4 w-4" />
+          Mayores Deudores
+          {subsDeudores.length > 0 && (
+            <span className="ml-1 rounded bg-rose-500/10 px-1.5 py-0.5 text-[10px] text-rose-400 font-mono border border-rose-500/20">
+              {subsDeudores.length}
+            </span>
+          )}
         </button>
 
-        {/* Tab 4: Reporte Temporal (Año/Sem/Trim/Mes) */}
         <button
           onClick={() => setActiveTab('reporte')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+          className={`pb-3 text-xs font-bold transition-colors cursor-pointer border-b-2 flex items-center gap-2 whitespace-nowrap ${
             activeTab === 'reporte'
-              ? 'border border-white/30 bg-black text-white shadow-sm'
-              : 'text-white/70 hover:text-white border border-transparent'
+              ? 'border-indigo-500 text-indigo-400'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
-          <TrendingUp className="h-3.5 w-3.5" />
-          <span>Reporte Temporal (Año/Sem/Trim/Mes)</span>
+          <TrendingUp className="h-4 w-4" />
+          Reporte Temporal (Año / Sem / Trim / Mes)
         </button>
       </div>
 
-      {/* ================= CONTENIDO DE LAS PESTAÑAS ================= */}
-
-      {/* PESTAÑAS 1, 2 Y 3: TABLA DE GESTIÓN DE SUSCRIPCIONES (IDÉNTICA A IMAGEN 2) */}
-      {activeTab !== 'reporte' && (
+      {/* ================= CONTENIDO DE TABLAS O REPORTE ================= */}
+      {activeTab !== 'reporte' ? (
         <div className="space-y-4">
-          {/* BARRA DE FILTROS (IDÉNTICA A IMAGEN 2) */}
-          <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center">
-            {/* Buscador */}
-            <div className="flex-1">
+          {/* BARRA DE FILTROS & BÚSQUEDA */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-900/70 p-3.5 rounded-xl border border-slate-800">
+            <div className="relative w-full sm:w-80">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
               <input
                 type="text"
-                placeholder="Buscar por cliente, código, SIM..."
+                placeholder="Buscar por cliente, SIM, router o código..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-white placeholder:text-slate-500 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 focus:outline-none"
+                className="w-full rounded-lg border border-slate-700 bg-slate-950 pl-9 pr-4 py-1.5 text-xs text-slate-200 placeholder-slate-400 focus:border-sky-500 focus:outline-none"
               />
             </div>
 
-            {/* Filtro Moneda */}
-            <div className="flex items-center rounded-xl border border-white/20 bg-black px-3 py-1.5 text-xs">
-              <span className="text-white/70 mr-2">Moneda:</span>
-              <div className="flex items-center gap-2 font-medium">
-                {(['Todas', 'CUP', 'USD'] as const).map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => setFiltroMoneda(m)}
-                    className={`px-2 py-0.5 rounded cursor-pointer transition-colors ${
-                      filtroMoneda === m ? 'text-white font-bold bg-white/10' : 'text-white/70 hover:text-white'
-                    }`}
-                  >
-                    {m}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <select
+                value={filtroMoneda}
+                onChange={(e) => setFiltroMoneda(e.target.value as any)}
+                className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs text-slate-300 focus:border-sky-500 focus:outline-none"
+              >
+                <option value="Todas">Todas las Monedas</option>
+                <option value="CUP">Moneda: CUP</option>
+                <option value="USD">Moneda: USD</option>
+              </select>
 
-            {/* Filtro Estado */}
-            <div className="flex items-center rounded-xl border border-white/20 bg-black px-3 py-1.5 text-xs">
-              <span className="text-white/70 mr-2">Estado:</span>
-              <div className="flex items-center gap-2 font-medium">
-                {(['Todos', 'Cobrados', 'Pendientes', 'En Mora'] as const).map((est) => (
-                  <button
-                    key={est}
-                    onClick={() => setFiltroEstado(est)}
-                    className={`px-2 py-0.5 rounded cursor-pointer transition-colors ${
-                      filtroEstado === est ? 'text-white font-bold bg-white/10' : 'text-white/70 hover:text-white'
-                    }`}
-                  >
-                    {est}
-                  </button>
-                ))}
-              </div>
+              <select
+                value={filtroEstado}
+                onChange={(e) => setFiltroEstado(e.target.value as any)}
+                className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs text-slate-300 focus:border-sky-500 focus:outline-none"
+              >
+                <option value="Todos">Todos los Estados</option>
+                <option value="Cobrados">Cobrados / Al Día</option>
+                <option value="Pendientes">Pendientes (Día 1-15)</option>
+                <option value="En Mora">En Mora / Con Deuda</option>
+              </select>
             </div>
           </div>
 
-          {/* TABLA PRINCIPAL (IDÉNTICA A IMAGEN 2) */}
-          <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/80 shadow-md">
+          {/* TABLA PRINCIPAL DE GESTIÓN */}
+          <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/50 shadow-sm">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-white">
-                <thead className="border-b border-slate-800 bg-slate-950/80 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              <table className="w-full text-left text-xs text-slate-300">
+                <thead className="bg-slate-950/80 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800">
                   <tr>
-                    <th className="py-3 px-4">Código</th>
-                    <th className="py-3 px-4">Cliente / Teléfono</th>
-                    <th className="py-3 px-4">Solución / SIM</th>
-                    <th className="py-3 px-4">Mensualidad</th>
-                    <th className="py-3 px-4">Deuda Anterior</th>
-                    <th className="py-3 px-4">Total a Cobrar</th>
-                    <th className="py-3 px-4 text-center">Estado</th>
-                    <th className="py-3 px-4 text-center">Acciones</th>
+                    <th className="py-3.5 px-4">Código</th>
+                    <th className="py-3.5 px-4">Cliente / Contacto</th>
+                    <th className="py-3.5 px-4">Solución / SIM</th>
+                    <th className="py-3.5 px-4">Mensualidad</th>
+                    <th className="py-3.5 px-4">Deuda Anterior</th>
+                    <th className="py-3.5 px-4">Total a Cobrar</th>
+                    <th className="py-3.5 px-4 text-center">Estado</th>
+                    <th className="py-3.5 px-4 text-center">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/80">
                   {filteredSubs.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-8 text-center text-white/50">
-                        No se encontraron registros con los filtros seleccionados.
+                      <td colSpan={8} className="py-8 text-center text-slate-500">
+                        No se encontraron suscripciones con los filtros seleccionados.
                       </td>
                     </tr>
                   ) : (
@@ -647,33 +705,33 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
                       const isEnMora = sub.estado_cobro_mes_actual === 'En_Mora' || sub.tiene_deuda;
 
                       return (
-                        <tr key={sub.id} className="hover:bg-white/[0.03] transition-colors">
+                        <tr key={sub.id} className="hover:bg-slate-800/40 transition-colors">
                           {/* Código */}
-                          <td className="py-3.5 px-4 font-mono font-semibold text-white whitespace-nowrap">
+                          <td className="py-3.5 px-4 font-mono font-bold text-sky-400 whitespace-nowrap">
                             {sub.codigo}
                           </td>
 
-                          {/* Cliente / Teléfono */}
+                          {/* Cliente / Contacto */}
                           <td className="py-3.5 px-4">
-                            <div className="font-semibold text-white">{sub.cliente_nombre}</div>
+                            <span className="font-semibold text-white block">{sub.cliente_nombre}</span>
                             {sub.cliente_telefono && (
-                              <div className="text-[11px] text-white/70 font-mono mt-0.5 flex items-center gap-1">
-                                <Phone className="h-3 w-3 inline text-white/60" />
-                                <span>{sub.cliente_telefono}</span>
-                              </div>
+                              <span className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5 font-mono">
+                                <Phone className="h-3 w-3 text-teal-400" />
+                                {sub.cliente_telefono}
+                              </span>
                             )}
                           </td>
 
                           {/* Solución / SIM */}
                           <td className="py-3.5 px-4">
-                            <div className="text-white text-xs">{sub.tipo_solucion || sub.nombre_servicio}</div>
-                            <div className="text-[11px] text-white/70 font-mono mt-0.5">
+                            <span className="text-slate-200 block">{sub.tipo_solucion || sub.nombre_servicio}</span>
+                            <span className="text-[11px] text-sky-400 font-mono mt-0.5 block">
                               SIM: {sub.sim_numero || 'Sin asignar'}
-                            </div>
+                            </span>
                           </td>
 
                           {/* Mensualidad */}
-                          <td className="py-3.5 px-4 font-mono font-semibold text-white whitespace-nowrap">
+                          <td className="py-3.5 px-4 font-mono font-semibold text-slate-200 whitespace-nowrap">
                             {sub.moneda === 'USD' 
                               ? `$${sub.tarifa_mensual}.00 USD` 
                               : `$${sub.tarifa_mensual.toLocaleString()}.00 CUP`}
@@ -683,22 +741,22 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
                           <td className="py-3.5 px-4 whitespace-nowrap">
                             {sub.tiene_deuda && sub.deuda_acumulada > 0 ? (
                               <div>
-                                <span className="font-mono font-semibold text-white">
-                                  {sub.moneda === 'USD'
-                                    ? `+$${sub.deuda_acumulada}.00`
-                                    : `+$${sub.deuda_acumulada.toLocaleString()}.00`}
+                                <span className="font-mono font-bold text-rose-400">
+                                  +{sub.moneda === 'USD' 
+                                    ? `$${sub.deuda_acumulada}.00` 
+                                    : `$${sub.deuda_acumulada.toLocaleString()}.00`}
                                 </span>
-                                <span className="block text-[10px] text-white/70">
+                                <span className="block text-[10px] text-slate-400">
                                   ({sub.meses_deuda_count} {sub.meses_deuda_count === 1 ? 'mes' : 'meses'})
                                 </span>
                               </div>
                             ) : (
-                              <span className="font-mono text-white/80">$0.00</span>
+                              <span className="font-mono text-slate-500">$0.00</span>
                             )}
                           </td>
 
                           {/* Total a Cobrar */}
-                          <td className="py-3.5 px-4 font-mono font-bold text-white whitespace-nowrap">
+                          <td className="py-3.5 px-4 font-mono font-extrabold text-white whitespace-nowrap">
                             {sub.moneda === 'USD'
                               ? `$${sub.monto_a_cobrar}.00 USD`
                               : `$${sub.monto_a_cobrar.toLocaleString()}.00 CUP`}
@@ -706,24 +764,22 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
 
                           {/* Estado */}
                           <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                            {isEnMora && (
-                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border border-white/30 text-white bg-black">
-                                <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-white/60 text-[9px] font-bold">!</span>
-                                <span>En Mora</span>
-                              </span>
-                            )}
-
                             {isAlDia && (
-                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border border-white/30 text-white bg-black">
-                                <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-white/60 text-[9px] font-bold">✓</span>
-                                <span>Cobrado</span>
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                <Check className="h-3 w-3 stroke-[2.5]" />
+                                Cobrado
                               </span>
                             )}
-
                             {isPendiente && (
-                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border border-white/30 text-white bg-black">
-                                <Clock className="h-3 w-3 text-white/80" />
-                                <span>Pendiente (Día 1-15)</span>
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                <Clock className="h-3 w-3" />
+                                Pendiente (Día 1-15)
+                              </span>
+                            )}
+                            {isEnMora && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                                <AlertTriangle className="h-3 w-3" />
+                                En Mora
                               </span>
                             )}
                           </td>
@@ -731,30 +787,30 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
                           {/* Acciones */}
                           <td className="py-3.5 px-4 text-center whitespace-nowrap">
                             <div className="flex items-center justify-center gap-2">
-                              {/* Botón Cobrar o Recibo */}
                               {isAlDia ? (
                                 <button
                                   onClick={() => handleVerRecibo(sub)}
-                                  className="flex items-center gap-1 px-3 py-1 rounded-lg border border-white/20 bg-black text-xs font-semibold text-white hover:bg-white/10 transition-colors cursor-pointer"
+                                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-medium transition-colors cursor-pointer"
+                                  title="Ver Recibo Oficial Digital"
                                 >
-                                  <Receipt className="h-3.5 w-3.5" />
+                                  <Receipt className="h-3.5 w-3.5 text-teal-400" />
                                   <span>Recibo</span>
                                 </button>
                               ) : (
                                 <button
                                   onClick={() => handleSelectSubForPago(sub)}
-                                  className="flex items-center gap-1 px-3 py-1 rounded-lg border border-white/20 bg-black text-xs font-semibold text-white hover:bg-white/10 transition-colors cursor-pointer"
+                                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 text-xs font-semibold transition-colors cursor-pointer"
+                                  title="Registrar cobro de la mensualidad"
                                 >
                                   <CreditCard className="h-3.5 w-3.5" />
                                   <span>Cobrar</span>
                                 </button>
                               )}
 
-                              {/* Botón WhatsApp */}
                               <button
                                 onClick={() => handleOpenWhatsAppReminder(sub)}
-                                title="Enviar recordatorio por WhatsApp"
-                                className="p-1.5 rounded-lg border border-white/20 bg-black text-white hover:bg-white/10 transition-colors cursor-pointer"
+                                title="Enviar recordatorio formal por WhatsApp"
+                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 transition-colors cursor-pointer"
                               >
                                 <MessageSquare className="h-3.5 w-3.5" />
                               </button>
@@ -769,290 +825,148 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
             </div>
           </div>
         </div>
-      )}
-
-      {/* ================= PESTAÑA 4: REPORTE TEMPORAL (AÑO / SEM / TRIM / MES) ================= */}
-      {activeTab === 'reporte' && (
-        <div className="rounded-xl border border-white/20 bg-black p-5 sm:p-6 space-y-6">
-          {/* Header del Reporte */}
-          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-white/15 pb-4">
+      ) : (
+        /* ================= PESTAÑA DE REPORTES TEMPORALES & GRÁFICA ================= */
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5 sm:p-6 space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-slate-800 pb-4">
             <div>
               <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-white" />
+                <TrendingUp className="h-5 w-5 text-indigo-400" />
                 Evolución Temporal & Comparativa de Recaudación (2026)
               </h3>
-              <p className="text-xs text-white/70 mt-0.5">
+              <p className="text-xs text-slate-400 mt-0.5">
                 Desglose analítico de cobros y efectividad por Año, Semestre, Trimestre y Mes.
               </p>
             </div>
 
-            {/* Selector de Período con botones limpios tipo píldora */}
-            <div className="flex items-center p-1 bg-black rounded-xl border border-white/20 text-xs">
-              {(['mensual', 'trimestral', 'semestral', 'anual'] as const).map((p) => (
+            {/* Selector de Período estilo DataPlus */}
+            <div className="flex items-center p-1 bg-slate-950 rounded-xl border border-slate-800 text-xs">
+              {(['mensual', 'trimestral', 'semestral', 'anual'] as const).map((per) => (
                 <button
-                  key={p}
-                  onClick={() => setPeriodoReporte(p)}
-                  className={`px-3.5 py-1.5 rounded-lg font-bold capitalize transition-all cursor-pointer ${
-                    periodoReporte === p 
-                      ? 'border border-white/30 bg-white/15 text-white shadow-sm' 
-                      : 'text-white/60 hover:text-white'
+                  key={per}
+                  onClick={() => setPeriodoReporte(per)}
+                  className={`px-3 py-1.5 rounded-lg font-bold transition-all capitalize cursor-pointer ${
+                    periodoReporte === per
+                      ? 'bg-sky-500 text-slate-950 shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  {p}
+                  {per}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* VISTA MENSUAL: GRÁFICO DE LÍNEAS INTERACTIVO (LINE CHART) */}
+          {/* VISTA MENSUAL: GRÁFICO INTERACTIVO DE BARRAS */}
           {periodoReporte === 'mensual' && (() => {
-            const data = reportesPeriodos.datosMensuales;
-            const maxVal = 28000;
-            const width = 860;
-            const height = 240;
-            const padX = 50;
-            const padY = 30;
-            const innerW = width - padX * 2;
-            const innerH = height - padY * 2;
-
-            // Coordenadas calculadas para la línea continua
-            const points = data.map((d, i) => {
-              const x = padX + (i / (data.length - 1)) * innerW;
-              const y = height - padY - (d.cupCobrado / maxVal) * innerH;
-              return { x, y, ...d };
-            });
-
-            // Generador de curva suave SVG
-            const makePath = (pts: { x: number; y: number }[]) => {
-              if (pts.length === 0) return '';
-              let path = `M ${pts[0].x} ${pts[0].y}`;
-              for (let i = 0; i < pts.length - 1; i++) {
-                const p0 = pts[i];
-                const p1 = pts[i + 1];
-                const cp1x = p0.x + (p1.x - p0.x) / 2;
-                const cp1y = p0.y;
-                const cp2x = p0.x + (p1.x - p0.x) / 2;
-                const cp2y = p1.y;
-                path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p1.x} ${p1.y}`;
-              }
-              return path;
-            };
-
-            const linePath = makePath(points);
-            const areaPath = `${linePath} L ${points[points.length - 1].x} ${height - padY} L ${points[0].x} ${height - padY} Z`;
-            const metaY = height - padY - (24500 / maxVal) * innerH;
+            const maxVal = Math.max(...reportesPeriodos.datosMensuales.map(m => m.cupCobrado), 24500);
 
             return (
               <div className="space-y-6">
-                {/* Visualización gráfica de líneas */}
-                <div className="rounded-xl border border-white/15 bg-black p-5 sm:p-6 space-y-4">
-                  {/* Leyenda de la gráfica */}
-                  <div className="flex flex-wrap items-center justify-between gap-3 text-xs border-b border-white/10 pb-3">
-                    <div className="flex items-center gap-6">
-                      <div className="flex items-center gap-2">
-                        <span className="w-5 h-[3px] bg-white rounded-full"></span>
-                        <span className="text-white font-semibold">Recaudación CUP (Línea Continua)</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="w-5 h-[2px] border-b-2 border-dashed border-sky-400"></span>
-                        <span className="text-sky-300">Recaudación USD</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="w-5 h-[1.5px] border-b border-dotted border-white/40"></span>
-                        <span className="text-white/60">Meta Exigible (~$24,500 CUP)</span>
-                      </div>
+                {/* Gráfico de barras */}
+                <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-5">
+                  <div className="flex justify-between items-center mb-6">
+                    <div>
+                      <span className="text-xs font-semibold text-slate-400">Recaudación Mensual en CUP</span>
+                      <p className="text-xs text-slate-500 mt-0.5">Pasa el cursor sobre las barras para ver detalles</p>
                     </div>
-                    <div className="text-[11px] font-mono text-white/70">
-                      Total 2026: <strong className="text-white">${reportesPeriodos.anual.totalAnualCUP.toLocaleString()} CUP</strong>
+                    <div className="flex items-center gap-4 text-[11px] text-slate-400">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded bg-sky-500"></span>
+                        <span>Cobrado</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-3 border-t border-dashed border-amber-400"></span>
+                        <span>Meta mensual ($24.5k CUP)</span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Canvas SVG del Gráfico de Líneas */}
-                  <div className="w-full overflow-x-auto">
-                    <svg viewBox={`0 0 ${width} ${height}`} className="w-full min-w-[650px] h-64 overflow-visible">
-                      <defs>
-                        <linearGradient id="cupAreaGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.22" />
-                          <stop offset="100%" stopColor="#ffffff" stopOpacity="0.00" />
-                        </linearGradient>
-                      </defs>
+                  {/* Lienzo del gráfico */}
+                  <div className="relative h-64 pt-6 pb-2 flex items-end justify-between gap-1 sm:gap-2">
+                    {/* Línea de meta discontinua */}
+                    <div 
+                      className="absolute inset-x-0 border-t border-dashed border-amber-400/50 pointer-events-none z-10"
+                      style={{ bottom: `${Math.round((24500 / maxVal) * 85)}%` }}
+                    >
+                      <span className="absolute right-0 -top-5 text-[10px] font-mono text-amber-400/80 bg-slate-950/90 px-1 rounded">
+                        Meta: $24,500 CUP
+                      </span>
+                    </div>
 
-                      {/* Líneas guía horizontales de fondo */}
-                      {[0, 7000, 14000, 21000, 28000].map((val) => {
-                        const y = height - padY - (val / maxVal) * innerH;
-                        return (
-                          <g key={val}>
-                            <line
-                              x1={padX}
-                              y1={y}
-                              x2={width - padX}
-                              y2={y}
-                              stroke="rgba(255, 255, 255, 0.08)"
-                              strokeDasharray="3 3"
-                            />
-                            <text
-                              x={padX - 8}
-                              y={y + 3}
-                              fill="rgba(255, 255, 255, 0.4)"
-                              fontSize="10"
-                              fontFamily="monospace"
-                              textAnchor="end"
-                            >
-                              ${val / 1000}k
-                            </text>
-                          </g>
-                        );
-                      })}
+                    {reportesPeriodos.datosMensuales.map((m) => {
+                      const pct = Math.round((m.cupCobrado / maxVal) * 85);
+                      const isCurrentMonth = m.key === '10';
 
-                      {/* Línea horizontal de Meta mensual */}
-                      <line
-                        x1={padX}
-                        y1={metaY}
-                        x2={width - padX}
-                        y2={metaY}
-                        stroke="rgba(255, 255, 255, 0.35)"
-                        strokeDasharray="4 4"
-                        strokeWidth="1.5"
-                      />
-                      <text
-                        x={width - padX + 5}
-                        y={metaY + 3}
-                        fill="rgba(255, 255, 255, 0.5)"
-                        fontSize="9"
-                        fontFamily="monospace"
-                      >
-                        Meta
-                      </text>
+                      return (
+                        <div key={m.key} className="flex-1 flex flex-col items-center h-full justify-end group relative">
+                          {/* Tooltip flotante */}
+                          <div className="absolute -top-16 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 border border-slate-700 text-white rounded-lg px-2.5 py-1.5 text-[11px] shadow-2xl pointer-events-none z-30 whitespace-nowrap font-sans">
+                            <p className="font-bold text-sky-400">{m.nombre}</p>
+                            <p className="font-mono text-xs">${m.cupCobrado.toLocaleString()} CUP</p>
+                            {m.usdCobrado > 0 && <p className="font-mono text-indigo-400">${m.usdCobrado} USD</p>}
+                            <p className="text-[10px] text-slate-400">{m.cumplimiento}% de la meta</p>
+                          </div>
 
-                      {/* Área sombreada bajo la línea de CUP */}
-                      <path d={areaPath} fill="url(#cupAreaGradient)" />
+                          {/* Barra de progreso */}
+                          <div className="w-full max-w-[32px] bg-slate-800/80 rounded-t-lg h-full flex items-end overflow-hidden p-0.5">
+                            <div
+                              style={{ height: `${pct}%` }}
+                              className={`w-full rounded-t transition-all duration-500 ${
+                                isCurrentMonth
+                                  ? 'bg-gradient-to-t from-sky-600 to-sky-400 shadow-md shadow-sky-500/30'
+                                  : m.cupCobrado > 0
+                                  ? 'bg-gradient-to-t from-teal-600 to-teal-400 group-hover:from-teal-500 group-hover:to-teal-300'
+                                  : 'bg-slate-800'
+                              }`}
+                            ></div>
+                          </div>
 
-                      {/* Línea principal trazada de recaudación CUP */}
-                      <path
-                        d={linePath}
-                        fill="none"
-                        stroke="#ffffff"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-
-                      {/* Puntos y etiquetas interactivas de cada mes */}
-                      {points.map((p) => {
-                        const isOct = p.key === '10';
-                        return (
-                          <g key={p.key} className="group cursor-pointer">
-                            {/* Línea vertical tenue al punto */}
-                            <line
-                              x1={p.x}
-                              y1={p.y}
-                              x2={p.x}
-                              y2={height - padY}
-                              stroke={isOct ? "rgba(255, 255, 255, 0.3)" : "rgba(255, 255, 255, 0.06)"}
-                              strokeDasharray="2 2"
-                            />
-
-                            {/* Círculo del punto de la línea */}
-                            <circle
-                              cx={p.x}
-                              cy={p.y}
-                              r={isOct ? "5.5" : "4"}
-                              fill={p.cupCobrado > 0 ? "#ffffff" : "#18181b"}
-                              stroke={isOct ? "#38bdf8" : "#ffffff"}
-                              strokeWidth={isOct ? "2" : "1.5"}
-                              className="transition-all duration-200 group-hover:r-7"
-                            />
-
-                            {/* Tooltip flotante SVG */}
-                            <g className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none">
-                              <rect
-                                x={p.x - 48}
-                                y={p.y - 42}
-                                width="96"
-                                height="34"
-                                rx="6"
-                                fill="#09090b"
-                                stroke="rgba(255, 255, 255, 0.25)"
-                                strokeWidth="1"
-                              />
-                              <text
-                                x={p.x}
-                                y={p.y - 28}
-                                fill="#ffffff"
-                                fontSize="10"
-                                fontWeight="bold"
-                                textAnchor="middle"
-                              >
-                                {p.nombre.slice(0, 3)}: ${p.cupCobrado.toLocaleString()}
-                              </text>
-                              <text
-                                x={p.x}
-                                y={p.y - 14}
-                                fill="#a1a1aa"
-                                fontSize="9"
-                                textAnchor="middle"
-                              >
-                                {p.cumplimiento}% meta
-                              </text>
-                            </g>
-
-                            {/* Etiqueta del Mes en el eje X */}
-                            <text
-                              x={p.x}
-                              y={height - padY + 16}
-                              fill={isOct ? "#ffffff" : "rgba(255, 255, 255, 0.6)"}
-                              fontSize="10"
-                              fontWeight={isOct ? "bold" : "normal"}
-                              fontFamily="monospace"
-                              textAnchor="middle"
-                            >
-                              {p.nombre.slice(0, 3)}
-                            </text>
-                          </g>
-                        );
-                      })}
-                    </svg>
-                  </div>
-
-                  <div className="flex justify-between items-center text-[11px] text-white/60 px-2 pt-2 border-t border-white/10">
-                    <span>Enero 2026</span>
-                    <span>Curva de Recaudación Anual · Línea de Tendencia Continua</span>
-                    <span>Diciembre 2026</span>
+                          {/* Etiqueta del Mes */}
+                          <span className={`text-[10px] font-mono mt-2 transition-colors ${
+                            isCurrentMonth ? 'text-sky-400 font-bold' : 'text-slate-400 group-hover:text-slate-200'
+                          }`}>
+                            {m.nombre.substring(0, 3)}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
-                {/* Tabla de desglose */}
-                <div className="overflow-x-auto rounded-xl border border-white/15 bg-black">
-                  <table className="w-full text-left text-xs text-white">
-                    <thead className="bg-black text-[10px] font-semibold text-white/70 uppercase tracking-wider border-b border-white/15">
+                {/* Tabla desglosada mensual */}
+                <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950/70">
+                  <table className="w-full text-left text-xs text-slate-300">
+                    <thead className="border-b border-slate-800 bg-slate-900/80 text-[11px] font-semibold text-slate-400 uppercase">
                       <tr>
                         <th className="py-2.5 px-4">Mes</th>
                         <th className="py-2.5 px-4">Cobrado CUP</th>
                         <th className="py-2.5 px-4">Cobrado USD</th>
-                        <th className="py-2.5 px-4">Operaciones</th>
                         <th className="py-2.5 px-4">Cumplimiento</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-white/10">
+                    <tbody className="divide-y divide-slate-800/60 font-mono">
                       {reportesPeriodos.datosMensuales.map((m) => (
-                        <tr key={m.key} className="hover:bg-white/[0.02]">
-                          <td className="py-2.5 px-4 font-semibold text-white">{m.nombre}</td>
-                          <td className="py-2.5 px-4 font-mono font-bold text-white">
-                            ${m.cupCobrado.toLocaleString()} CUP
+                        <tr key={m.key} className="hover:bg-slate-800/30 transition-colors">
+                          <td className="py-2.5 px-4 font-sans font-medium text-white flex items-center gap-2">
+                            {m.nombre}
+                            {m.key === '10' && (
+                              <span className="rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 px-1.5 py-0.2 text-[9px] font-bold font-sans">
+                                En curso
+                              </span>
+                            )}
                           </td>
-                          <td className="py-2.5 px-4 font-mono font-bold text-white">
-                            ${m.usdCobrado} USD
-                          </td>
-                          <td className="py-2.5 px-4 text-white/70">{m.totalOperaciones} pagos</td>
+                          <td className="py-2.5 px-4 text-emerald-400 font-bold">${m.cupCobrado.toLocaleString()}</td>
+                          <td className="py-2.5 px-4 text-slate-300">${m.usdCobrado}</td>
                           <td className="py-2.5 px-4">
                             <div className="flex items-center gap-2">
-                              <div className="w-24 bg-white/10 rounded-full h-1.5 overflow-hidden">
+                              <div className="w-24 bg-slate-800 h-1.5 rounded-full overflow-hidden">
                                 <div 
-                                  className="bg-white h-full rounded-full"
+                                  className="bg-sky-500 h-full rounded-full" 
                                   style={{ width: `${m.cumplimiento}%` }}
                                 ></div>
                               </div>
-                              <span className="text-[11px] font-mono text-white/80">{m.cumplimiento}%</span>
+                              <span className="text-[11px] text-slate-400">{m.cumplimiento}%</span>
                             </div>
                           </td>
                         </tr>
@@ -1068,23 +982,25 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
           {periodoReporte === 'trimestral' && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {reportesPeriodos.trimestres.map((t) => (
-                <div key={t.id} className="p-4 rounded-xl border border-white/20 bg-black space-y-3">
+                <div key={t.id} className="p-4 rounded-xl border border-slate-800 bg-slate-950/70 space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="font-mono text-xs font-bold text-white border border-white/30 px-2 py-0.5 rounded">{t.id}</span>
-                    <span className="text-xs font-mono font-bold text-white">{t.cumplimiento}%</span>
+                    <span className="font-mono text-xs font-bold text-sky-400 border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 rounded">
+                      {t.id}
+                    </span>
+                    <span className="text-xs font-mono font-bold text-emerald-400">{t.cumplimiento}%</span>
                   </div>
                   <h4 className="text-xs font-bold text-white">{t.nombre}</h4>
-                  <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
-                    <div className="bg-white h-full rounded-full" style={{ width: `${t.cumplimiento}%` }}></div>
+                  <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                    <div className="bg-sky-500 h-full rounded-full" style={{ width: `${t.cumplimiento}%` }}></div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/15 text-xs">
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800 text-xs">
                     <div>
-                      <p className="text-[10px] text-white/60">CUP:</p>
-                      <p className="text-xs font-bold font-mono text-white">${t.cupCobrado.toLocaleString()}</p>
+                      <p className="text-[10px] text-slate-400">CUP:</p>
+                      <p className="text-xs font-bold font-mono text-emerald-400">${t.cupCobrado.toLocaleString()}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] text-white/60">USD:</p>
-                      <p className="text-xs font-bold font-mono text-white">${t.usdCobrado}</p>
+                      <p className="text-[10px] text-slate-400">USD:</p>
+                      <p className="text-xs font-bold font-mono text-slate-200">${t.usdCobrado}</p>
                     </div>
                   </div>
                 </div>
@@ -1096,23 +1012,25 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
           {periodoReporte === 'semestral' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {reportesPeriodos.semestres.map((s) => (
-                <div key={s.id} className="p-5 rounded-xl border border-white/20 bg-black space-y-4">
+                <div key={s.id} className="p-5 rounded-xl border border-slate-800 bg-slate-950/70 space-y-4">
                   <div className="flex justify-between items-center">
-                    <span className="font-mono text-xs font-bold border border-white/30 px-2 py-0.5 rounded">{s.id}</span>
-                    <span className="text-xs font-mono font-bold text-white">{s.cumplimiento}% efectividad</span>
+                    <span className="font-mono text-xs font-bold text-sky-400 border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 rounded">
+                      {s.id}
+                    </span>
+                    <span className="text-xs font-mono font-bold text-emerald-400">{s.cumplimiento}% efectividad</span>
                   </div>
                   <h4 className="text-sm font-bold text-white">{s.nombre}</h4>
-                  <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden">
-                    <div className="bg-white h-full rounded-full" style={{ width: `${s.cumplimiento}%` }}></div>
+                  <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                    <div className="bg-sky-500 h-full rounded-full" style={{ width: `${s.cumplimiento}%` }}></div>
                   </div>
-                  <div className="space-y-2 pt-2 border-t border-white/15 text-xs">
-                    <div className="flex justify-between text-white/70">
+                  <div className="space-y-2 pt-2 border-t border-slate-800 text-xs">
+                    <div className="flex justify-between text-slate-400">
                       <span>Total CUP Cobrado:</span>
-                      <span className="font-mono font-bold text-white">${s.cupCobrado.toLocaleString()} CUP</span>
+                      <span className="font-mono font-bold text-emerald-400">${s.cupCobrado.toLocaleString()} CUP</span>
                     </div>
-                    <div className="flex justify-between text-white/70">
+                    <div className="flex justify-between text-slate-400">
                       <span>Total USD Cobrado:</span>
-                      <span className="font-mono font-bold text-white">${s.usdCobrado} USD</span>
+                      <span className="font-mono font-bold text-slate-200">${s.usdCobrado} USD</span>
                     </div>
                   </div>
                 </div>
@@ -1122,22 +1040,22 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
 
           {/* VISTA ANUAL */}
           {periodoReporte === 'anual' && (
-            <div className="p-6 rounded-xl border border-white/20 bg-black space-y-5">
+            <div className="p-6 rounded-xl border border-slate-800 bg-slate-950/70 space-y-5">
               <div className="flex justify-between items-center">
                 <h4 className="text-base font-bold text-white">Consolidado Anual Ejercicio Fiscal 2026</h4>
-                <span className="font-mono text-xs font-bold border border-white/30 px-3 py-1 rounded-full">
+                <span className="font-mono text-xs font-bold border border-sky-500/30 bg-sky-500/10 text-sky-400 px-3 py-1 rounded-full">
                   {reportesPeriodos.anual.cumplimientoGlobal}% Cumplimiento Anual
                 </span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-white/15">
-                <div className="p-4 rounded-xl border border-white/20 bg-black">
-                  <p className="text-xs text-white/70 font-semibold">Total Cobrado en CUP</p>
-                  <p className="text-2xl font-extrabold text-white font-mono mt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-800">
+                <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60">
+                  <p className="text-xs text-slate-400 font-semibold">Total Cobrado en CUP</p>
+                  <p className="text-2xl font-extrabold text-emerald-400 font-mono mt-1">
                     ${reportesPeriodos.anual.totalAnualCUP.toLocaleString()} CUP
                   </p>
                 </div>
-                <div className="p-4 rounded-xl border border-white/20 bg-black">
-                  <p className="text-xs text-white/70 font-semibold">Total Cobrado en USD</p>
+                <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60">
+                  <p className="text-xs text-slate-400 font-semibold">Total Cobrado en USD</p>
                   <p className="text-2xl font-extrabold text-white font-mono mt-1">
                     ${reportesPeriodos.anual.totalAnualUSD} USD
                   </p>
@@ -1148,37 +1066,41 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
         </div>
       )}
 
-      {/* ================= MODALES FLOTANTES CON CIERRE SEGURO (CLICK AFUERA / ESCAPE) ================= */}
+      {/* ========================================================================= */}
+      {/* MODALES FLOTANTES (CIERRE SEGURO: CLICK BACKDROP, ESCAPE, BOTÓN X)       */}
+      {/* ========================================================================= */}
 
       {/* 1. MODAL REGISTRAR COBRO */}
       {isPagoModalOpen && selectedSub && (
         <div 
           onClick={() => setIsPagoModalOpen(false)} 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 overflow-y-auto cursor-pointer"
         >
           <div 
             onClick={(e) => e.stopPropagation()} 
-            className="relative w-full max-w-lg rounded-2xl border border-white/20 bg-zinc-950 p-6 shadow-2xl my-8 text-white"
+            className="relative w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl my-8 text-slate-100 cursor-default"
           >
-            <div className="flex items-center justify-between border-b border-white/15 pb-3 mb-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-5">
               <div className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5 text-white" />
+                <div className="rounded-lg bg-sky-500/10 p-2 text-sky-400 border border-sky-500/20">
+                  <CreditCard className="h-5 w-5" />
+                </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white">Registrar Cobro de Mensualidad</h3>
-                  <p className="text-[11px] text-white/70">Gestión Remota · Mes Adelantado (1-15 días)</p>
+                  <h3 className="text-base font-bold text-white">Registrar Cobro de Mensualidad</h3>
+                  <p className="text-xs text-slate-400">Gestión Remota · Mes Adelantado (1-15 días)</p>
                 </div>
               </div>
               <button 
                 onClick={() => setIsPagoModalOpen(false)} 
-                className="text-white/60 hover:text-white p-1 rounded-lg cursor-pointer"
+                className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
               >
-                <X className="h-4 w-4" />
+                <X className="h-5 w-5" />
               </button>
             </div>
 
             <form onSubmit={handleSavePago} className="space-y-4">
               <div>
-                <label className="block text-[11px] font-medium text-white/70 mb-1">Cliente / Servicio *</label>
+                <label className="block text-[11px] font-medium text-slate-400 mb-1">Cliente / Servicio *</label>
                 <select
                   value={pagoSubId}
                   onChange={(e) => {
@@ -1190,7 +1112,7 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
                       setPagoEfectivoEntrega(sub.cliente_nombre);
                     }
                   }}
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-xs text-white focus:border-sky-500 focus:ring-1 focus:ring-sky-500 focus:outline-none"
+                  className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-200 focus:border-sky-500 focus:outline-none"
                 >
                   {suscripciones.map(s => (
                     <option key={s.id} value={s.id}>
@@ -1200,24 +1122,25 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
                 </select>
               </div>
 
-              <div className="p-3.5 rounded-xl border border-white/15 bg-black space-y-2 text-xs">
-                <div className="flex justify-between text-white/70">
+              {/* Resumen del estado de cuenta */}
+              <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/70 space-y-2 text-xs">
+                <div className="flex justify-between text-slate-400">
                   <span>Mensualidad base:</span>
                   <span className="font-mono text-white font-bold">
                     {selectedSub.moneda === 'USD' ? `$${selectedSub.tarifa_mensual} USD` : `$${selectedSub.tarifa_mensual.toLocaleString()} CUP`}
                   </span>
                 </div>
                 {selectedSub.tiene_deuda && (
-                  <div className="flex justify-between text-white/70">
-                    <span>Deuda anterior:</span>
-                    <span className="font-mono text-white font-bold">
+                  <div className="flex justify-between text-slate-400">
+                    <span>Deuda anterior acumulada:</span>
+                    <span className="font-mono text-rose-400 font-bold">
                       +{selectedSub.moneda === 'USD' ? `$${selectedSub.deuda_acumulada} USD` : `$${selectedSub.deuda_acumulada.toLocaleString()} CUP`}
                     </span>
                   </div>
                 )}
-                <div className="flex justify-between text-white font-bold border-t border-white/15 pt-2">
-                  <span>Total exigible:</span>
-                  <span className="font-mono text-sm">
+                <div className="flex justify-between text-slate-200 font-bold border-t border-slate-800 pt-2">
+                  <span>Total exigible a liquidar:</span>
+                  <span className="font-mono text-sm text-sky-400">
                     {selectedSub.moneda === 'USD' ? `$${selectedSub.monto_a_cobrar} USD` : `$${selectedSub.monto_a_cobrar.toLocaleString()} CUP`}
                   </span>
                 </div>
@@ -1225,48 +1148,48 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-medium text-white/70 mb-1">Monto a Abonar *</label>
+                  <label className="block text-[11px] font-medium text-slate-400 mb-1">Monto a Abonar *</label>
                   <input
                     type="number"
                     required
                     value={pagoMonto}
                     onChange={(e) => setPagoMonto(Number(e.target.value))}
-                    className="w-full rounded-xl border border-white/20 bg-black px-3 py-2 text-xs font-mono font-bold text-white focus:border-white focus:outline-none"
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-mono font-bold text-white focus:border-sky-500 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-medium text-white/70 mb-1">Fecha de Cobro *</label>
+                  <label className="block text-[11px] font-medium text-slate-400 mb-1">Fecha de Cobro *</label>
                   <input
                     type="date"
                     required
                     value={pagoFecha}
                     onChange={(e) => setPagoFecha(e.target.value)}
-                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-xs text-white focus:border-sky-500 focus:ring-1 focus:ring-sky-500 focus:outline-none"
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-200 focus:border-sky-500 focus:outline-none"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[11px] font-medium text-white/70 mb-1">Método de Cobro *</label>
+                <label className="block text-[11px] font-medium text-slate-400 mb-1">Método de Cobro *</label>
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={() => setPagoMetodo('Transferencia')}
-                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                    className={`p-2.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
                       pagoMetodo === 'Transferencia'
-                        ? 'border-white bg-white/15 text-white'
-                        : 'border-white/20 bg-black text-white/60'
+                        ? 'border-sky-500/50 bg-sky-500/10 text-sky-400'
+                        : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200'
                     }`}
                   >
-                    Transferencia
+                    Transferencia Bancaria
                   </button>
                   <button
                     type="button"
                     onClick={() => setPagoMetodo('Efectivo')}
-                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                    className={`p-2.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
                       pagoMetodo === 'Efectivo'
-                        ? 'border-white bg-white/15 text-white'
-                        : 'border-white/20 bg-black text-white/60'
+                        ? 'border-sky-500/50 bg-sky-500/10 text-sky-400'
+                        : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200'
                     }`}
                   >
                     Pago en Efectivo
@@ -1275,14 +1198,14 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
               </div>
 
               {pagoMetodo === 'Transferencia' ? (
-                <div className="p-3.5 rounded-xl border border-white/15 bg-black space-y-3">
+                <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/70 space-y-3">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[10px] font-medium text-white/70 mb-1">Plataforma</label>
+                      <label className="block text-[10px] font-medium text-slate-400 mb-1">Plataforma</label>
                       <select
                         value={pagoPlataforma}
                         onChange={(e) => setPagoPlataforma(e.target.value)}
-                        className="w-full rounded-lg border border-white/20 bg-zinc-950 px-2.5 py-1.5 text-xs text-white focus:border-white focus:outline-none"
+                        className="w-full rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-200 focus:border-sky-500 focus:outline-none"
                       >
                         <option value="Transfermóvil">Transfermóvil</option>
                         <option value="EnZona">EnZona</option>
@@ -1291,21 +1214,21 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
                       </select>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-medium text-white/70 mb-1">No. Transacción / Ref *</label>
+                      <label className="block text-[10px] font-medium text-slate-400 mb-1">No. Transacción / Ref *</label>
                       <input
                         type="text"
                         required
                         value={pagoNumTransaccion}
                         onChange={(e) => setPagoNumTransaccion(e.target.value)}
                         placeholder="TRF-5918234"
-                        className="w-full rounded-lg border border-white/20 bg-zinc-950 px-2.5 py-1.5 text-xs font-mono font-bold text-white focus:border-white focus:outline-none"
+                        className="w-full rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1.5 text-xs font-mono font-bold text-white focus:border-sky-500 focus:outline-none"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-medium text-white/70 mb-1">
-                      Comprobante de WhatsApp (Imagen)
+                    <label className="block text-[10px] font-medium text-slate-400 mb-1">
+                      Comprobante de WhatsApp (Captura)
                     </label>
                     <div className="flex items-center gap-2">
                       <input
@@ -1318,24 +1241,25 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="flex-1 flex items-center justify-center gap-1.5 p-2 rounded-lg border border-white/20 bg-zinc-900 hover:bg-zinc-800 text-xs text-white cursor-pointer"
+                        className="flex-1 flex items-center justify-center gap-1.5 p-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 transition-colors cursor-pointer"
                       >
-                        <Upload className="h-3.5 w-3.5" />
+                        <Upload className="h-3.5 w-3.5 text-sky-400" />
                         {pagoComprobanteNombre ? 'Cambiar Imagen' : 'Subir Imagen de WhatsApp'}
                       </button>
                       <button
                         type="button"
                         onClick={handleGenerateSampleVoucher}
-                        className="px-2.5 py-2 rounded-lg border border-white/20 bg-zinc-900 hover:bg-zinc-800 text-xs font-semibold cursor-pointer"
+                        className="px-3 py-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition-colors cursor-pointer"
                       >
                         Muestra
                       </button>
                     </div>
+
                     {pagoComprobanteUrl && (
-                      <div className="mt-2 flex items-center justify-between p-2 rounded-lg bg-zinc-950 border border-white/20">
+                      <div className="mt-2 flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800">
                         <div className="flex items-center gap-2 overflow-hidden">
-                          <img src={pagoComprobanteUrl} alt="Comprobante" className="h-8 w-8 rounded object-cover border border-white/20" />
-                          <span className="text-xs text-white/80 truncate max-w-[200px]">{pagoComprobanteNombre || 'comprobante.png'}</span>
+                          <img src={pagoComprobanteUrl} alt="Comprobante" className="h-8 w-8 rounded object-cover border border-slate-700" />
+                          <span className="text-xs text-slate-300 truncate max-w-[200px]">{pagoComprobanteNombre || 'comprobante.png'}</span>
                         </div>
                         <button
                           type="button"
@@ -1343,7 +1267,7 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
                             setPagoComprobanteUrl('');
                             setPagoComprobanteNombre('');
                           }}
-                          className="text-white/60 hover:text-white p-1"
+                          className="text-slate-400 hover:text-rose-400 p-1 transition-colors"
                         >
                           <X className="h-3.5 w-3.5" />
                         </button>
@@ -1352,41 +1276,41 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
                   </div>
                 </div>
               ) : (
-                <div className="p-3.5 rounded-xl border border-white/15 bg-black space-y-3">
+                <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/70 space-y-3">
                   <div>
-                    <label className="block text-[10px] font-medium text-white/70 mb-1">¿Quién Recibe el Dinero? *</label>
+                    <label className="block text-[10px] font-medium text-slate-400 mb-1">¿Quién Recibe el Dinero? *</label>
                     <input
                       type="text"
                       required
                       value={pagoEfectivoRecibe}
                       onChange={(e) => setPagoEfectivoRecibe(e.target.value)}
-                      className="w-full rounded-lg border border-white/20 bg-zinc-950 px-2.5 py-1.5 text-xs text-white focus:border-white focus:outline-none"
+                      className="w-full rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-200 focus:border-sky-500 focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-medium text-white/70 mb-1">¿Quién lo Entrega? *</label>
+                    <label className="block text-[10px] font-medium text-slate-400 mb-1">¿Quién lo Entrega? *</label>
                     <input
                       type="text"
                       required
                       value={pagoEfectivoEntrega}
                       onChange={(e) => setPagoEfectivoEntrega(e.target.value)}
-                      className="w-full rounded-lg border border-white/20 bg-zinc-950 px-2.5 py-1.5 text-xs text-white focus:border-white focus:outline-none"
+                      className="w-full rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-200 focus:border-sky-500 focus:outline-none"
                     />
                   </div>
                 </div>
               )}
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-white/15">
+              <div className="flex justify-end gap-2 pt-4 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => setIsPagoModalOpen(false)}
-                  className="rounded-xl border border-white/20 bg-black px-4 py-2 text-xs font-semibold text-white/70 hover:text-white cursor-pointer"
+                  className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl border border-white/30 bg-white text-black px-5 py-2 text-xs font-bold hover:bg-white/90 cursor-pointer shadow-md"
+                  className="rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 px-5 py-2 text-xs font-bold transition-all shadow-md shadow-sky-500/20 cursor-pointer"
                 >
                   Confirmar Cobro
                 </button>
@@ -1400,29 +1324,37 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
       {isSubModalOpen && (
         <div 
           onClick={() => setIsSubModalOpen(false)} 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 overflow-y-auto cursor-pointer"
         >
           <div 
             onClick={(e) => e.stopPropagation()} 
-            className="relative w-full max-w-md rounded-2xl border border-white/20 bg-zinc-950 p-6 shadow-2xl my-8 text-white"
+            className="relative w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl my-8 text-slate-100 cursor-default"
           >
-            <div className="flex items-center justify-between border-b border-white/15 pb-3 mb-4">
-              <h3 className="text-sm font-bold text-white">Nueva Suscripción a Gestión Remota</h3>
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-5">
+              <div className="flex items-center gap-2">
+                <div className="rounded-lg bg-sky-500/10 p-2 text-sky-400 border border-sky-500/20">
+                  <Radio className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Nueva Suscripción de Gestión Remota</h3>
+                  <p className="text-xs text-slate-400">Póliza mensual recurrente</p>
+                </div>
+              </div>
               <button 
                 onClick={() => setIsSubModalOpen(false)} 
-                className="text-white/60 hover:text-white p-1 rounded-lg cursor-pointer"
+                className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
               >
-                <X className="h-4 w-4" />
+                <X className="h-5 w-5" />
               </button>
             </div>
 
             <form onSubmit={handleSaveSuscripcion} className="space-y-4">
               <div>
-                <label className="block text-[11px] font-medium text-white/70 mb-1">Cliente *</label>
+                <label className="block text-[11px] font-medium text-slate-400 mb-1">Cliente *</label>
                 <select
                   value={subClienteId}
                   onChange={(e) => setSubClienteId(e.target.value)}
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-xs text-white focus:border-sky-500 focus:ring-1 focus:ring-sky-500 focus:outline-none"
+                  className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-200 focus:border-sky-500 focus:outline-none"
                 >
                   {clientes.map(c => (
                     <option key={c.id} value={c.id}>{c.nombre} ({c.codigo})</option>
@@ -1431,74 +1363,74 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
               </div>
 
               <div>
-                <label className="block text-[11px] font-medium text-white/70 mb-1">Nombre del Servicio *</label>
+                <label className="block text-[11px] font-medium text-slate-400 mb-1">Nombre del Servicio *</label>
                 <input
                   type="text"
                   required
                   value={subNombreServicio}
                   onChange={(e) => setSubNombreServicio(e.target.value)}
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-xs text-white focus:border-sky-500 focus:ring-1 focus:ring-sky-500 focus:outline-none"
+                  className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-200 focus:border-sky-500 focus:outline-none"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-medium text-white/70 mb-1">Router / Solución</label>
+                  <label className="block text-[11px] font-medium text-slate-400 mb-1">Router / Solución</label>
                   <input
                     type="text"
                     value={subTipoSolucion}
                     onChange={(e) => setSubTipoSolucion(e.target.value)}
                     placeholder="Router 4G Huawei B310"
-                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-xs text-white focus:border-sky-500 focus:ring-1 focus:ring-sky-500 focus:outline-none"
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-200 focus:border-sky-500 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-medium text-white/70 mb-1">No. SIM Asignada</label>
+                  <label className="block text-[11px] font-medium text-slate-400 mb-1">No. SIM Asignada</label>
                   <input
                     type="text"
                     value={subSimNumero}
                     onChange={(e) => setSubSimNumero(e.target.value)}
                     placeholder="5352849102"
-                    className="w-full rounded-xl border border-white/20 bg-black px-3 py-2 text-xs font-mono text-white focus:border-white focus:outline-none"
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-mono text-slate-200 focus:border-sky-500 focus:outline-none"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-medium text-white/70 mb-1">Moneda *</label>
+                  <label className="block text-[11px] font-medium text-slate-400 mb-1">Moneda *</label>
                   <select
                     value={subMoneda}
                     onChange={(e) => setSubMoneda(e.target.value as Moneda)}
-                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-xs text-white focus:border-sky-500 focus:ring-1 focus:ring-sky-500 focus:outline-none"
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-200 focus:border-sky-500 focus:outline-none"
                   >
                     <option value="CUP">CUP</option>
                     <option value="USD">USD</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-medium text-white/70 mb-1">Tarifa Mensual *</label>
+                  <label className="block text-[11px] font-medium text-slate-400 mb-1">Tarifa Mensual *</label>
                   <input
                     type="number"
                     required
                     value={subTarifa}
                     onChange={(e) => setSubTarifa(Number(e.target.value))}
-                    className="w-full rounded-xl border border-white/20 bg-black px-3 py-2 text-xs font-mono font-bold text-white focus:border-white focus:outline-none"
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-mono font-bold text-white focus:border-sky-500 focus:outline-none"
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-white/15">
+              <div className="flex justify-end gap-2 pt-4 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => setIsSubModalOpen(false)}
-                  className="rounded-xl border border-white/20 bg-black px-4 py-2 text-xs font-semibold text-white/70 hover:text-white cursor-pointer"
+                  className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl border border-white/30 bg-white text-black px-5 py-2 text-xs font-bold hover:bg-white/90 cursor-pointer shadow-md"
+                  className="rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 px-5 py-2 text-xs font-bold transition-all shadow-md shadow-sky-500/20 cursor-pointer"
                 >
                   Guardar Suscripción
                 </button>
@@ -1508,66 +1440,72 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
         </div>
       )}
 
-      {/* 3. MODAL VISOR DE RECIBO OFICIAL DATAPLUS */}
+      {/* 3. MODAL VISOR DE RECIBO DIGITAL OFICIAL */}
       {reciboModalData && (
         <div 
           onClick={() => setReciboModalData(null)} 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 overflow-y-auto cursor-pointer"
         >
           <div 
             onClick={(e) => e.stopPropagation()} 
-            className="relative w-full max-w-md rounded-2xl border border-white/20 bg-zinc-950 p-6 shadow-2xl my-8 text-white space-y-4"
+            className="relative w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl my-8 text-slate-100 space-y-4 cursor-default"
           >
-            <div className="flex items-center justify-between border-b border-white/15 pb-3">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
-                <Receipt className="h-5 w-5 text-white" />
+                <div className="rounded-lg bg-teal-500/10 p-2 text-teal-400 border border-teal-500/20">
+                  <Receipt className="h-5 w-5" />
+                </div>
                 <div>
-                  <h4 className="text-sm font-bold text-white">Recibo Oficial de Pago</h4>
-                  <p className="text-[10px] text-white/70 font-mono">DataPlus CUBA · {reciboModalData.codigo_pago}</p>
+                  <h4 className="text-base font-bold text-white">Recibo Digital de Pago</h4>
+                  <p className="text-[11px] text-slate-400 font-mono">DataPlus CUBA · {reciboModalData.codigo_pago}</p>
                 </div>
               </div>
               <button 
                 onClick={() => setReciboModalData(null)} 
-                className="text-white/60 hover:text-white p-1 rounded-lg cursor-pointer"
+                className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
               >
-                <X className="h-4 w-4" />
+                <X className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="p-4 rounded-xl bg-black border border-white/15 font-mono text-xs space-y-3 text-white/90">
-              <div className="text-center border-b border-white/15 pb-2">
-                <p className="font-extrabold text-white text-sm">DATAPLUS PLATAFORMA</p>
-                <p className="text-[10px] text-white/60">Servicio de Gestión Remota & Enlaces 4G</p>
-                <p className="text-[10px] text-white font-bold mt-1">RECIBO DE COBRO VERIFICADO</p>
+            <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs space-y-3">
+              <div className="text-center border-b border-slate-800 pb-2">
+                <p className="font-extrabold text-white text-sm tracking-wider">DATAPLUS PLATAFORMA</p>
+                <p className="text-[10px] text-slate-400">Servicio de Gestión Remota & Enlaces 4G</p>
+                <span className="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  COBRO VERIFICADO Y CONCILIADO
+                </span>
               </div>
 
               <div className="space-y-1.5 text-[11px]">
                 <div className="flex justify-between">
-                  <span className="text-white/60">Cliente:</span>
+                  <span className="text-slate-400">Cliente:</span>
                   <span className="font-bold text-white">{reciboModalData.cliente_nombre}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-white/60">Periodo:</span>
-                  <span className="text-white">{reciboModalData.mes_nombre_legible}</span>
+                  <span className="text-slate-400">Periodo liquidado:</span>
+                  <span className="text-slate-200">{reciboModalData.mes_nombre_legible}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-white/60">Fecha de Pago:</span>
-                  <span className="text-white">{reciboModalData.fecha_pago}</span>
+                  <span className="text-slate-400">Fecha de Pago:</span>
+                  <span className="text-slate-200">{reciboModalData.fecha_pago}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-white/60">Método:</span>
-                  <span className="text-white">{reciboModalData.metodo_pago}</span>
+                  <span className="text-slate-400">Método:</span>
+                  <span className="text-slate-200">{reciboModalData.metodo_pago}</span>
                 </div>
                 {reciboModalData.numero_transaccion && (
                   <div className="flex justify-between">
-                    <span className="text-white/60">Referencia:</span>
-                    <span className="text-white">{reciboModalData.numero_transaccion}</span>
+                    <span className="text-slate-400">Referencia:</span>
+                    <span className="font-mono text-sky-400">{reciboModalData.numero_transaccion}</span>
                   </div>
                 )}
-                <div className="flex justify-between border-t border-white/15 pt-2 text-xs">
+                <div className="flex justify-between border-t border-slate-800 pt-2 text-xs">
                   <span className="font-bold text-white">Monto Abonado:</span>
-                  <span className="font-extrabold text-white">
-                    {reciboModalData.moneda === 'USD' ? `$${reciboModalData.monto_pagado}.00 USD` : `$${reciboModalData.monto_pagado.toLocaleString()}.00 CUP`}
+                  <span className="font-extrabold text-emerald-400 font-mono text-sm">
+                    {reciboModalData.moneda === 'USD' 
+                      ? `$${reciboModalData.monto_pagado}.00 USD` 
+                      : `$${reciboModalData.monto_pagado.toLocaleString()}.00 CUP`}
                   </span>
                 </div>
               </div>
@@ -1577,14 +1515,15 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
               <button
                 type="button"
                 onClick={() => handleCopyReceiptText(reciboModalData)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/20 bg-black text-xs font-semibold text-white hover:bg-white/10 cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition-colors cursor-pointer"
               >
-                {copiedReceipt ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                <span>{copiedReceipt ? 'Copiado' : 'Copiar Texto'}</span>
+                {copiedReceipt ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                <span>{copiedReceipt ? 'Copiado al Portapapeles' : 'Copiar Texto'}</span>
               </button>
+
               <button
                 onClick={() => setReciboModalData(null)}
-                className="px-4 py-1.5 rounded-xl border border-white/30 bg-white text-black font-bold text-xs hover:bg-white/90 cursor-pointer"
+                className="px-4 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs transition-colors cursor-pointer"
               >
                 Cerrar
               </button>
@@ -1597,50 +1536,51 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
       {previewVoucherUrl && (
         <div 
           onClick={() => setPreviewVoucherUrl(null)} 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 overflow-y-auto cursor-pointer"
         >
           <div 
             onClick={(e) => e.stopPropagation()} 
-            className="relative w-full max-w-md rounded-2xl border border-white/20 bg-zinc-950 p-5 shadow-2xl space-y-4 my-8 text-white"
+            className="relative w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl my-8 text-slate-100 space-y-4 cursor-default"
           >
-            <div className="flex items-center justify-between border-b border-white/15 pb-3">
-              <div>
-                <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                  <ImageIcon className="h-4 w-4" />
-                  Comprobante WhatsApp
-                </h4>
-                <p className="text-[11px] text-white/60 font-mono">
-                  {previewVoucherUrl.cliente} · Ref: {previewVoucherUrl.op || previewVoucherUrl.codigo}
-                </p>
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="rounded-lg bg-emerald-500/10 p-2 text-emerald-400 border border-emerald-500/20">
+                  <ImageIcon className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="text-base font-bold text-white">Comprobante de WhatsApp</h4>
+                  <p className="text-xs text-slate-400">{previewVoucherUrl.cliente} · {previewVoucherUrl.codigo}</p>
+                </div>
               </div>
-              <button
-                onClick={() => setPreviewVoucherUrl(null)}
-                className="p-1 rounded-lg text-white/60 hover:text-white cursor-pointer"
+              <button 
+                onClick={() => setPreviewVoucherUrl(null)} 
+                className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
               >
-                <X className="h-4 w-4" />
+                <X className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="flex justify-center p-2 rounded-xl bg-black border border-white/15 max-h-[70vh] overflow-auto">
-              <img
-                src={previewVoucherUrl.url}
-                alt="Comprobante de Transferencia"
-                className="max-h-[60vh] object-contain rounded-lg shadow-lg"
+            <div className="rounded-xl overflow-hidden border border-slate-800 bg-slate-950 p-2 flex items-center justify-center">
+              <img 
+                src={previewVoucherUrl.url} 
+                alt="Comprobante Transferencia" 
+                className="max-h-[380px] w-auto rounded-lg object-contain shadow-lg"
               />
             </div>
 
             <div className="flex justify-between items-center pt-2">
               <a
                 href={previewVoucherUrl.url}
-                download={`comprobante_${previewVoucherUrl.codigo}.png`}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/20 bg-black text-xs font-semibold text-white hover:bg-white/10"
+                download={`comprobante_${previewVoucherUrl.codigo.toLowerCase()}.svg`}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition-colors cursor-pointer"
               >
-                <Download className="h-3.5 w-3.5" />
+                <Download className="h-3.5 w-3.5 text-sky-400" />
                 <span>Descargar</span>
               </a>
+
               <button
                 onClick={() => setPreviewVoucherUrl(null)}
-                className="px-4 py-1.5 rounded-xl border border-white/30 bg-white text-black font-bold text-xs hover:bg-white/90 cursor-pointer"
+                className="px-4 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs transition-colors cursor-pointer"
               >
                 Cerrar
               </button>

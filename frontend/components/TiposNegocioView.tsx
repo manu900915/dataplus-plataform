@@ -132,8 +132,8 @@ export const TiposNegocioView: React.FC<TiposNegocioViewProps> = ({
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="relative w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+        <div onClick={() => setIsModalOpen(false)} className="cursor-pointer fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div onClick={(e) => e.stopPropagation()} className="cursor-default relative w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
               <h3 className="text-sm font-bold text-white">
                 {editingTipo ? 'Editar Tipo de Negocio' : 'Nuevo Tipo de Negocio'}

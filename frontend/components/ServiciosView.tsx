@@ -65,6 +65,17 @@ export const ServiciosView: React.FC<ServiciosViewProps> = ({
 
   const selectedCliente = clientes.find(c => c.id === formData.cliente_id);
 
+  // Escape to close modal
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const handleOpenAdd = () => {
     setEditingServicio(null);
     setFormData({
@@ -380,8 +391,8 @@ export const ServiciosView: React.FC<ServiciosViewProps> = ({
 
       {/* Modal Crear / Editar Servicio */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="relative w-full max-w-2xl rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl my-8">
+        <div onClick={() => setIsModalOpen(false)} className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto cursor-pointer">
+          <div onClick={(e) => e.stopPropagation()} className="relative w-full max-w-2xl rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl my-8 cursor-default">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-5">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <Radio className="h-5 w-5 text-sky-400" />

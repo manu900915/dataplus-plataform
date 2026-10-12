@@ -87,6 +87,19 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
     return matchesSearch && matchesAlmacen && matchesCategory && matchesStock;
   });
 
+  // Escape to close modals
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowMovementModal(false);
+        setShowItemModal(false);
+        if (onClearQuickRestock) onClearQuickRestock();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClearQuickRestock]);
+
   const handleCreateItem = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newNombre || !newCodigo) return;
@@ -407,8 +420,8 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
 
       {/* Movement Modal */}
       {showMovementModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden">
+        <div onClick={() => { setShowMovementModal(false); if (onClearQuickRestock) onClearQuickRestock(); }} className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm cursor-pointer">
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden cursor-default">
             <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 bg-slate-950/60">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <History className="h-4 w-4 text-teal-400" />
@@ -514,8 +527,8 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
 
       {/* New Item Modal */}
       {showItemModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-xl rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden">
+        <div onClick={() => setShowItemModal(false)} className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm cursor-pointer">
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-xl rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden cursor-default">
             <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 bg-slate-950/60">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <Boxes className="h-4 w-4 text-teal-400" />

@@ -157,8 +157,8 @@ export const AlmacenesView: React.FC<AlmacenesViewProps> = ({
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden">
+        <div onClick={() => setShowModal(false)} className="cursor-pointer fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+          <div onClick={(e) => e.stopPropagation()} className="cursor-default w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 bg-slate-950/60">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <Warehouse className="h-4 w-4 text-teal-400" />

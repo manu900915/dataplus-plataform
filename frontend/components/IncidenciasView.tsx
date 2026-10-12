@@ -289,8 +289,8 @@ export const IncidenciasView: React.FC<IncidenciasViewProps> = ({
 
       {/* Manage / Detail Modal */}
       {selectedIncidencia && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-2xl rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden">
+        <div onClick={() => setSelectedIncidencia(null)} className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm cursor-pointer">
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-2xl rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden cursor-default">
             <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 bg-slate-950/60">
               <div className="flex items-center gap-2">
                 <span className="font-mono text-sm font-bold text-teal-400">{selectedIncidencia.codigo}</span>
@@ -413,8 +413,8 @@ export const IncidenciasView: React.FC<IncidenciasViewProps> = ({
 
       {/* Create Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-xl rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden">
+        <div onClick={() => setShowCreateModal(false)} className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm cursor-pointer">
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-xl rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden cursor-default">
             <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 bg-slate-950/60">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <AlertCircle className="h-4 w-4 text-teal-400" />
