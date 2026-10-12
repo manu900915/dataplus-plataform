@@ -63,15 +63,7 @@ a, a * {
   caret-color: transparent !important;
 }
 
-header h1,
-header span,
-aside span,
-aside button,
-aside a,
-button > span,
-a > span {
-  pointer-events: none;
-}
+
 
 button, a {
   pointer-events: auto;

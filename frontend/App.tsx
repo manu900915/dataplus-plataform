@@ -65,6 +65,21 @@ import { CategoriasItemView } from './components/CategoriasItemView';
 import { UsuariosView } from './components/UsuariosView';
 
 export const App: React.FC = () => {
+  // Limpiar claves obsoletas con datos ficticios previos para sincronizar con la interfaz limpia
+  useEffect(() => {
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith('dataplus_v1_') || k.startsWith('dataplus_v2_') || k.startsWith('dataplus_v3_') || k.startsWith('dataplus_storage_'))) {
+          keysToRemove.push(k);
+        }
+      }
+      keysToRemove.forEach(k => localStorage.removeItem(k));
+    } catch (e) {
+      // Ignorar restricciones en iframes
+    }
+  }, []);
   // Prevenir que quede cursor de texto o foco parpadeante en palabras o botones
   useEffect(() => {
     const handleMouseDown = (e: MouseEvent) => {

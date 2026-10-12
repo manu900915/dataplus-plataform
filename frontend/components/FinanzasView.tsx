@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { BanknotesIcon } from '@heroicon/react/24/outline';
 import { 
   DollarSign, 
   ShoppingCart, 
@@ -296,8 +295,8 @@ export const FinanzasView: React.FC<FinanzasViewProps> = ({
 
       {/* Modal Nueva Venta */}
       {isVentaModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="relative w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+        <div onClick={() => setIsVentaModalOpen(false)} className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div onClick={(e) => e.stopPropagation()} className="relative w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
               <h3 className="text-sm font-bold text-white">Registrar Factura / Venta</h3>
               <button onClick={() => setIsVentaModalOpen(false)} className="text-slate-400 hover:text-white">
@@ -373,8 +372,8 @@ export const FinanzasView: React.FC<FinanzasViewProps> = ({
 
       {/* Modal Nuevo Gasto */}
       {isGastoModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="relative w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+        <div onClick={() => setIsGastoModalOpen(false)} className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div onClick={(e) => e.stopPropagation()} className="relative w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
               <h3 className="text-sm font-bold text-white">Registrar Gasto Operativo</h3>
               <button onClick={() => setIsGastoModalOpen(false)} className="text-slate-400 hover:text-white">
