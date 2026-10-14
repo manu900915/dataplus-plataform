@@ -8,354 +8,771 @@
         $reporteTemporal = $this->getDatosReporteTemporal();
     @endphp
 
+    {{-- ============================================================
+         ESTILOS AUTO-CONTENIDOS Y HOMOGÉNEOS CON EL DISEÑO DE LA PLATAFORMA (IDENTICO A REPORTES)
+         ============================================================ --}}
     <style>
         [x-cloak] { display: none !important; }
+
         .dp-fact-wrap {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             color: #f1f5f9;
             width: 100%;
+            position: relative;
         }
-        /* Estilos consistentes con la plataforma DataPlus para todos los inputs flotantes */
-        .dp-modal-input {
+
+        /* ─── Contenedor de Filtros del Módulo (Pantalla) ─── */
+        .dp-filter-box {
+            border-radius: 1rem;
+            border: 1px solid #1e293b;
+            background: rgba(15, 23, 42, 0.95);
+            padding: 1.5rem;
+            margin-bottom: 2rem !important;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+        }
+
+        .dp-filter-nav {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            overflow-x: auto;
+            margin-bottom: 1.25rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid #1e293b;
+        }
+
+        .dp-period-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            border-radius: 0.6rem;
+            padding: 0.6rem 1.25rem;
+            font-size: 0.8rem;
+            font-weight: 700;
+            border: none;
+            background: transparent;
+            color: #94a3b8;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .dp-period-btn:hover {
+            background: rgba(30, 41, 59, 0.8);
+            color: #f1f5f9;
+        }
+
+        .dp-period-btn.active {
+            background: linear-gradient(90deg, #0ea5e9 0%, #0284c7 100%) !important;
+            color: #ffffff !important;
+            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.35);
+        }
+
+        .dp-period-btn.active-rose {
+            background: linear-gradient(90deg, #f43f5e 0%, #e11d48 100%) !important;
+            color: #ffffff !important;
+            box-shadow: 0 4px 12px rgba(244, 63, 94, 0.35);
+        }
+
+        .dp-inputs-row {
+            display: grid;
+            grid-template-columns: repeat(1, minmax(0, 1fr));
+            gap: 1rem;
+            align-items: flex-end;
+        }
+
+        @media (min-width: 640px) {
+            .dp-inputs-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+
+        @media (min-width: 1024px) {
+            .dp-inputs-row { grid-template-columns: 2fr 1.2fr 1.2fr 1.6fr; }
+        }
+
+        .dp-input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+
+        .dp-input-label {
+            font-size: 0.725rem;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .dp-input-field {
+            background-color: #020617;
+            border: 1px solid #334155;
+            border-radius: 0.5rem;
+            padding: 0.55rem 0.85rem;
+            color: #ffffff;
+            font-size: 0.825rem;
+            outline: none;
+            transition: border-color 0.15s ease;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .dp-input-field:focus {
+            border-color: #38bdf8;
+        }
+
+        select.dp-input-field,
+        select.dp-select-field {
+            appearance: none !important;
+            -webkit-appearance: none !important;
+            -moz-appearance: none !important;
             background-color: #020617 !important;
-            color: #f8fafc !important;
-            border: 1px solid #334155 !important;
-            border-radius: 0.75rem !important;
-            padding: 0.6rem 0.85rem !important;
-            font-size: 0.8125rem !important;
-            width: 100% !important;
-            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e") !important;
+            background-position: right 0.75rem center !important;
+            background-repeat: no-repeat !important;
+            background-size: 1.15rem 1.15rem !important;
+            padding-right: 2.5rem !important;
+            cursor: pointer;
         }
-        .dp-modal-input:focus {
-            border-color: #0284c7 !important;
-            outline: none !important;
-            box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.3) !important;
+
+        select.dp-input-field option,
+        select.dp-select-field option {
+            background-color: #0f172a !important;
+            color: #ffffff !important;
         }
-        .dp-modal-input option {
-            background-color: #020617 !important;
-            color: #f8fafc !important;
+
+        /* ─── Botones de Acción ─── */
+        .dp-btn-group-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            flex-wrap: wrap;
         }
-        .dp-card {
-            background-color: rgba(15, 23, 42, 0.75) !important;
-            border: 1px solid #1e293b !important;
-            border-radius: 1rem !important;
+
+        .dp-btn-primary {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.45rem;
+            border-radius: 0.5rem;
+            background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+            color: #ffffff;
+            padding: 0.6rem 1.25rem;
+            font-size: 0.825rem;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+            transition: all 0.2s ease;
+            height: 38px;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .dp-btn-primary:hover {
+            transform: translateY(-1px);
+            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+        }
+
+        .dp-btn-emerald {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.45rem;
+            border-radius: 0.5rem;
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            color: #ffffff;
+            padding: 0.5rem 1rem;
+            font-size: 0.775rem;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 4px 10px rgba(5, 150, 105, 0.25);
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .dp-btn-emerald:hover {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            transform: translateY(-1px);
+        }
+
+        .dp-btn-secondary {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.45rem;
+            border-radius: 0.5rem;
+            background: rgba(30, 41, 59, 0.9);
+            color: #38bdf8;
+            border: 1px solid rgba(56, 189, 248, 0.4);
+            padding: 0.5rem 0.9rem;
+            font-size: 0.775rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .dp-btn-secondary:hover {
+            background: rgba(56, 189, 248, 0.15);
+            border-color: #38bdf8;
+            color: #ffffff;
+        }
+
+        /* ─── Hero / Encabezado Principal (Idéntico a Reportes) ─── */
+        .dp-rep-hero {
+            position: relative;
+            overflow: hidden;
+            border-radius: 1.25rem;
+            background: linear-gradient(135deg, #0284c7 0%, #0369a1 55%, #075985 100%);
+            padding: 2rem 2.25rem;
+            color: #ffffff;
+            box-shadow: 0 20px 25px -5px rgba(8, 47, 73, 0.35);
+            margin-bottom: 2rem !important;
+        }
+
+        .dp-rep-hero-content {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+            justify-content: space-between;
+        }
+
+        @media (min-width: 768px) {
+            .dp-rep-hero-content {
+                flex-direction: row;
+                align-items: center;
+            }
+        }
+
+        .dp-rep-hero-tag {
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: rgba(224, 242, 254, 0.9);
+            margin: 0;
+        }
+
+        .dp-rep-hero-title {
+            margin-top: 0.35rem;
+            font-size: 1.85rem;
+            font-weight: 800;
+            letter-spacing: -0.025em;
+            color: #ffffff;
+            line-height: 1.2;
+        }
+
+        .dp-rep-hero-sub {
+            margin-top: 0.5rem;
+            font-size: 0.875rem;
+            color: rgba(224, 242, 254, 0.9);
+            font-weight: 500;
+        }
+
+        .dp-rep-hero-badge {
+            text-align: right;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 0.85rem;
+            padding: 0.85rem 1.35rem;
+            backdrop-filter: blur(10px);
+            min-width: 220px;
+        }
+
+        /* ─── Grids de Tarjetas KPI Superiores (Pantalla) ─── */
+        .dp-stat-grid-4 {
+            display: grid;
+            grid-template-columns: repeat(1, minmax(0, 1fr));
+            gap: 1.25rem;
+            margin-bottom: 2.25rem !important;
+        }
+
+        @media (min-width: 640px) {
+            .dp-stat-grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+
+        @media (min-width: 1024px) {
+            .dp-stat-grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        }
+
+        .dp-stat-card {
+            border-radius: 1rem;
+            border: 1px solid #1e293b;
+            background: rgba(15, 23, 42, 0.85);
+            padding: 1.35rem 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.15);
+            transition: all 0.2s ease;
+        }
+
+        .dp-stat-card:hover {
+            border-color: rgba(56, 189, 248, 0.45);
+            transform: translateY(-2px);
+        }
+
+        .dp-stat-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .dp-stat-label {
+            font-size: 0.775rem;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .dp-stat-num {
+            font-size: 1.65rem;
+            font-weight: 800;
+            color: #ffffff;
+            margin-top: 0.6rem;
+            line-height: 1.15;
+            letter-spacing: -0.02em;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+
+        .dp-stat-hint {
+            font-size: 0.725rem;
+            color: #94a3b8;
+            margin-top: 0.35rem;
+        }
+
+        /* ─── Paneles de Contenido (Pantalla) ─── */
+        .dp-panel {
+            border-radius: 1rem;
+            border: 1px solid #1e293b;
+            background: rgba(15, 23, 42, 0.85);
+            padding: 1.75rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.15);
+            margin-bottom: 2rem !important;
+        }
+
+        .dp-panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.35rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid rgba(30, 41, 59, 0.8);
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .dp-panel-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 0;
+        }
+
+        /* ─── Tablas de Datos del Reporte ─── */
+        .dp-table-wrap {
+            overflow-x: auto;
+            border-radius: 0.75rem;
+            border: 1px solid #1e293b;
+            background: rgba(2, 6, 23, 0.65);
+        }
+
+        .dp-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.775rem;
+            text-align: left;
+        }
+
+        .dp-table th {
+            background: rgba(15, 23, 42, 0.9);
+            color: #94a3b8;
+            padding: 0.75rem 1rem;
+            font-weight: 600;
+            border-bottom: 1px solid #1e293b;
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            letter-spacing: 0.05em;
+        }
+
+        .dp-table td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid rgba(30, 41, 59, 0.6);
+            color: #f1f5f9;
+        }
+
+        .dp-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .dp-table tr:hover td {
+            background: rgba(30, 41, 59, 0.4);
+        }
+
+        /* ─── Modales Flotantes DataPlus ─── */
+        .dp-modal-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 99999;
+            background: rgba(2, 6, 23, 0.88);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            overflow-y: auto;
+        }
+
+        .dp-modal-card {
+            background: #0f172a;
+            border: 1px solid #1e293b;
+            border-radius: 1rem;
+            width: 100%;
+            max-width: 560px;
+            padding: 1.75rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+            color: #f1f5f9;
+            position: relative;
+            margin: auto;
+        }
+
+        .dp-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #1e293b;
+            margin-bottom: 1.25rem;
+        }
+
+        .dp-modal-title {
+            font-size: 1.05rem;
+            font-weight: 800;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            margin: 0;
+        }
+
+        .dp-modal-close-btn {
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+            padding: 0.35rem;
+            border-radius: 0.4rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.15s ease;
+        }
+
+        .dp-modal-close-btn:hover {
+            color: #ffffff;
+            background: rgba(30, 41, 59, 0.6);
+        }
+
+        .dp-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.25rem 0.65rem;
+            border-radius: 9999px;
+            font-size: 0.725rem;
+            font-weight: 700;
+        }
+
+        .dp-badge-emerald {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .dp-badge-amber {
+            background: rgba(245, 158, 11, 0.15);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .dp-badge-rose {
+            background: rgba(244, 63, 94, 0.15);
+            color: #fb7185;
+            border: 1px solid rgba(244, 63, 94, 0.3);
         }
     </style>
 
-    <div class="dp-fact-wrap space-y-6">
-        {{-- ─── 1. BANNER PRINCIPAL DE PLAZO (ESTILO DATAPLUS) ─── --}}
-        <div class="rounded-2xl border border-sky-500/30 bg-gradient-to-r from-sky-950/70 via-slate-900 to-indigo-950/70 p-5 shadow-xl relative overflow-hidden">
-            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 relative z-10">
-                <div class="flex items-center gap-4">
-                    <div class="h-12 w-12 rounded-xl bg-sky-500/20 border border-sky-500/40 flex items-center justify-center text-sky-400 shrink-0">
-                        <x-heroicon-o-calendar-days class="h-6 w-6" />
+    <div class="dp-fact-wrap">
+        {{-- ================= PANEL DE FILTROS & NAVEGACIÓN SUPERIOR ================= --}}
+        <div class="dp-filter-box">
+            {{-- Pestañas principales con efecto glowing idéntico a Reportes --}}
+            <div class="dp-filter-nav">
+                <button type="button"
+                        wire:click="$set('activeTab', 'cobros')"
+                        class="dp-period-btn {{ $activeTab === 'cobros' ? 'active' : '' }}">
+                    <x-heroicon-o-table-cells style="width: 1rem; height: 1rem;" />
+                    <span>Control de Cobros Mensuales ({{ count($suscripciones) }})</span>
+                </button>
+                <button type="button"
+                        wire:click="$set('activeTab', 'semana')"
+                        class="dp-period-btn {{ $activeTab === 'semana' ? 'active' : '' }}">
+                    <x-heroicon-o-check-circle style="width: 1rem; height: 1rem;" />
+                    <span>Pagaron esta Semana ({{ count($pagosSemana) }})</span>
+                </button>
+                <button type="button"
+                        wire:click="$set('activeTab', 'deudores')"
+                        class="dp-period-btn {{ $activeTab === 'deudores' ? 'active-rose' : '' }}">
+                    <x-heroicon-o-exclamation-triangle style="width: 1rem; height: 1rem;" />
+                    <span>Mayores Deudores ({{ count($mayoresDeudores) }})</span>
+                </button>
+                <button type="button"
+                        wire:click="$set('activeTab', 'reporte')"
+                        class="dp-period-btn {{ $activeTab === 'reporte' ? 'active' : '' }}">
+                    <x-heroicon-o-chart-bar style="width: 1rem; height: 1rem;" />
+                    <span>Evolución & Comparativa Anual</span>
+                </button>
+            </div>
+
+            {{-- Fila de Parámetros y Acciones --}}
+            <div class="dp-inputs-row">
+                <div class="dp-input-group">
+                    <label class="dp-input-label">Buscar Cliente / Código / SIM</label>
+                    <input type="text"
+                           wire:model.live.debounce.300ms="busqueda"
+                           placeholder="Ej. Juan Pérez, SUB-001, 535284..."
+                           class="dp-input-field" />
+                </div>
+
+                <div class="dp-input-group">
+                    <label class="dp-input-label">Moneda</label>
+                    <select wire:model.live="filtroMoneda" class="dp-input-field dp-select-field">
+                        <option value="todas">Todas las Monedas</option>
+                        <option value="CUP">Pesos Cubanos (CUP)</option>
+                        <option value="USD">Dólares (USD)</option>
+                    </select>
+                </div>
+
+                <div class="dp-input-group">
+                    <label class="dp-input-label">Estado de Cobro</label>
+                    <select wire:model.live="filtroEstado" class="dp-input-field dp-select-field">
+                        <option value="todos">Todos los Estados</option>
+                        <option value="cobrados">Cobrados (Al Día)</option>
+                        <option value="pendientes">Pendientes (Días 1-15)</option>
+                        <option value="mora">En Mora (Vencidos)</option>
+                    </select>
+                </div>
+
+                <div class="dp-input-group">
+                    <label class="dp-input-label" style="opacity: 0;">Acción</label>
+                    <div class="dp-btn-group-actions">
+                        <button type="button"
+                                wire:click="$set('modalNuevaSubOpen', true)"
+                                class="dp-btn-primary"
+                                title="Crear nueva suscripción de servicio de Gestión Remota">
+                            <x-heroicon-m-plus style="width: 1.1rem; height: 1.1rem; stroke-width: 2.5;" />
+                            <span>Nueva Suscripción</span>
+                        </button>
                     </div>
-                    <div>
-                        <div class="flex flex-wrap items-center gap-2">
-                            <h2 class="text-lg font-bold text-white tracking-tight">Periodo de Cobro: Octubre 2026</h2>
-                            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">
-                                Mes Adelantado
-                            </span>
-                        </div>
-                        <p class="text-xs text-slate-300 mt-1">
-                            Norma operativa: El servicio de Gestión Remota se liquida en los <strong class="text-white">primeros 15 días</strong> del mes en curso.
+                </div>
+            </div>
+        </div>
+
+        {{-- ================= HERO BANNER PRINCIPAL (ESTILO REPORTE MENSUAL) ================= --}}
+        <div class="dp-rep-hero">
+            <div class="dp-rep-hero-content">
+                <div>
+                    <p class="dp-rep-hero-tag">
+                        Periodo de Cobro: Octubre 2026 · Mes Adelantado
+                    </p>
+                    <h1 class="dp-rep-hero-title">Facturación de Gestión Remota & Servicios Recurrentes</h1>
+                    <p class="dp-rep-hero-sub">
+                        DataPlus S.R.L. · 
+                        @if($metricas['periodo_vencido'])
+                            <strong style="color: #fecdd3;">Plazo Vencido: Cuentas no liquidadas en mora</strong>
+                        @else
+                            Plazo en curso: <strong style="color: #bae6fd;">{{ $metricas['dias_restantes_15'] }} días restantes</strong> (Día {{ $metricas['dia_del_mes'] }} de 15)
+                        @endif
+                        · Norma operativa: Liquidación en los primeros 15 días del mes.
+                    </p>
+                </div>
+                <div class="dp-rep-hero-badge">
+                    <p style="font-size: 0.65rem; text-transform: uppercase; font-weight: 700; color: #e0f2fe; margin: 0;">Recaudado Mes en Curso</p>
+                    <p style="font-size: 1.65rem; font-weight: 800; color: #ffffff; margin: 0.25rem 0 0; line-height: 1; font-family: ui-monospace, monospace;">
+                        ${{ number_format($metricas['recaudado_cup'], 2) }} <span style="font-size: 0.85rem; color: #7dd3fc;">CUP</span>
+                    </p>
+                    @if($metricas['recaudado_usd'] > 0)
+                        <p style="font-size: 0.8rem; font-weight: 700; color: #38bdf8; margin: 0.35rem 0 0; font-family: ui-monospace, monospace;">
+                            +${{ number_format($metricas['recaudado_usd'], 2) }} USD
                         </p>
+                    @endif
+                </div>
+            </div>
+        </div>
+
+        {{-- ================= 4 TARJETAS KPI (ESTILO IDÉNTICO A REPORTES) ================= --}}
+        <div class="dp-stat-grid-4">
+            {{-- 1. Recaudado CUP --}}
+            <div class="dp-stat-card">
+                <div class="dp-stat-top">
+                    <span class="dp-stat-label">Recaudado Octubre (CUP)</span>
+                    <div style="border-radius: 0.5rem; padding: 0.45rem; background: rgba(16, 185, 129, 0.15); color: #34d399;">
+                        <x-heroicon-o-banknotes style="width: 1.1rem; height: 1.1rem;" />
                     </div>
                 </div>
+                <p class="dp-stat-num" style="color: #34d399;">${{ number_format($metricas['recaudado_cup'], 2) }}</p>
+                <p class="dp-stat-hint">
+                    Pendiente por recaudar: <strong style="color: #fbbf24;">${{ number_format($metricas['pendiente_cup'], 2) }} CUP</strong>
+                </p>
+            </div>
 
-                <div class="flex flex-wrap items-center gap-3">
-                    <div class="bg-slate-950/90 border border-slate-800 rounded-xl px-4 py-2 text-center min-w-[120px]">
-                        <span class="text-[10px] uppercase font-bold text-slate-400 block">Día del mes actual</span>
-                        <div class="flex items-center justify-center gap-1 mt-0.5">
-                            <span class="text-lg font-black text-white font-mono">{{ $metricas['dia_del_mes'] }}</span>
-                            <span class="text-xs text-slate-500">/ 15</span>
-                        </div>
+            {{-- 2. Recaudado USD --}}
+            <div class="dp-stat-card">
+                <div class="dp-stat-top">
+                    <span class="dp-stat-label">Recaudado Octubre (USD)</span>
+                    <div style="border-radius: 0.5rem; padding: 0.45rem; background: rgba(14, 165, 233, 0.15); color: #38bdf8;">
+                        <x-heroicon-o-currency-dollar style="width: 1.1rem; height: 1.1rem;" />
                     </div>
+                </div>
+                <p class="dp-stat-num" style="color: #38bdf8;">${{ number_format($metricas['recaudado_usd'], 2) }}</p>
+                <p class="dp-stat-hint">
+                    Pendiente: <strong style="color: #38bdf8;">${{ number_format($metricas['pendiente_usd'], 2) }} USD</strong>
+                </p>
+            </div>
 
-                    @if($metricas['periodo_vencido'])
-                        <div class="bg-rose-500/10 border border-rose-500/30 rounded-xl px-4 py-2 text-center min-w-[130px]">
-                            <span class="text-[10px] uppercase font-bold block text-rose-400">Plazo Concluido</span>
-                            <span class="text-xs font-semibold text-rose-300">Cuentas en mora</span>
-                        </div>
-                    @else
-                        <div class="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-2 text-center min-w-[130px]">
-                            <span class="text-[10px] uppercase font-bold block text-amber-400">Plazo en Curso</span>
-                            <span class="text-xs font-bold font-mono text-amber-300">{{ $metricas['dias_restantes_15'] }} días restantes</span>
-                        </div>
+            {{-- 3. Deuda Acumulada --}}
+            <div class="dp-stat-card">
+                <div class="dp-stat-top">
+                    <span class="dp-stat-label">Deuda Acumulada</span>
+                    <div style="border-radius: 0.5rem; padding: 0.45rem; background: rgba(244, 63, 94, 0.15); color: #fb7185;">
+                        <x-heroicon-o-exclamation-triangle style="width: 1.1rem; height: 1.1rem;" />
+                    </div>
+                </div>
+                <p class="dp-stat-num" style="color: #fb7185;">${{ number_format($metricas['deuda_cup'], 2) }} <span style="font-size: 0.75rem; color: #94a3b8;">CUP</span></p>
+                <p class="dp-stat-hint">
+                    <strong style="color: #fb7185;">{{ $metricas['total_deudores'] }} clientes en mora</strong>
+                    @if($metricas['deuda_usd'] > 0)
+                        <span>(+ ${{ number_format($metricas['deuda_usd'], 2) }} USD)</span>
                     @endif
+                </p>
+            </div>
 
-                    <button 
-                        wire:click="$set('modalNuevaSubOpen', true)"
-                        type="button" 
-                        class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs transition-all shadow-lg shadow-sky-600/30 cursor-pointer">
-                        <x-heroicon-m-plus class="h-4 w-4 stroke-[2.5]" />
-                        <span>Nueva Suscripción</span>
-                    </button>
+            {{-- 4. Parque Gestión Remota --}}
+            <div class="dp-stat-card">
+                <div class="dp-stat-top">
+                    <span class="dp-stat-label">Parque Gestión Remota</span>
+                    <div style="border-radius: 0.5rem; padding: 0.45rem; background: rgba(168, 85, 247, 0.15); color: #c084fc;">
+                        <x-heroicon-o-signal style="width: 1.1rem; height: 1.1rem;" />
+                    </div>
                 </div>
+                <p class="dp-stat-num" style="color: #c084fc;">{{ $metricas['total_routers'] ?? count($suscripciones) }} <span style="font-size: 0.75rem; color: #94a3b8;">Routers</span></p>
+                <p class="dp-stat-hint">
+                    {{ $metricas['al_dia_count'] ?? 0 }} cobros al día ({{ $metricas['porcentaje_al_dia'] ?? 50 }}% cumplimiento)
+                </p>
             </div>
         </div>
 
-        {{-- ─── 2. TARJETAS DE MÉTRICAS KPI (ESTILO DASHBOARD DATAPLUS) ─── --}}
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {{-- Recaudado CUP --}}
-            <div class="dp-card p-5 border-l-4 border-l-emerald-500 shadow-md">
-                <div class="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
-                    <span>Recaudado Octubre (CUP)</span>
-                    <span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 text-[10px] font-mono font-bold border border-emerald-500/30">CUP</span>
-                </div>
-                <div class="text-2xl font-black text-white font-mono mt-1">
-                    ${{ number_format($metricas['recaudado_cup'], 2) }}
-                </div>
-                <div class="text-[11px] text-slate-400 mt-2 flex items-center justify-between border-t border-slate-800/80 pt-2">
-                    <span>Pendiente:</span>
-                    <span class="text-amber-400 font-mono font-bold">${{ number_format($metricas['pendiente_cup'], 2) }}</span>
-                </div>
-            </div>
-
-            {{-- Recaudado USD --}}
-            <div class="dp-card p-5 border-l-4 border-l-sky-500 shadow-md">
-                <div class="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
-                    <span>Recaudado Octubre (USD)</span>
-                    <span class="px-2 py-0.5 rounded bg-sky-500/15 text-sky-400 text-[10px] font-mono font-bold border border-sky-500/30">USD</span>
-                </div>
-                <div class="text-2xl font-black text-white font-mono mt-1">
-                    ${{ number_format($metricas['recaudado_usd'], 2) }}
-                </div>
-                <div class="text-[11px] text-slate-400 mt-2 flex items-center justify-between border-t border-slate-800/80 pt-2">
-                    <span>Pendiente:</span>
-                    <span class="text-amber-400 font-mono font-bold">${{ number_format($metricas['pendiente_usd'], 2) }}</span>
-                </div>
-            </div>
-
-            {{-- Deuda Acumulada --}}
-            <div class="dp-card p-5 border-l-4 border-l-rose-500 shadow-md">
-                <div class="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
-                    <span>Deuda Acumulada</span>
-                    <span class="px-2 py-0.5 rounded bg-rose-500/15 text-rose-400 text-[10px] font-mono font-bold border border-rose-500/30">En Mora</span>
-                </div>
-                <div class="flex items-baseline gap-2 mt-1">
-                    <span class="text-xl font-black text-rose-400 font-mono">${{ number_format($metricas['deuda_cup'], 0) }} CUP</span>
-                    <span class="text-slate-500">/</span>
-                    <span class="text-base font-bold text-rose-300 font-mono">${{ number_format($metricas['deuda_usd'], 0) }} USD</span>
-                </div>
-                <div class="text-[11px] text-slate-400 mt-2 flex items-center justify-between border-t border-slate-800/80 pt-2">
-                    <span>Clientes con Deuda:</span>
-                    <span class="text-rose-400 font-bold">{{ $metricas['total_deudores'] }} de {{ $metricas['total_clientes'] }}</span>
-                </div>
-            </div>
-
-            {{-- Parque Activo --}}
-            <div class="dp-card p-5 border-l-4 border-l-blue-500 shadow-md">
-                <div class="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
-                    <span>Parque Gestión Remota</span>
-                    <span class="px-2 py-0.5 rounded bg-blue-500/15 text-blue-400 text-[10px] font-mono font-bold border border-blue-500/30">4G LTE</span>
-                </div>
-                <div class="text-2xl font-black text-white font-mono mt-1">
-                    {{ $metricas['total_clientes'] }} <span class="text-xs font-normal text-slate-400">Routers</span>
-                </div>
-                <div class="text-[11px] text-slate-400 mt-2 flex items-center justify-between border-t border-slate-800/80 pt-2">
-                    <span>Cobros al día:</span>
-                    <span class="text-emerald-400 font-semibold">{{ $metricas['total_clientes'] - $metricas['total_deudores'] }} cuentas (50%)</span>
-                </div>
-            </div>
-        </div>
-
-        {{-- ─── 3. SELECTOR DE PESTAÑAS (TABS REACTIVOS) ─── --}}
-        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
-            <div class="flex gap-2 overflow-x-auto">
-                <button 
-                    wire:click="$set('activeTab', 'cobros')"
-                    type="button"
-                    class="px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 {{ $activeTab === 'cobros' ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30 shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent' }}">
-                    <x-heroicon-o-table-cells class="h-4 w-4" />
-                    <span>Control de Cobros Mensuales</span>
-                    <span class="px-1.5 py-0.5 rounded-full text-[10px] bg-slate-800 text-slate-300 font-mono font-bold">{{ count($suscripciones) }}</span>
-                </button>
-
-                <button 
-                    wire:click="$set('activeTab', 'semana')"
-                    type="button"
-                    class="px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 {{ $activeTab === 'semana' ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30 shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent' }}">
-                    <x-heroicon-o-check-circle class="h-4 w-4" />
-                    <span>Pagaron esta Semana</span>
-                    <span class="px-1.5 py-0.5 rounded-full text-[10px] bg-emerald-500/20 text-emerald-300 font-mono font-bold">{{ count($pagosSemana) }}</span>
-                </button>
-
-                <button 
-                    wire:click="$set('activeTab', 'deudores')"
-                    type="button"
-                    class="px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 {{ $activeTab === 'deudores' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30 shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent' }}">
-                    <x-heroicon-o-exclamation-triangle class="h-4 w-4" />
-                    <span>Mayores Deudores</span>
-                    @if(count($mayoresDeudores) > 0)
-                        <span class="px-1.5 py-0.5 rounded-full text-[10px] bg-rose-500 text-white font-mono font-bold">{{ count($mayoresDeudores) }}</span>
-                    @endif
-                </button>
-
-                <button 
-                    wire:click="$set('activeTab', 'reporte')"
-                    type="button"
-                    class="px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 {{ $activeTab === 'reporte' ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30 shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent' }}">
-                    <x-heroicon-o-chart-bar class="h-4 w-4" />
-                    <span>Reporte Temporal (Año/Sem/Trim/Mes)</span>
-                </button>
-            </div>
-        </div>
-
-        {{-- ─── TAB 1: CONTROL DE COBROS MENSUALES ─── --}}
+        {{-- ================= TAB 1: CONTROL DE COBROS MENSUALES ================= --}}
         @if($activeTab === 'cobros')
-            <div class="space-y-4">
-                {{-- Barra de Filtros --}}
-                <div class="flex flex-col sm:flex-row gap-3 items-center justify-between bg-slate-900/80 p-3 rounded-2xl border border-slate-800 shadow-sm">
-                    <div class="flex items-center gap-2 w-full sm:w-auto">
-                        <div class="relative w-full sm:w-80">
-                            <input 
-                                wire:model.live.debounce.300ms="busqueda"
-                                type="text" 
-                                placeholder="Buscar por cliente, código, SIM..."
-                                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500" />
-                        </div>
-                    </div>
-
-                    <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
-                        <div class="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
-                            <span class="text-[11px] font-semibold text-slate-400 px-2">Moneda:</span>
-                            <button 
-                                wire:click="$set('filtroMoneda', 'todas')"
-                                class="px-2.5 py-1 rounded-lg font-bold text-xs cursor-pointer {{ $filtroMoneda === 'todas' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white' }}">
-                                Todas
-                            </button>
-                            <button 
-                                wire:click="$set('filtroMoneda', 'CUP')"
-                                class="px-2.5 py-1 rounded-lg font-bold text-xs cursor-pointer {{ $filtroMoneda === 'CUP' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white' }}">
-                                CUP
-                            </button>
-                            <button 
-                                wire:click="$set('filtroMoneda', 'USD')"
-                                class="px-2.5 py-1 rounded-lg font-bold text-xs cursor-pointer {{ $filtroMoneda === 'USD' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white' }}">
-                                USD
-                            </button>
-                        </div>
-
-                        <div class="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
-                            <span class="text-[11px] font-semibold text-slate-400 px-2">Estado:</span>
-                            <button 
-                                wire:click="$set('filtroEstado', 'todos')"
-                                class="px-2.5 py-1 rounded-lg font-bold text-xs cursor-pointer {{ $filtroEstado === 'todos' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white' }}">
-                                Todos
-                            </button>
-                            <button 
-                                wire:click="$set('filtroEstado', 'cobrados')"
-                                class="px-2.5 py-1 rounded-lg font-bold text-xs cursor-pointer {{ $filtroEstado === 'cobrados' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white' }}">
-                                Cobrados
-                            </button>
-                            <button 
-                                wire:click="$set('filtroEstado', 'pendientes')"
-                                class="px-2.5 py-1 rounded-lg font-bold text-xs cursor-pointer {{ $filtroEstado === 'pendientes' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white' }}">
-                                Pendientes
-                            </button>
-                            <button 
-                                wire:click="$set('filtroEstado', 'mora')"
-                                class="px-2.5 py-1 rounded-lg font-bold text-xs cursor-pointer {{ $filtroEstado === 'mora' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white' }}">
-                                En Mora
-                            </button>
-                        </div>
-                    </div>
+            <div class="dp-panel">
+                <div class="dp-panel-header">
+                    <h3 class="dp-panel-title">
+                        <x-heroicon-o-receipt-percent style="width: 1.1rem; height: 1.1rem; color: #38bdf8;" />
+                        Planilla General de Cobros de Gestión Remota & Servicios Recurrentes
+                    </h3>
+                    <span style="font-size: 0.75rem; color: #38bdf8; font-weight: 700; background: rgba(14, 165, 233, 0.15); padding: 0.25rem 0.75rem; border-radius: 0.35rem; border: 1px solid rgba(14, 165, 233, 0.3);">
+                        {{ count($suscripciones) }} Servicios Registrados
+                    </span>
                 </div>
 
-                {{-- Tabla de Cobros --}}
-                <div class="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/80 shadow-md">
-                    <table class="w-full text-left text-xs text-slate-200">
-                        <thead class="bg-slate-950/80 text-[11px] font-semibold uppercase tracking-wider text-slate-400 border-b border-slate-800">
+                <div class="dp-table-wrap">
+                    <table class="dp-table">
+                        <thead>
                             <tr>
-                                <th class="px-4 py-3">Código</th>
-                                <th class="px-4 py-3">Cliente / Teléfono</th>
-                                <th class="px-4 py-3">Solución / SIM</th>
-                                <th class="px-4 py-3">Mensualidad</th>
-                                <th class="px-4 py-3">Deuda Anterior</th>
-                                <th class="px-4 py-3 font-bold text-white">Total a Cobrar</th>
-                                <th class="px-4 py-3 text-center">Estado</th>
-                                <th class="px-4 py-3 text-center">Acciones</th>
+                                <th>Código</th>
+                                <th>Cliente / Teléfono</th>
+                                <th>Solución / SIM</th>
+                                <th style="text-align: right;">Mensualidad</th>
+                                <th style="text-align: right;">Deuda Previa</th>
+                                <th style="text-align: right; color: #ffffff;">Total Exigible</th>
+                                <th style="text-align: center;">Estado</th>
+                                <th style="text-align: center;">Acciones</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-800/80">
+                        <tbody>
                             @forelse($suscripciones as $sub)
                                 @php
                                     $esMora = $sub->estado_cobro_mes_actual === 'En_Mora' || $sub->tiene_deuda;
                                     $esCobrado = $sub->estado_cobro_mes_actual === 'Al_Dia';
                                     $esPendiente = $sub->estado_cobro_mes_actual === 'Pendiente';
                                 @endphp
-                                <tr class="hover:bg-slate-800/40 transition-colors">
-                                    <td class="px-4 py-3.5 font-mono font-bold text-white whitespace-nowrap">
+                                <tr>
+                                    <td style="font-family: ui-monospace, monospace; font-weight: 700; color: #38bdf8;">
                                         {{ $sub->codigo }}
                                     </td>
-                                    <td class="px-4 py-3.5">
-                                        <div class="font-bold text-white">{{ $sub->cliente_nombre }}</div>
+                                    <td>
+                                        <div style="font-weight: 700; color: #ffffff;">{{ $sub->cliente_nombre }}</div>
                                         @if($sub->cliente_telefono)
-                                            <div class="text-[11px] text-slate-400 font-mono mt-0.5 flex items-center gap-1">
-                                                <x-heroicon-m-phone class="h-3 w-3 inline text-slate-500" />
-                                                <span>{{ $sub->cliente_telefono }}</span>
+                                            <div style="font-size: 0.7rem; color: #94a3b8; font-family: ui-monospace, monospace; margin-top: 2px;">
+                                                ☎ {{ $sub->cliente_telefono }}
                                             </div>
                                         @endif
                                     </td>
-                                    <td class="px-4 py-3.5">
-                                        <div class="text-slate-200">{{ $sub->tipo_solucion ?: $sub->nombre_servicio }}</div>
-                                        <div class="text-[11px] text-slate-400 font-mono mt-0.5">
+                                    <td>
+                                        <div style="color: #f1f5f9; font-weight: 500;">{{ $sub->tipo_solucion ?: $sub->nombre_servicio }}</div>
+                                        <div style="font-size: 0.7rem; color: #64748b; font-family: ui-monospace, monospace; margin-top: 2px;">
                                             SIM: {{ $sub->sim_numero ?: 'Sin asignar' }}
                                         </div>
                                     </td>
-                                    <td class="px-4 py-3.5 font-mono font-semibold text-slate-200 whitespace-nowrap">
+                                    <td style="text-align: right; font-family: ui-monospace, monospace; font-weight: 600; color: #e2e8f0;">
                                         ${{ number_format($sub->tarifa_mensual, 2) }} {{ $sub->moneda }}
                                     </td>
-                                    <td class="px-4 py-3.5 whitespace-nowrap">
+                                    <td style="text-align: right; font-family: ui-monospace, monospace;">
                                         @if($sub->tiene_deuda && $sub->deuda_acumulada > 0)
-                                            <div class="text-rose-400 font-mono font-bold">
-                                                +${{ number_format($sub->deuda_acumulada, 2) }}
-                                            </div>
-                                            <div class="text-[10px] text-slate-500">
-                                                ({{ $sub->meses_deuda_count }} {{ $sub->meses_deuda_count === 1 ? 'mes' : 'meses' }})
-                                            </div>
+                                            <span style="color: #fb7185; font-weight: 700;">+${{ number_format($sub->deuda_acumulada, 2) }}</span>
+                                            <div style="font-size: 0.65rem; color: #94a3b8;">({{ $sub->meses_deuda_count }}m)</div>
                                         @else
-                                            <span class="text-slate-500 font-mono">$0.00</span>
+                                            <span style="color: #64748b;">$0.00</span>
                                         @endif
                                     </td>
-                                    <td class="px-4 py-3.5 font-mono font-black text-white text-sm whitespace-nowrap">
+                                    <td style="text-align: right; font-family: ui-monospace, monospace; font-weight: 800; color: #ffffff; font-size: 0.85rem;">
                                         ${{ number_format($sub->monto_a_cobrar, 2) }} {{ $sub->moneda }}
                                     </td>
-                                    <td class="px-4 py-3.5 text-center whitespace-nowrap">
+                                    <td style="text-align: center;">
                                         @if($esMora)
-                                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30">
-                                                <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5" />
+                                            <span class="dp-badge dp-badge-rose">
+                                                <x-heroicon-m-exclamation-triangle style="width: 0.9rem; height: 0.9rem;" />
                                                 <span>En Mora</span>
                                             </span>
                                         @elseif($esCobrado)
-                                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                                                <x-heroicon-m-check class="h-3.5 w-3.5 stroke-[2.5]" />
+                                            <span class="dp-badge dp-badge-emerald">
+                                                <x-heroicon-m-check style="width: 0.9rem; height: 0.9rem; stroke-width: 2.5;" />
                                                 <span>Cobrado</span>
                                             </span>
                                         @else
-                                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
-                                                <x-heroicon-m-clock class="h-3.5 w-3.5" />
-                                                <span>Pendiente (Día 1-15)</span>
+                                            <span class="dp-badge dp-badge-amber">
+                                                <x-heroicon-m-clock style="width: 0.9rem; height: 0.9rem;" />
+                                                <span>Pendiente (1-15)</span>
                                             </span>
                                         @endif
                                     </td>
-                                    <td class="px-4 py-3.5 text-center whitespace-nowrap">
-                                        <div class="flex items-center justify-center gap-2">
+                                    <td style="text-align: center;">
+                                        <div style="display: inline-flex; align-items: center; gap: 0.4rem; justify-content: center;">
                                             @if($esCobrado)
-                                                <button 
-                                                    wire:click="abrirModalRecibo({{ $sub->id }})"
-                                                    type="button" 
-                                                    class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-400 font-bold text-xs border border-slate-700 transition-all cursor-pointer">
-                                                    <x-heroicon-m-receipt-percent class="h-3.5 w-3.5" />
+                                                <button type="button"
+                                                        wire:click="abrirModalRecibo({{ $sub->id }})"
+                                                        class="dp-btn-secondary"
+                                                        title="Ver Recibo Oficial de Cobro">
+                                                    <x-heroicon-m-receipt-percent style="width: 0.9rem; height: 0.9rem;" />
                                                     <span>Recibo</span>
                                                 </button>
                                             @else
-                                                <button 
-                                                    wire:click="abrirModalPago({{ $sub->id }})"
-                                                    type="button" 
-                                                    class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-md shadow-emerald-500/20 transition-all cursor-pointer">
-                                                    <x-heroicon-m-credit-card class="h-3.5 w-3.5" />
+                                                <button type="button"
+                                                        wire:click="abrirModalPago({{ $sub->id }})"
+                                                        class="dp-btn-emerald"
+                                                        title="Registrar cobranza efectuada">
+                                                    <x-heroicon-m-credit-card style="width: 0.9rem; height: 0.9rem;" />
                                                     <span>Cobrar</span>
                                                 </button>
                                             @endif
@@ -365,12 +782,11 @@
                                                     $tel = preg_replace('/[^0-9]/', '', $sub->cliente_telefono);
                                                     $msg = rawurlencode("Hola {$sub->cliente_nombre}, le contactamos de DataPlus para recordarle el pago de su servicio mensual de Gestión Remota por un total de $" . number_format($sub->monto_a_cobrar, 2) . " {$sub->moneda}. Recuerde enviar el comprobante de su transferencia a este chat. ¡Muchas gracias!");
                                                 @endphp
-                                                <a 
-                                                    href="https://wa.me/{{ $tel }}?text={{ $msg }}"
-                                                    target="_blank"
-                                                    title="Cobrar por WhatsApp"
-                                                    class="p-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition-all">
-                                                    <x-heroicon-m-chat-bubble-left-ellipsis class="h-4 w-4" />
+                                                <a href="https://wa.me/{{ $tel }}?text={{ $msg }}"
+                                                   target="_blank"
+                                                   title="Contactar y Cobrar por WhatsApp"
+                                                   style="display: inline-flex; align-items: center; justify-content: center; padding: 0.45rem; border-radius: 0.5rem; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); text-decoration: none;">
+                                                    <x-heroicon-m-chat-bubble-left-ellipsis style="width: 1rem; height: 1rem;" />
                                                 </a>
                                             @endif
                                         </div>
@@ -378,8 +794,8 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="text-center py-8 text-slate-500">
-                                        No se encontraron registros con los filtros seleccionados.
+                                    <td colspan="8" style="text-align: center; padding: 2.5rem 1rem; color: #64748b;">
+                                        No se encontraron suscripciones con los filtros seleccionados.
                                     </td>
                                 </tr>
                             @endforelse
@@ -389,85 +805,134 @@
             </div>
         @endif
 
-        {{-- ─── TAB 2: PAGARON ESTA SEMANA ─── --}}
+        {{-- ================= TAB 2: PAGARON ESTA SEMANA ================= --}}
         @if($activeTab === 'semana')
-            <div class="space-y-4">
-                <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-md">
-                    <h3 class="text-sm font-bold text-white flex items-center gap-2 mb-3">
-                        <x-heroicon-o-check-circle class="h-5 w-5 text-emerald-400" />
-                        <span>Clientes con Pago Registrado esta Semana</span>
+            <div class="dp-panel">
+                <div class="dp-panel-header">
+                    <h3 class="dp-panel-title">
+                        <x-heroicon-o-check-circle style="width: 1.1rem; height: 1.1rem; color: #34d399;" />
+                        Clientes con Pago Registrado esta Semana
                     </h3>
-                    <div class="divide-y divide-slate-800">
-                        @forelse($pagosSemana as $pago)
-                            <div class="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                <div>
-                                    <div class="font-bold text-white text-xs">{{ $pago->cliente_nombre }}</div>
-                                    <div class="text-[11px] text-slate-400 mt-0.5">
-                                        Código: <span class="font-mono text-sky-400">{{ $pago->codigo_pago }}</span> · Fecha: {{ $pago->fecha_pago }} · Método: {{ $pago->metodo_pago }}
-                                    </div>
-                                </div>
-                                <div class="text-right">
-                                    <span class="font-mono font-black text-emerald-400 text-sm">
+                    <span style="font-size: 0.75rem; color: #34d399; font-weight: 700; background: rgba(16, 185, 129, 0.15); padding: 0.25rem 0.75rem; border-radius: 0.35rem; border: 1px solid rgba(16, 185, 129, 0.3);">
+                        {{ count($pagosSemana) }} Cobros Liquidados
+                    </span>
+                </div>
+
+                <div class="dp-table-wrap">
+                    <table class="dp-table">
+                        <thead>
+                            <tr>
+                                <th>Código Pago</th>
+                                <th>Cliente</th>
+                                <th>Fecha de Pago</th>
+                                <th>Método / Vía</th>
+                                <th style="text-align: right;">Monto Liquidado</th>
+                                <th style="text-align: center;">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($pagosSemana as $pago)
+                                <tr>
+                                    <td style="font-family: ui-monospace, monospace; font-weight: 700; color: #38bdf8;">
+                                        {{ $pago->codigo_pago }}
+                                    </td>
+                                    <td style="font-weight: 700; color: #ffffff;">
+                                        {{ $pago->cliente_nombre }}
+                                    </td>
+                                    <td style="font-family: ui-monospace, monospace; color: #94a3b8;">
+                                        {{ $pago->fecha_pago }}
+                                    </td>
+                                    <td>
+                                        <span class="dp-badge dp-badge-emerald">
+                                            {{ $pago->metodo_pago }}
+                                        </span>
+                                    </td>
+                                    <td style="text-align: right; font-family: ui-monospace, monospace; font-weight: 800; color: #34d399; font-size: 0.85rem;">
                                         +${{ number_format($pago->monto_pagado, 2) }} {{ $pago->moneda }}
-                                    </span>
-                                </div>
-                            </div>
-                        @empty
-                            <div class="text-center py-6 text-slate-500 text-xs">
-                                No hay cobros registrados en los últimos 7 días.
-                            </div>
-                        @endforelse
-                    </div>
+                                    </td>
+                                    <td style="text-align: center;">
+                                        <button type="button"
+                                                wire:click="abrirModalRecibo({{ $pago->suscripcion_id ?? 1 }})"
+                                                class="dp-btn-secondary">
+                                            <x-heroicon-m-receipt-percent style="width: 0.9rem; height: 0.9rem;" />
+                                            <span>Recibo</span>
+                                        </button>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="6" style="text-align: center; padding: 2.5rem 1rem; color: #64748b;">
+                                        No hay cobros registrados en los últimos 7 días.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
                 </div>
             </div>
         @endif
 
-        {{-- ─── TAB 3: MAYORES DEUDORES ─── --}}
+        {{-- ================= TAB 3: MAYORES DEUDORES ================= --}}
         @if($activeTab === 'deudores')
-            <div class="space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="dp-panel">
+                <div class="dp-panel-header">
+                    <h3 class="dp-panel-title">
+                        <x-heroicon-o-exclamation-triangle style="width: 1.1rem; height: 1.1rem; color: #fb7185;" />
+                        Clientes con Deuda Acumulada y Cuentas en Mora
+                    </h3>
+                    <span style="font-size: 0.75rem; color: #fb7185; font-weight: 700; background: rgba(244, 63, 94, 0.15); padding: 0.25rem 0.75rem; border-radius: 0.35rem; border: 1px solid rgba(244, 63, 94, 0.3);">
+                        {{ count($mayoresDeudores) }} Clientes en Mora
+                    </span>
+                </div>
+
+                <div class="dp-stat-grid-4" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
                     @forelse($mayoresDeudores as $d)
-                        <div class="rounded-2xl border border-rose-900/40 bg-slate-900/80 p-5 shadow-lg space-y-3">
-                            <div class="flex items-center justify-between">
-                                <span class="font-mono text-xs font-bold text-rose-400 bg-rose-500/10 px-2.5 py-0.5 rounded-full border border-rose-500/20">
+                        <div class="dp-stat-card" style="border-color: rgba(244, 63, 94, 0.35); background: rgba(15, 23, 42, 0.9);">
+                            <div class="dp-stat-top">
+                                <span class="dp-badge dp-badge-rose">
                                     {{ $d->codigo }}
                                 </span>
-                                <span class="text-xs font-bold text-rose-400 font-mono">
+                                <span style="font-size: 0.75rem; font-weight: 700; color: #fb7185; font-family: ui-monospace, monospace;">
                                     {{ $d->meses_deuda_count }} meses atrasados
                                 </span>
                             </div>
-                            <div>
-                                <h4 class="text-sm font-bold text-white">{{ $d->cliente_nombre }}</h4>
-                                <p class="text-xs text-slate-400 mt-0.5">{{ $d->tipo_solucion ?: $d->nombre_servicio }}</p>
-                            </div>
-                            <div class="flex items-center justify-between pt-2 border-t border-slate-800 text-xs">
+                            <h4 style="margin: 0.75rem 0 0.2rem; font-size: 0.95rem; font-weight: 800; color: #ffffff;">
+                                {{ $d->cliente_nombre }}
+                            </h4>
+                            <p style="font-size: 0.75rem; color: #94a3b8; margin: 0 0 1rem;">
+                                {{ $d->tipo_solucion ?: $d->nombre_servicio }}
+                            </p>
+                            <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #1e293b; padding-top: 0.75rem;">
                                 <div>
-                                    <span class="text-[11px] text-slate-400">Total con mora:</span>
-                                    <p class="text-base font-black font-mono text-rose-400">
+                                    <span style="font-size: 0.65rem; text-transform: uppercase; color: #94a3b8; font-weight: 600; display: block;">Total con mora:</span>
+                                    <span style="font-size: 1.15rem; font-weight: 900; color: #fb7185; font-family: ui-monospace, monospace;">
                                         ${{ number_format($d->monto_a_cobrar, 2) }} {{ $d->moneda }}
-                                    </p>
+                                    </span>
                                 </div>
-                                <div class="flex items-center gap-2">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
                                     @if($d->cliente_telefono)
                                         @php
                                             $telD = preg_replace('/[^0-9]/', '', $d->cliente_telefono);
                                             $msgD = rawurlencode("Hola {$d->cliente_nombre}, le contactamos de DataPlus para recordarle que presenta {$d->meses_deuda_count} meses pendientes de pago por su servicio de Gestión Remota. El monto total es de $" . number_format($d->monto_a_cobrar, 2) . " {$d->moneda}. Le solicitamos realizar la liquidación a la brevedad.");
                                         @endphp
-                                        <a href="https://wa.me/{{ $telD }}?text={{ $msgD }}" target="_blank" class="p-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                                            <x-heroicon-m-chat-bubble-left-ellipsis class="h-4 w-4" />
+                                        <a href="https://wa.me/{{ $telD }}?text={{ $msgD }}"
+                                           target="_blank"
+                                           title="Contactar vía WhatsApp"
+                                           style="display: inline-flex; align-items: center; justify-content: center; padding: 0.5rem; border-radius: 0.5rem; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); text-decoration: none;">
+                                            <x-heroicon-m-chat-bubble-left-ellipsis style="width: 1rem; height: 1rem;" />
                                         </a>
                                     @endif
-                                    <button 
-                                        wire:click="abrirModalPago({{ $d->id }})"
-                                        type="button" 
-                                        class="px-3 py-1.5 rounded-xl bg-rose-500 hover:bg-rose-400 text-slate-950 font-bold text-xs shadow-md shadow-rose-500/20 cursor-pointer">
+                                    <button type="button"
+                                            wire:click="abrirModalPago({{ $d->id }})"
+                                            class="dp-btn-primary"
+                                            style="height: 32px; padding: 0.4rem 0.85rem; font-size: 0.75rem; background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%); box-shadow: 0 4px 10px rgba(244, 63, 94, 0.3);">
                                         Cobrar
                                     </button>
                                 </div>
                             </div>
                         </div>
                     @empty
-                        <div class="col-span-2 text-center py-8 text-slate-500 text-xs">
+                        <div style="grid-column: 1 / -1; text-align: center; padding: 3rem 1rem; color: #64748b;">
                             Excelente: No existen clientes con mora registrada.
                         </div>
                     @endforelse
@@ -475,66 +940,69 @@
             </div>
         @endif
 
-        {{-- ─── TAB 4: REPORTE TEMPORAL CON GRÁFICA ESTILIZADA (LINE & EVOLUTION) ─── --}}
+        {{-- ================= TAB 4: REPORTE TEMPORAL CON GRÁFICA ================= --}}
         @if($activeTab === 'reporte')
-            <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl space-y-6">
-                {{-- Encabezado del Reporte --}}
-                <div class="flex flex-col sm:flex-row items-center justify-between pb-4 border-b border-slate-800 gap-3">
+            <div class="dp-panel">
+                <div class="dp-panel-header">
                     <div>
-                        <h3 class="text-base font-bold text-white flex items-center gap-2">
-                            <x-heroicon-o-presentation-chart-line class="h-5 w-5 text-sky-400" />
-                            <span>Evolución Temporal & Comparativa de Recaudación (2026)</span>
+                        <h3 class="dp-panel-title">
+                            <x-heroicon-o-presentation-chart-line style="width: 1.1rem; height: 1.1rem; color: #38bdf8;" />
+                            Evolución Temporal & Comparativa de Recaudación (2026)
                         </h3>
-                        <p class="text-xs text-slate-400 mt-0.5">
+                        <p style="font-size: 0.75rem; color: #94a3b8; margin: 0.25rem 0 0;">
                             Comportamiento histórico y cumplimiento mensual del servicio de Gestión Remota.
                         </p>
                     </div>
 
                     {{-- Selector de Periodicidad --}}
-                    <div class="flex items-center p-1 bg-slate-950 rounded-xl border border-slate-800 text-xs shadow-inner">
-                        <button 
-                            wire:click="$set('periodoReporte', 'mensual')"
-                            class="px-3.5 py-1.5 rounded-lg font-bold cursor-pointer transition-all {{ $periodoReporte === 'mensual' ? 'bg-sky-600 text-white shadow-md' : 'text-slate-400 hover:text-white' }}">
+                    <div style="display: flex; gap: 0.35rem; background: #020617; padding: 0.25rem; border-radius: 0.5rem; border: 1px solid #1e293b;">
+                        <button type="button"
+                                wire:click="$set('periodoReporte', 'mensual')"
+                                class="dp-period-btn {{ $periodoReporte === 'mensual' ? 'active' : '' }}"
+                                style="padding: 0.35rem 0.75rem; font-size: 0.75rem;">
                             Mensual
                         </button>
-                        <button 
-                            wire:click="$set('periodoReporte', 'trimestral')"
-                            class="px-3.5 py-1.5 rounded-lg font-bold cursor-pointer transition-all {{ $periodoReporte === 'trimestral' ? 'bg-sky-600 text-white shadow-md' : 'text-slate-400 hover:text-white' }}">
+                        <button type="button"
+                                wire:click="$set('periodoReporte', 'trimestral')"
+                                class="dp-period-btn {{ $periodoReporte === 'trimestral' ? 'active' : '' }}"
+                                style="padding: 0.35rem 0.75rem; font-size: 0.75rem;">
                             Trimestral
                         </button>
-                        <button 
-                            wire:click="$set('periodoReporte', 'semestral')"
-                            class="px-3.5 py-1.5 rounded-lg font-bold cursor-pointer transition-all {{ $periodoReporte === 'semestral' ? 'bg-sky-600 text-white shadow-md' : 'text-slate-400 hover:text-white' }}">
+                        <button type="button"
+                                wire:click="$set('periodoReporte', 'semestral')"
+                                class="dp-period-btn {{ $periodoReporte === 'semestral' ? 'active' : '' }}"
+                                style="padding: 0.35rem 0.75rem; font-size: 0.75rem;">
                             Semestral
                         </button>
-                        <button 
-                            wire:click="$set('periodoReporte', 'anual')"
-                            class="px-3.5 py-1.5 rounded-lg font-bold cursor-pointer transition-all {{ $periodoReporte === 'anual' ? 'bg-sky-600 text-white shadow-md' : 'text-slate-400 hover:text-white' }}">
+                        <button type="button"
+                                wire:click="$set('periodoReporte', 'anual')"
+                                class="dp-period-btn {{ $periodoReporte === 'anual' ? 'active' : '' }}"
+                                style="padding: 0.35rem 0.75rem; font-size: 0.75rem;">
                             Anual
                         </button>
                     </div>
                 </div>
 
-                {{-- CANVAS SVG DE LA GRÁFICA ESTILIZADA DE LA PLATAFORMA --}}
-                <div class="rounded-xl border border-slate-800 bg-slate-950/70 p-5 space-y-4">
+                {{-- Contenedor de la Gráfica --}}
+                <div style="background: rgba(2, 6, 23, 0.75); border: 1px solid #1e293b; border-radius: 0.75rem; padding: 1.5rem; margin-bottom: 1.5rem;">
                     {{-- Leyenda --}}
-                    <div class="flex flex-wrap items-center justify-between gap-3 text-xs border-b border-slate-800/80 pb-3">
-                        <div class="flex items-center gap-6">
-                            <div class="flex items-center gap-2">
-                                <span class="w-4 h-[3px] bg-emerald-400 rounded-full shadow-sm shadow-emerald-400/50"></span>
-                                <span class="text-slate-200 font-semibold">Recaudación CUP</span>
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 0.75rem; margin-bottom: 1rem; font-size: 0.75rem;">
+                        <div style="display: flex; gap: 1.5rem; align-items: center;">
+                            <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                <span style="width: 14px; height: 3px; background: #34d399; border-radius: 2px;"></span>
+                                <span style="color: #e2e8f0; font-weight: 600;">Recaudación CUP</span>
                             </div>
-                            <div class="flex items-center gap-2">
-                                <span class="w-4 h-[2px] border-b-2 border-dashed border-sky-400"></span>
-                                <span class="text-sky-300">Recaudación USD</span>
+                            <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                <span style="width: 14px; height: 2px; border-bottom: 2px dashed #38bdf8;"></span>
+                                <span style="color: #7dd3fc;">Recaudación USD</span>
                             </div>
-                            <div class="flex items-center gap-2">
-                                <span class="w-4 h-[1.5px] border-b border-dotted border-amber-400/70"></span>
-                                <span class="text-slate-400">Meta Mensual (~$24,500 CUP)</span>
+                            <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                <span style="width: 14px; height: 1.5px; border-bottom: 1.5px dotted #fbbf24;"></span>
+                                <span style="color: #94a3b8;">Meta Mensual (~$24,500 CUP)</span>
                             </div>
                         </div>
-                        <div class="text-[11px] font-mono text-slate-400">
-                            Año Fiscal 2026 · Mes en curso: <strong class="text-emerald-400">Octubre</strong>
+                        <div style="color: #94a3b8; font-family: ui-monospace, monospace;">
+                            Año Fiscal 2026 · Mes actual: <strong style="color: #34d399;">Octubre</strong>
                         </div>
                     </div>
 
@@ -558,109 +1026,81 @@
                             $puntos[] = [
                                 'x' => $x,
                                 'y' => $y,
-                                'periodo' => $f['periodo'] ?? '',
-                                'cup' => $monto,
-                                'usd' => $f['usd_cobrado'] ?? 0,
-                                'cumplimiento' => $f['cumplimiento'] ?? '0%'
+                                'monto' => $monto,
+                                'usd' => floatval($f['usd_cobrado'] ?? 0),
+                                'label' => $f['etiqueta'] ?? "P{$idx}",
+                                'pct' => $f['porcentaje_meta'] ?? 0
                             ];
                         }
-
-                        $pathLine = '';
-                        if (count($puntos) > 0) {
-                            $pathLine = 'M ' . $puntos[0]['x'] . ' ' . $puntos[0]['y'];
-                            for ($i = 0; $i < count($puntos) - 1; $i++) {
-                                $p0 = $puntos[$i];
-                                $p1 = $puntos[$i + 1];
-                                $cx = $p0['x'] + ($p1['x'] - $p0['x']) / 2;
-                                $pathLine .= " C {$cx} {$p0['y']}, {$cx} {$p1['y']}, {$p1['x']} {$p1['y']}";
-                            }
-                        }
-                        $areaLine = count($puntos) > 0 
-                            ? $pathLine . ' L ' . $puntos[count($puntos)-1]['x'] . ' ' . ($svgH - $padY) . ' L ' . $puntos[0]['x'] . ' ' . ($svgH - $padY) . ' Z'
-                            : '';
+                        $polylinePoints = implode(' ', array_map(fn($p) => "{$p['x']},{$p['y']}", $puntos));
+                        $areaPoints = "{$padX}," . ($svgH - $padY) . " " . $polylinePoints . " " . ($svgW - $padX) . "," . ($svgH - $padY);
                     @endphp
 
-                    <div class="w-full overflow-x-auto">
-                        <svg viewBox="0 0 {{ $svgW }} {{ $svgH }}" class="w-full min-w-[650px] h-60 overflow-visible">
+                    <div style="width: 100%; overflow-x: auto;">
+                        <svg viewBox="0 0 {{ $svgW }} {{ $svgH }}" style="width: 100%; min-width: 650px; height: auto;" preserveAspectRatio="xMidYMid meet">
                             <defs>
-                                <linearGradient id="dpLineGradient" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stop-color="#10b981" stop-opacity="0.25" />
+                                <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stop-color="#10b981" stop-opacity="0.35" />
                                     <stop offset="100%" stop-color="#10b981" stop-opacity="0.0" />
                                 </linearGradient>
                             </defs>
 
                             {{-- Guías Horizontales --}}
-                            @foreach([0, 7000, 14000, 21000, 28000] as $gridVal)
-                                @php $gy = $svgH - $padY - (($gridVal / $maxCUP) * $innerH); @endphp
-                                <line x1="{{ $padX }}" y1="{{ $gy }}" x2="{{ $svgW - $padX }}" y2="{{ $gy }}" stroke="rgba(255, 255, 255, 0.06)" stroke-dasharray="3 3" />
-                                <text x="{{ $padX - 8 }}" y="{{ $gy + 3 }}" fill="#64748b" font-size="10" font-family="monospace" text-anchor="end">${{ $gridVal / 1000 }}k</text>
-                            @endforeach
+                            @for($g = 0; $g <= 4; $g++)
+                                @php
+                                    $gy = $padY + ($g * ($innerH / 4));
+                                    $valG = $maxCUP - ($g * ($maxCUP / 4));
+                                @endphp
+                                <line x1="{{ $padX }}" y1="{{ $gy }}" x2="{{ $svgW - $padX }}" y2="{{ $gy }}" stroke="#1e293b" stroke-width="1" stroke-dasharray="3 3" />
+                                <text x="{{ $padX - 8 }}" y="{{ $gy + 4 }}" fill="#64748b" font-size="9" text-anchor="end" font-family="monospace">${{ number_format($valG / 1000) }}k</text>
+                            @endfor
 
-                            {{-- Meta Mensual --}}
-                            <line x1="{{ $padX }}" y1="{{ $metaY }}" x2="{{ $svgW - $padX }}" y2="{{ $metaY }}" stroke="rgba(245, 158, 11, 0.4)" stroke-dasharray="4 4" stroke-width="1.5" />
-                            <text x="{{ $svgW - $padX + 5 }}" y="{{ $metaY + 3 }}" fill="#f59e0b" font-size="9" font-family="monospace">Meta</text>
+                            {{-- Línea de Meta --}}
+                            <line x1="{{ $padX }}" y1="{{ $metaY }}" x2="{{ $svgW - $padX }}" y2="{{ $metaY }}" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.8" />
+                            <text x="{{ $svgW - $padX + 8 }}" y="{{ $metaY + 3 }}" fill="#fbbf24" font-size="9" font-family="monospace">Meta</text>
 
-                            {{-- Área sombreada --}}
-                            @if($areaLine)
-                                <path d="{{ $areaLine }}" fill="url(#dpLineGradient)" />
-                            @endif
+                            {{-- Área y Línea continua --}}
+                            <polygon points="{{ $areaPoints }}" fill="url(#chartGradient)" />
+                            <polyline points="{{ $polylinePoints }}" fill="none" stroke="#10b981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
 
-                            {{-- Línea continua de recaudación CUP --}}
-                            @if($pathLine)
-                                <path d="{{ $pathLine }}" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
-                            @endif
-
-                            {{-- Nodos y etiquetas --}}
+                            {{-- Nodos interactivos --}}
                             @foreach($puntos as $pt)
-                                @php $isActual = str_contains($pt['periodo'], 'Octubre') || str_contains($pt['periodo'], 'Q4') || str_contains($pt['periodo'], '2do Semestre'); @endphp
-                                <g class="cursor-pointer group">
-                                    <line x1="{{ $pt['x'] }}" y1="{{ $pt['y'] }}" x2="{{ $pt['x'] }}" y2="{{ $svgH - $padY }}" stroke="{{ $isActual ? 'rgba(56, 189, 248, 0.4)' : 'rgba(255, 255, 255, 0.05)' }}" stroke-dasharray="2 2" />
-                                    <circle cx="{{ $pt['x'] }}" cy="{{ $pt['y'] }}" r="{{ $isActual ? '6' : '4.5' }}" fill="{{ $pt['cup'] > 0 ? '#10b981' : '#0f172a' }}" stroke="{{ $isActual ? '#38bdf8' : '#059669' }}" stroke-width="{{ $isActual ? '2.5' : '1.5' }}" />
-                                    <text x="{{ $pt['x'] }}" y="{{ $svgH - $padY + 16 }}" fill="{{ $isActual ? '#38bdf8' : '#94a3b8' }}" font-size="10" font-weight="{{ $isActual ? 'bold' : 'normal' }}" font-family="monospace" text-anchor="middle">
-                                        {{ mb_substr(explode(' ', $pt['periodo'])[0], 0, 3) }}
-                                    </text>
-                                </g>
+                                <circle cx="{{ $pt['x'] }}" cy="{{ $pt['y'] }}" r="4.5" fill="#020617" stroke="#10b981" stroke-width="2.5" />
+                                <text x="{{ $pt['x'] }}" y="{{ $svgH - 8 }}" fill="#94a3b8" font-size="10" text-anchor="middle" font-family="sans-serif">{{ $pt['label'] }}</text>
+                                <text x="{{ $pt['x'] }}" y="{{ $pt['y'] - 8 }}" fill="#ffffff" font-size="9" text-anchor="middle" font-weight="bold" font-family="monospace">${{ number_format($pt['monto']) }}</text>
                             @endforeach
                         </svg>
                     </div>
-
-                    <div class="flex justify-between items-center text-[11px] text-slate-400 px-2 pt-2 border-t border-slate-800">
-                        <span>Ene 2026</span>
-                        <span>Plataforma DataPlus · Sistema de Análisis Contable</span>
-                        <span>Dic 2026</span>
-                    </div>
                 </div>
 
-                {{-- Tabla complementaria --}}
-                <div class="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/60 shadow-md">
-                    <table class="w-full text-left text-xs text-slate-200">
-                        <thead class="bg-slate-950/90 text-[10px] font-semibold uppercase tracking-wider text-slate-400 border-b border-slate-800">
+                {{-- Tabla complementaria del reporte --}}
+                <div class="dp-table-wrap">
+                    <table class="dp-table">
+                        <thead>
                             <tr>
-                                <th class="px-4 py-3">Periodo</th>
-                                <th class="px-4 py-3 text-right">Recaudado (CUP)</th>
-                                <th class="px-4 py-3 text-right">Recaudado (USD)</th>
-                                <th class="px-4 py-3 text-right">Deuda Pendiente</th>
-                                <th class="px-4 py-3 text-center">Cumplimiento</th>
+                                <th>Período</th>
+                                <th style="text-align: right;">Recaudado CUP</th>
+                                <th style="text-align: right;">Recaudado USD</th>
+                                <th style="text-align: right;">Cobros Realizados</th>
+                                <th style="text-align: center;">% Cumplimiento</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-800/80">
-                            @foreach($reporteTemporal['filas'] as $fila)
-                                <tr class="hover:bg-slate-800/40 transition-colors">
-                                    <td class="px-4 py-3 font-bold text-white whitespace-nowrap">
-                                        {{ $fila['periodo'] }}
+                        <tbody>
+                            @foreach($filas as $f)
+                                <tr>
+                                    <td style="font-weight: 700; color: #ffffff;">{{ $f['etiqueta'] }}</td>
+                                    <td style="text-align: right; font-family: ui-monospace, monospace; color: #34d399; font-weight: 700;">
+                                        ${{ number_format($f['cup_cobrado'], 2) }} CUP
                                     </td>
-                                    <td class="px-4 py-3 text-right font-mono font-bold text-emerald-400 whitespace-nowrap">
-                                        ${{ number_format($fila['cup_cobrado'], 2) }} CUP
+                                    <td style="text-align: right; font-family: ui-monospace, monospace; color: #38bdf8;">
+                                        ${{ number_format($f['usd_cobrado'], 2) }} USD
                                     </td>
-                                    <td class="px-4 py-3 text-right font-mono font-bold text-sky-400 whitespace-nowrap">
-                                        ${{ number_format($fila['usd_cobrado'], 2) }} USD
+                                    <td style="text-align: right; font-family: ui-monospace, monospace; color: #e2e8f0;">
+                                        {{ $f['total_cobros'] }}
                                     </td>
-                                    <td class="px-4 py-3 text-right font-mono text-rose-400 whitespace-nowrap">
-                                        ${{ number_format($fila['cup_deuda'], 0) }} CUP
-                                    </td>
-                                    <td class="px-4 py-3 text-center whitespace-nowrap">
-                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-sky-500/15 text-sky-300 border border-sky-500/30">
-                                            {{ $fila['cumplimiento'] }}
+                                    <td style="text-align: center;">
+                                        <span class="dp-badge {{ $f['porcentaje_meta'] >= 80 ? 'dp-badge-emerald' : 'dp-badge-amber' }}">
+                                            {{ $f['porcentaje_meta'] }}%
                                         </span>
                                     </td>
                                 </tr>
@@ -671,161 +1111,127 @@
             </div>
         @endif
 
-        {{-- ─── MODAL 1: REGISTRAR PAGO (DISMISS EN FONDO) ─── --}}
+        {{-- ============================================================
+             MODALES FLOTANTES (ESTILO DATAPLUS, CIERRE CON FONDO Y ESCAPE)
+             ============================================================ --}}
+
+        {{-- ─── MODAL 1: REGISTRAR COBRANZA ─── --}}
         @if($modalPagoOpen)
-            <div 
-                x-data 
-                x-on:click.self="$wire.set('modalPagoOpen', false)" 
-                x-on:keydown.escape.window="$wire.set('modalPagoOpen', false)" 
-                class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 overflow-y-auto cursor-pointer">
-                <div 
-                    x-on:click.stop 
-                    class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg p-6 shadow-2xl relative text-left my-8 cursor-default text-white">
-                    <div class="flex items-center justify-between pb-3 border-b border-slate-800">
-                        <div class="flex items-center gap-2">
-                            <x-heroicon-o-credit-card class="h-6 w-6 text-emerald-400" />
-                            <h3 class="text-base font-bold text-white">Registrar Cobranza de Gestión Remota</h3>
-                        </div>
-                        <button 
-                            wire:click="$set('modalPagoOpen', false)" 
-                            type="button" 
-                            class="text-slate-400 hover:text-white cursor-pointer p-1 rounded-lg">
-                            <x-heroicon-m-x-mark class="h-5 w-5" />
+            <div x-data
+                 x-on:click.self="$wire.set('modalPagoOpen', false)"
+                 x-on:keydown.escape.window="$wire.set('modalPagoOpen', false)"
+                 class="dp-modal-overlay">
+                <div x-on:click.stop class="dp-modal-card">
+                    <div class="dp-modal-header">
+                        <h3 class="dp-modal-title">
+                            <x-heroicon-o-credit-card style="width: 1.35rem; height: 1.35rem; color: #34d399;" />
+                            <span>Registrar Cobranza de Gestión Remota</span>
+                        </h3>
+                        <button type="button"
+                                wire:click="$set('modalPagoOpen', false)"
+                                class="dp-modal-close-btn">
+                            <x-heroicon-m-x-mark style="width: 1.25rem; height: 1.25rem;" />
                         </button>
                     </div>
 
-                    <div class="mt-4 space-y-4 text-xs">
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-slate-300 font-semibold mb-1">Monto Pagado</label>
-                                <input 
-                                    wire:model="formMontoPagado" 
-                                    type="number" 
-                                    step="0.01" 
-                                    class="dp-modal-input font-mono font-bold" />
+                    <div style="display: flex; flex-direction: column; gap: 1rem; font-size: 0.8rem;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                            <div class="dp-input-group">
+                                <label class="dp-input-label">Monto Pagado</label>
+                                <input wire:model="formMontoPagado" type="number" step="0.01" class="dp-input-field" style="font-family: monospace; font-weight: 700; font-size: 0.95rem; color: #34d399;" />
                             </div>
-                            <div>
-                                <label class="block text-slate-300 font-semibold mb-1">Día que Pagó</label>
-                                <input 
-                                    wire:model="formFechaPago" 
-                                    type="date" 
-                                    class="dp-modal-input font-mono" />
+                            <div class="dp-input-group">
+                                <label class="dp-input-label">Fecha del Pago</label>
+                                <input wire:model="formFechaPago" type="date" class="dp-input-field" />
                             </div>
                         </div>
 
-                        <div>
-                            <label class="block text-slate-300 font-semibold mb-1">Método de Pago</label>
-                            <div class="grid grid-cols-2 gap-2">
-                                <button 
-                                    wire:click="$set('formMetodoPago', 'transferencia')" 
-                                    type="button" 
-                                    class="px-3 py-2 rounded-xl font-bold border cursor-pointer text-center text-xs transition-all {{ $formMetodoPago === 'transferencia' ? 'bg-sky-500/20 text-sky-300 border-sky-500' : 'bg-slate-950 text-slate-400 border-slate-800' }}">
+                        <div class="dp-input-group">
+                            <label class="dp-input-label">Vía / Método de Pago</label>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                                <button type="button"
+                                        wire:click="$set('formMetodoPago', 'transferencia')"
+                                        style="padding: 0.6rem; border-radius: 0.5rem; font-weight: 700; font-size: 0.775rem; cursor: pointer; border: 1px solid {{ $formMetodoPago === 'transferencia' ? '#0ea5e9' : '#334155' }}; background: {{ $formMetodoPago === 'transferencia' ? 'rgba(14, 165, 233, 0.2)' : '#020617' }}; color: {{ $formMetodoPago === 'transferencia' ? '#38bdf8' : '#94a3b8' }};">
                                     Transferencia (Transfermóvil / EnZona)
                                 </button>
-                                <button 
-                                    wire:click="$set('formMetodoPago', 'efectivo')" 
-                                    type="button" 
-                                    class="px-3 py-2 rounded-xl font-bold border cursor-pointer text-center text-xs transition-all {{ $formMetodoPago === 'efectivo' ? 'bg-sky-500/20 text-sky-300 border-sky-500' : 'bg-slate-950 text-slate-400 border-slate-800' }}">
+                                <button type="button"
+                                        wire:click="$set('formMetodoPago', 'efectivo')"
+                                        style="padding: 0.6rem; border-radius: 0.5rem; font-weight: 700; font-size: 0.775rem; cursor: pointer; border: 1px solid {{ $formMetodoPago === 'efectivo' ? '#0ea5e9' : '#334155' }}; background: {{ $formMetodoPago === 'efectivo' ? 'rgba(14, 165, 233, 0.2)' : '#020617' }}; color: {{ $formMetodoPago === 'efectivo' ? '#38bdf8' : '#94a3b8' }};">
                                     Pago en Efectivo (Cobro en Sitio)
                                 </button>
                             </div>
                         </div>
 
                         @if($formMetodoPago === 'transferencia')
-                            <div>
-                                <label class="block text-slate-300 font-semibold mb-1">Número de Transacción / Operación</label>
-                                <input 
-                                    wire:model="formNumeroTransaccion" 
-                                    type="text" 
-                                    placeholder="TRF-9018231 o ID EnZona" 
-                                    class="dp-modal-input font-mono font-bold" />
+                            <div class="dp-input-group">
+                                <label class="dp-input-label">Número de Transacción / Operación</label>
+                                <input wire:model="formNumeroTransaccion" type="text" placeholder="Ej. TRF-5918234" class="dp-input-field" style="font-family: monospace;" />
                             </div>
                         @else
-                            <div class="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label class="block text-slate-300 font-semibold mb-1">¿Quién Recibe?</label>
-                                    <input 
-                                        wire:model="formQuienRecibe" 
-                                        type="text" 
-                                        class="dp-modal-input" />
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                                <div class="dp-input-group">
+                                    <label class="dp-input-label">Quién Recibe (DataPlus)</label>
+                                    <input wire:model="formQuienRecibe" type="text" class="dp-input-field" />
                                 </div>
-                                <div>
-                                    <label class="block text-slate-300 font-semibold mb-1">¿Quién Entrega?</label>
-                                    <input 
-                                        wire:model="formQuienEntrega" 
-                                        type="text" 
-                                        placeholder="Nombre del cliente" 
-                                        class="dp-modal-input" />
+                                <div class="dp-input-group">
+                                    <label class="dp-input-label">Quién Entrega</label>
+                                    <input wire:model="formQuienEntrega" type="text" placeholder="Nombre de quien entrega" class="dp-input-field" />
                                 </div>
                             </div>
                         @endif
 
-                        <div>
-                            <label class="block text-slate-300 font-semibold mb-1">Notas / Observaciones</label>
-                            <textarea 
-                                wire:model="formNotasPago" 
-                                rows="2" 
-                                placeholder="Notas opcionales del pago..." 
-                                class="dp-modal-input"></textarea>
+                        <div class="dp-input-group">
+                            <label class="dp-input-label">Notas / Observaciones</label>
+                            <input wire:model="formNotasPago" type="text" placeholder="Ej. Pago verificado por WhatsApp" class="dp-input-field" />
                         </div>
                     </div>
 
-                    <div class="mt-6 flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
-                        <button 
-                            wire:click="$set('modalPagoOpen', false)" 
-                            type="button" 
-                            class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs border border-slate-700 cursor-pointer">
+                    <div style="display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #1e293b;">
+                        <button type="button"
+                                wire:click="$set('modalPagoOpen', false)"
+                                class="dp-btn-secondary">
                             Cancelar
                         </button>
-                        <button 
-                            wire:click="guardarPago" 
-                            type="button" 
-                            class="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/25 cursor-pointer">
-                            Confirmar Cobranza
+                        <button type="button"
+                                wire:click="guardarPago"
+                                class="dp-btn-primary"
+                                style="background: linear-gradient(135deg, #059669 0%, #047857 100%);">
+                            <x-heroicon-m-check style="width: 1.1rem; height: 1.1rem; stroke-width: 2.5;" />
+                            <span>Confirmar Cobro</span>
                         </button>
                     </div>
                 </div>
             </div>
         @endif
 
-        {{-- ─── MODAL 2: VISOR DE COMPROBANTE DE WHATSAPP ─── --}}
+        {{-- ─── MODAL 2: VISOR DE COMPROBANTE ─── --}}
         @if($modalVisorOpen && $comprobanteActual)
-            <div 
-                x-data 
-                x-on:click.self="$wire.set('modalVisorOpen', false)" 
-                x-on:keydown.escape.window="$wire.set('modalVisorOpen', false)" 
-                class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 overflow-y-auto cursor-pointer">
-                <div 
-                    x-on:click.stop 
-                    class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl relative text-left my-8 cursor-default text-white">
-                    <div class="flex items-center justify-between pb-3 border-b border-slate-800">
-                        <div class="flex items-center gap-2">
-                            <x-heroicon-o-document-magnifying-glass class="h-6 w-6 text-sky-400" />
-                            <h3 class="text-base font-bold text-white">Comprobante de Pago (WhatsApp)</h3>
-                        </div>
-                        <button wire:click="$set('modalVisorOpen', false)" class="text-slate-400 hover:text-white cursor-pointer">
-                            <x-heroicon-m-x-mark class="h-5 w-5" />
+            <div x-data
+                 x-on:click.self="$wire.set('modalVisorOpen', false)"
+                 x-on:keydown.escape.window="$wire.set('modalVisorOpen', false)"
+                 class="dp-modal-overlay">
+                <div x-on:click.stop class="dp-modal-card">
+                    <div class="dp-modal-header">
+                        <h3 class="dp-modal-title">
+                            <x-heroicon-o-photo style="width: 1.35rem; height: 1.35rem; color: #38bdf8;" />
+                            <span>Comprobante de WhatsApp</span>
+                        </h3>
+                        <button type="button" wire:click="$set('modalVisorOpen', false)" class="dp-modal-close-btn">
+                            <x-heroicon-m-x-mark style="width: 1.25rem; height: 1.25rem;" />
                         </button>
                     </div>
-
-                    <div class="mt-4 space-y-3 text-xs">
-                        <div class="p-2 rounded-xl bg-slate-950 border border-slate-800 flex justify-center">
-                            @if(!empty($comprobanteActual['url']))
-                                <img src="{{ $comprobanteActual['url'] }}" alt="Comprobante" class="max-h-72 object-contain rounded-lg" />
-                            @else
-                                <div class="py-12 text-center text-slate-500">Sin archivo adjunto</div>
-                            @endif
-                        </div>
-                        <p class="text-[11px] text-slate-400 font-mono text-center">
+                    <div style="text-align: center;">
+                        @if(!empty($comprobanteActual['url']))
+                            <img src="{{ $comprobanteActual['url'] }}" alt="Comprobante" style="max-height: 380px; width: auto; margin: 0 auto; border-radius: 0.5rem; border: 1px solid #334155;" />
+                        @else
+                            <div style="padding: 3rem 1rem; color: #64748b;">No hay imagen adjunta.</div>
+                        @endif
+                        <p style="font-size: 0.75rem; color: #94a3b8; font-family: monospace; margin-top: 0.75rem;">
                             Ref: {{ $comprobanteActual['referencia'] ?? 'N/A' }} · Cliente: {{ $comprobanteActual['cliente'] ?? 'N/A' }}
                         </p>
                     </div>
-
-                    <div class="mt-5 flex justify-end">
-                        <button 
-                            wire:click="$set('modalVisorOpen', false)" 
-                            type="button" 
-                            class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs border border-slate-700 cursor-pointer">
+                    <div style="display: flex; justify-content: flex-end; margin-top: 1.25rem; border-top: 1px solid #1e293b; padding-top: 0.75rem;">
+                        <button type="button" wire:click="$set('modalVisorOpen', false)" class="dp-btn-secondary">
                             Cerrar Visor
                         </button>
                     </div>
@@ -835,88 +1241,77 @@
 
         {{-- ─── MODAL 3: RECIBO OFICIAL DATAPLUS ─── --}}
         @if($modalReciboOpen && $reciboActual)
-            <div 
-                x-data 
-                x-on:click.self="$wire.set('modalReciboOpen', false)" 
-                x-on:keydown.escape.window="$wire.set('modalReciboOpen', false)" 
-                class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 overflow-y-auto cursor-pointer">
-                <div 
-                    x-on:click.stop 
-                    class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg p-6 shadow-2xl relative text-left my-8 cursor-default text-white">
-                    <div class="flex items-center justify-between pb-3 border-b border-slate-800">
-                        <div class="flex items-center gap-2">
-                            <x-heroicon-o-receipt-percent class="h-6 w-6 text-sky-400" />
-                            <h3 class="text-base font-bold text-white">Comprobante Oficial DataPlus S.R.L.</h3>
-                        </div>
-                        <button wire:click="$set('modalReciboOpen', false)" class="text-slate-400 hover:text-white cursor-pointer">
-                            <x-heroicon-m-x-mark class="h-5 w-5" />
+            <div x-data
+                 x-on:click.self="$wire.set('modalReciboOpen', false)"
+                 x-on:keydown.escape.window="$wire.set('modalReciboOpen', false)"
+                 class="dp-modal-overlay">
+                <div x-on:click.stop class="dp-modal-card" style="max-width: 500px;">
+                    <div class="dp-modal-header">
+                        <h3 class="dp-modal-title">
+                            <x-heroicon-o-receipt-percent style="width: 1.35rem; height: 1.35rem; color: #38bdf8;" />
+                            <span>Recibo Oficial de Pago</span>
+                        </h3>
+                        <button type="button" wire:click="$set('modalReciboOpen', false)" class="dp-modal-close-btn">
+                            <x-heroicon-m-x-mark style="width: 1.25rem; height: 1.25rem;" />
                         </button>
                     </div>
 
-                    <div class="mt-4 p-4 rounded-xl border border-slate-700 bg-slate-950 space-y-3 text-xs font-mono">
-                        <div class="text-center border-b border-slate-800 pb-2">
-                            <h4 class="font-extrabold text-sm text-white">DATAPLUS PLATAFORMA</h4>
-                            <p class="text-[10px] text-slate-400">Servicio de Gestión Remota & Enlaces 4G</p>
-                            <p class="text-[10px] text-emerald-400 font-bold mt-1">RECIBO DE COBRO VERIFICADO</p>
+                    <div style="background: #020617; border: 1px solid #334155; border-radius: 0.75rem; padding: 1.25rem; font-family: monospace; font-size: 0.75rem;">
+                        <div style="text-align: center; border-bottom: 1px solid #1e293b; padding-bottom: 0.75rem; margin-bottom: 0.75rem;">
+                            <h4 style="font-size: 1rem; font-weight: 900; color: #ffffff; margin: 0;">DATAPLUS S.R.L.</h4>
+                            <p style="font-size: 0.7rem; color: #94a3b8; margin: 2px 0 0;">Gestión Remota & Soluciones de Conectividad</p>
+                            <span class="dp-badge dp-badge-emerald" style="margin-top: 6px;">PAGO VERIFICADO Y REGISTRADO</span>
                         </div>
 
-                        <div class="space-y-1.5 text-slate-300 text-[11px]">
-                            <div class="flex justify-between">
-                                <span class="text-slate-400">No. Recibo:</span>
-                                <span class="text-white font-bold">{{ $reciboActual['codigo_pago'] ?? '' }}</span>
+                        <div style="display: flex; flex-direction: column; gap: 0.4rem; color: #cbd5e1;">
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: #64748b;">No. Recibo:</span>
+                                <span style="color: #ffffff; font-weight: 700;">{{ $reciboActual['codigo_pago'] ?? '' }}</span>
                             </div>
-                            <div class="flex justify-between">
-                                <span class="text-slate-400">Cliente:</span>
-                                <span class="text-white font-bold">{{ $reciboActual['cliente_nombre'] ?? '' }}</span>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: #64748b;">Cliente:</span>
+                                <span style="color: #ffffff; font-weight: 700;">{{ $reciboActual['cliente_nombre'] ?? '' }}</span>
                             </div>
-                            <div class="flex justify-between">
-                                <span class="text-slate-400">Servicio:</span>
-                                <span class="text-white">{{ $reciboActual['servicio_nombre'] ?? 'Gestión Remota' }}</span>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: #64748b;">Servicio:</span>
+                                <span style="color: #ffffff;">{{ $reciboActual['servicio_nombre'] ?? 'Gestión Remota' }}</span>
                             </div>
-                            <div class="flex justify-between">
-                                <span class="text-slate-400">Mes Liquidado:</span>
-                                <span class="text-white">{{ $reciboActual['mes_nombre'] ?? 'Octubre 2026' }}</span>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: #64748b;">Mes Liquidado:</span>
+                                <span style="color: #ffffff;">{{ $reciboActual['mes_nombre'] ?? 'Octubre 2026' }}</span>
                             </div>
-                            <div class="flex justify-between">
-                                <span class="text-slate-400">Fecha de Pago:</span>
-                                <span class="text-white">{{ $reciboActual['fecha_pago'] ?? '' }}</span>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: #64748b;">Fecha de Pago:</span>
+                                <span style="color: #ffffff;">{{ $reciboActual['fecha_pago'] ?? '' }}</span>
                             </div>
-                            <div class="flex justify-between">
-                                <span class="text-slate-400">Método:</span>
-                                <span class="text-white">{{ $reciboActual['metodo_pago'] ?? '' }}</span>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: #64748b;">Método:</span>
+                                <span style="color: #ffffff;">{{ $reciboActual['metodo_pago'] ?? '' }}</span>
                             </div>
-                            <div class="flex justify-between border-t border-slate-800 pt-2 text-xs font-bold">
-                                <span class="text-white">Monto Abonado:</span>
-                                <span class="text-emerald-400 font-black text-sm">
+                            <div style="display: flex; justify-content: space-between; border-top: 1px solid #1e293b; padding-top: 0.6rem; margin-top: 0.2rem; font-size: 0.85rem;">
+                                <span style="color: #ffffff; font-weight: 700;">Monto Abonado:</span>
+                                <span style="color: #34d399; font-weight: 900; font-size: 1rem;">
                                     ${{ number_format($reciboActual['monto_pagado'] ?? 0, 2) }} {{ $reciboActual['moneda'] ?? 'CUP' }}
                                 </span>
                             </div>
                         </div>
                     </div>
 
-                    <div class="mt-6 flex items-center justify-between pt-3 border-t border-slate-800">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 1.25rem; border-top: 1px solid #1e293b; padding-top: 0.75rem;">
                         @php
                             $telR = preg_replace('/[^0-9]/', '', $reciboActual['cliente_telefono'] ?? '');
-                            $msgR = rawurlencode("*DATAPLUS - RECIBO DE PAGO*
-Recibo: {$reciboActual['codigo_pago']}
-Cliente: {$reciboActual['cliente_nombre']}
-Mes: {$reciboActual['mes_nombre']}
-Monto: $" . number_format($reciboActual['monto_pagado'] ?? 0, 2) . " {$reciboActual['moneda']}
-¡Pago verificado y registrado exitosamente!");
+                            $msgR = rawurlencode("*DATAPLUS - RECIBO DE PAGO*\nRecibo: {$reciboActual['codigo_pago']}\nCliente: {$reciboActual['cliente_nombre']}\nMes: {$reciboActual['mes_nombre']}\nMonto: $" . number_format($reciboActual['monto_pagado'] ?? 0, 2) . " {$reciboActual['moneda']}\n¡Pago verificado y registrado exitosamente!");
                             $linkWpRecibo = "https://wa.me/{$telR}?text={$msgR}";
                         @endphp
-                        <a 
-                            href="{{ $linkWpRecibo }}" 
-                            target="_blank"
-                            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md">
-                            <x-heroicon-m-share class="h-4 w-4" />
+                        <a href="{{ $linkWpRecibo }}"
+                           target="_blank"
+                           class="dp-btn-emerald"
+                           style="text-decoration: none;">
+                            <x-heroicon-m-share style="width: 1rem; height: 1rem;" />
                             <span>Enviar por WhatsApp</span>
                         </a>
 
-                        <button 
-                            wire:click="$set('modalReciboOpen', false)" 
-                            type="button" 
-                            class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 cursor-pointer">
+                        <button type="button" wire:click="$set('modalReciboOpen', false)" class="dp-btn-secondary">
                             Cerrar
                         </button>
                     </div>
@@ -924,109 +1319,78 @@ Monto: $" . number_format($reciboActual['monto_pagado'] ?? 0, 2) . " {$reciboAct
             </div>
         @endif
 
-        {{-- ─── MODAL 4: NUEVA SUSCRIPCIÓN (DISMISS EN FONDO Y ESTILO DATAPLUS) ─── --}}
+        {{-- ─── MODAL 4: NUEVA SUSCRIPCIÓN ─── --}}
         @if($modalNuevaSubOpen)
-            <div 
-                x-data 
-                x-on:click.self="$wire.set('modalNuevaSubOpen', false)" 
-                x-on:keydown.escape.window="$wire.set('modalNuevaSubOpen', false)" 
-                class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 overflow-y-auto cursor-pointer">
-                <div 
-                    x-on:click.stop
-                    class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg p-6 shadow-2xl relative text-left my-8 cursor-default text-white">
-                    <div class="flex items-center justify-between pb-3 border-b border-slate-800">
-                        <div class="flex items-center gap-2">
-                            <x-heroicon-o-plus-circle class="h-6 w-6 text-sky-400" />
-                            <h3 class="text-base font-bold text-white">Nueva Suscripción de Gestión Remota</h3>
-                        </div>
-                        <button 
-                            wire:click="$set('modalNuevaSubOpen', false)" 
-                            type="button"
-                            class="text-slate-400 hover:text-white cursor-pointer p-1 rounded-lg">
-                            <x-heroicon-m-x-mark class="h-5 w-5" />
+            <div x-data
+                 x-on:click.self="$wire.set('modalNuevaSubOpen', false)"
+                 x-on:keydown.escape.window="$wire.set('modalNuevaSubOpen', false)"
+                 class="dp-modal-overlay">
+                <div x-on:click.stop class="dp-modal-card">
+                    <div class="dp-modal-header">
+                        <h3 class="dp-modal-title">
+                            <x-heroicon-o-plus-circle style="width: 1.35rem; height: 1.35rem; color: #38bdf8;" />
+                            <span>Nueva Suscripción de Gestión Remota</span>
+                        </h3>
+                        <button type="button" wire:click="$set('modalNuevaSubOpen', false)" class="dp-modal-close-btn">
+                            <x-heroicon-m-x-mark style="width: 1.25rem; height: 1.25rem;" />
                         </button>
                     </div>
 
-                    <div class="mt-4 space-y-3.5 text-xs">
-                        <div>
-                            <label class="block text-slate-300 font-semibold mb-1">Nombre del Cliente / Negocio *</label>
-                            <input 
-                                wire:model="newSubClienteNombre" 
-                                type="text" 
-                                placeholder="Ej: Hostal Miramar o Juan Pérez"
-                                class="dp-modal-input" />
+                    <div style="display: flex; flex-direction: column; gap: 0.85rem; font-size: 0.8rem;">
+                        <div class="dp-input-group">
+                            <label class="dp-input-label">Nombre del Cliente / Empresa</label>
+                            <input wire:model="newSubClienteNombre" type="text" placeholder="Ej. Hostal La Habana" class="dp-input-field" />
                         </div>
 
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-slate-300 font-semibold mb-1">Teléfono Móvil (WhatsApp)</label>
-                                <input 
-                                    wire:model="newSubClienteTelefono" 
-                                    type="text" 
-                                    placeholder="+53 5200 0000"
-                                    class="dp-modal-input font-mono" />
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                            <div class="dp-input-group">
+                                <label class="dp-input-label">Teléfono de Contacto</label>
+                                <input wire:model="newSubClienteTelefono" type="text" placeholder="+53 5284 9102" class="dp-input-field" />
                             </div>
-                            <div>
-                                <label class="block text-slate-300 font-semibold mb-1">Número SIM Card</label>
-                                <input 
-                                    wire:model="newSubSim" 
-                                    type="text" 
-                                    placeholder="535XXXXXXX"
-                                    class="dp-modal-input font-mono" />
+                            <div class="dp-input-group">
+                                <label class="dp-input-label">Número de SIM / Línea</label>
+                                <input wire:model="newSubSim" type="text" placeholder="5352849102" class="dp-input-field" />
                             </div>
                         </div>
 
-                        <div>
-                            <label class="block text-slate-300 font-semibold mb-1">Solución de Gestión Remota</label>
-                            <input 
-                                wire:model="newSubSolucion" 
-                                type="text" 
-                                placeholder="Ej: Router 4G LTE Huawei B310 o MikroTik"
-                                class="dp-modal-input" />
+                        <div class="dp-input-group">
+                            <label class="dp-input-label">Solución / Equipo Instalado</label>
+                            <select wire:model="newSubSolucion" class="dp-input-field dp-select-field">
+                                <option value="Router 4G LTE Huawei B310">Router 4G LTE Huawei B310</option>
+                                <option value="Router 4G LTE Huawei B311">Router 4G LTE Huawei B311</option>
+                                <option value="Router 4G LTE TP-Link MR6400">Router 4G LTE TP-Link MR6400</option>
+                                <option value="Enlace Ubiquiti AirMax">Enlace Ubiquiti AirMax</option>
+                                <option value="Sistema DVR / NVR CCTV IP">Sistema DVR / NVR CCTV IP</option>
+                            </select>
                         </div>
 
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-slate-300 font-semibold mb-1">Moneda de Cobro</label>
-                                <select 
-                                    wire:model="newSubMoneda" 
-                                    class="dp-modal-input font-bold">
-                                    <option value="CUP">CUP (Pesos Cubanos)</option>
-                                    <option value="USD">USD (Dólares)</option>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                            <div class="dp-input-group">
+                                <label class="dp-input-label">Moneda</label>
+                                <select wire:model="newSubMoneda" class="dp-input-field dp-select-field">
+                                    <option value="CUP">Pesos Cubanos (CUP)</option>
+                                    <option value="USD">Dólares (USD)</option>
                                 </select>
                             </div>
-                            <div>
-                                <label class="block text-slate-300 font-semibold mb-1">Tarifa Mensual</label>
-                                <input 
-                                    wire:model="newSubMonto" 
-                                    type="number" 
-                                    step="0.01" 
-                                    class="dp-modal-input font-mono font-bold" />
+                            <div class="dp-input-group">
+                                <label class="dp-input-label">Tarifa Mensual</label>
+                                <input wire:model="newSubMonto" type="number" step="0.01" class="dp-input-field" style="font-family: monospace; font-weight: 700; color: #38bdf8;" />
                             </div>
                         </div>
 
-                        <div>
-                            <label class="block text-slate-300 font-semibold mb-1">Notas / Observaciones</label>
-                            <textarea 
-                                wire:model="newSubNotas" 
-                                rows="2" 
-                                placeholder="Condiciones especiales o notas..."
-                                class="dp-modal-input"></textarea>
+                        <div class="dp-input-group">
+                            <label class="dp-input-label">Notas Adicionales</label>
+                            <input wire:model="newSubNotas" type="text" placeholder="Ubicación física o detalles de la antena" class="dp-input-field" />
                         </div>
                     </div>
 
-                    <div class="mt-6 flex justify-end gap-3 pt-3 border-t border-slate-800">
-                        <button 
-                            wire:click="$set('modalNuevaSubOpen', false)" 
-                            type="button" 
-                            class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs border border-slate-700 cursor-pointer">
+                    <div style="display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #1e293b;">
+                        <button type="button" wire:click="$set('modalNuevaSubOpen', false)" class="dp-btn-secondary">
                             Cancelar
                         </button>
-                        <button 
-                            wire:click="crearSuscripcion" 
-                            type="button" 
-                            class="px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow-lg shadow-sky-600/30 cursor-pointer">
-                            Guardar Suscripción
+                        <button type="button" wire:click="guardarNuevaSub" class="dp-btn-primary">
+                            <x-heroicon-m-check style="width: 1.1rem; height: 1.1rem; stroke-width: 2.5;" />
+                            <span>Crear Suscripción</span>
                         </button>
                     </div>
                 </div>

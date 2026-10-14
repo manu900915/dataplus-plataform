@@ -496,6 +496,32 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
         </div>
       </div>
 
+      {/* ================= HERO BANNER PRINCIPAL (ESTILO REPORTE MENSUAL) ================= */}
+      <div className="rounded-2xl bg-gradient-to-r from-sky-600 to-sky-700 text-white p-6 shadow-xl relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-sky-200">
+            Periodo de Cobro: Octubre 2026 · Mes Adelantado
+          </p>
+          <h2 className="text-2xl font-extrabold text-white mt-1">
+            Facturación de Gestión Remota & Servicios Recurrentes
+          </h2>
+          <p className="text-xs text-sky-100/90 mt-1">
+            DataPlus S.R.L. · Plazo en curso: <strong className="text-white">{diasRestantes} días restantes</strong> (Día {diaActual} de {diasLimite}) · Norma operativa: Liquidación en los primeros 15 días.
+          </p>
+        </div>
+        <div className="bg-sky-950/40 backdrop-blur-sm border border-sky-400/30 rounded-xl p-4 text-right min-w-[220px]">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-sky-200">Recaudado Mes en Curso</p>
+          <p className="text-2xl font-extrabold font-mono text-white mt-0.5">
+            ${totalCobradoCUP.toLocaleString()} <span className="text-sm font-sans text-sky-200">CUP</span>
+          </p>
+          {totalCobradoUSD > 0 && (
+            <p className="text-xs font-bold text-sky-300 font-mono mt-0.5">
+              +${totalCobradoUSD.toLocaleString()} USD
+            </p>
+          )}
+        </div>
+      </div>
+
       {/* ================= TARJETAS KPI / ESTADO OPERATIVO ================= */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Tarjeta 1: Periodo & Norma Operativa */}
