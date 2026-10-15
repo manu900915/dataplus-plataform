@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    'chatwoot' => [
+        'base_url' => rtrim((string) env('CHATWOOT_BASE_URL', 'https://chat.dataplus.cu/'), '/'),
+        'access_token' => env('CHATWOOT_ACCESS_TOKEN', 'p9wKrE7Zt44CJWgAVtfzvjx4'),
+        'account_id' => (int) env('CHATWOOT_ACCOUNT_ID', 1),
+        'inbox_id' => (int) env('CHATWOOT_INBOX_ID', 1),
+    ],
+
 ];

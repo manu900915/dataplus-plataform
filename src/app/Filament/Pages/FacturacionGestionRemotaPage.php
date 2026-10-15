@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Models\Cliente;
 use App\Models\PagoGestionRemota;
 use App\Models\SuscripcionGestionRemota;
+use App\Services\ChatwootService;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -178,6 +179,7 @@ class FacturacionGestionRemotaPage extends Page
     public function getPagosSemana()
     {
         $hace7Dias = now()->subDays(7)->startOfDay();
+
         return PagoGestionRemota::where("fecha_pago", ">=", $hace7Dias)
             ->with("suscripcion")
             ->orderBy("fecha_pago", "desc")
@@ -217,6 +219,7 @@ class FacturacionGestionRemotaPage extends Page
         $totalUsdDeuda = $subs->where("moneda", "USD")->sum("deuda_acumulada");
 
         $filas = [];
+
         if ($p === "mensual") {
             $meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre"];
             foreach ($meses as $i => $m) {
@@ -399,7 +402,6 @@ class FacturacionGestionRemotaPage extends Page
             "nombre_archivo" => $pago->comprobante_nombre ?: "Comprobante_Transferencia.jpg",
             "url" => $pago->comprobante_url,
         ];
-
         $this->modalVisorOpen = true;
     }
 
@@ -430,7 +432,140 @@ class FacturacionGestionRemotaPage extends Page
             "transaccion" => $ultimoPago?->numero_transaccion ?: "N/A",
             "receptor" => $ultimoPago?->efectivo_quien_recibe ?: (Auth::user()?->name ?? "Admin Finanzas"),
         ];
-
         $this->modalReciboOpen = true;
+    }
+
+    /**
+     * Enviar recordatorio de cobro por WhatsApp a través de Chatwoot (Asistencia Técnica)
+     */
+    public function enviarWhatsAppChatwoot(int $suscripcionId): void
+    {
+        $sub = SuscripcionGestionRemota::find($suscripcionId);
+        if (!$sub) {
+            Notification::make()->title('Suscripción no encontrada')->danger()->send();
+            return;
+        }
+
+        if (empty($sub->cliente_telefono)) {
+            Notification::make()
+                ->title('Teléfono no registrado')
+                ->body("El cliente {$sub->cliente_nombre} no tiene un número telefónico asignado.")
+                ->warning()
+                ->send();
+            return;
+        }
+
+        $monto = number_format((float) ($sub->tiene_deuda ? ($sub->monto_mensual + $sub->deuda_acumulada) : $sub->monto_mensual), 2);
+        $mensaje = "Hola {$sub->cliente_nombre}, le contactamos de DataPlus (Asistencia Técnica) para recordarle el pago de su servicio de Gestión Remota por un total de \${$monto} {$sub->moneda}. Recuerde enviar el comprobante de su transferencia a este mismo chat para procesarlo de inmediato. ¡Muchas gracias!";
+
+        /** @var ChatwootService $chatwoot */
+        $chatwoot = app(ChatwootService::class);
+        $resultado = $chatwoot->enviarMensaje($sub->cliente_nombre, $sub->cliente_telefono, $mensaje);
+
+        if ($resultado['success']) {
+            Notification::make()
+                ->title('Mensaje enviado por WhatsApp (Chatwoot)')
+                ->body("Enviado con éxito a {$sub->cliente_nombre} ({$sub->cliente_telefono}) desde la cuenta oficial de Asistencia Técnica.")
+                ->success()
+                ->send();
+        } else {
+            Notification::make()
+                ->title('Error al enviar mensaje por Chatwoot')
+                ->body($resultado['message'])
+                ->danger()
+                ->send();
+        }
+    }
+
+    /**
+     * Enviar notificación a deudor con meses acumulados por WhatsApp a través de Chatwoot
+     */
+    public function enviarWhatsAppDeudorChatwoot(int $suscripcionId): void
+    {
+        $sub = SuscripcionGestionRemota::find($suscripcionId);
+        if (!$sub) {
+            Notification::make()->title('Cliente no encontrado')->danger()->send();
+            return;
+        }
+
+        if (empty($sub->cliente_telefono)) {
+            Notification::make()
+                ->title('Teléfono no registrado')
+                ->body("El cliente {$sub->cliente_nombre} no tiene un número de WhatsApp registrado.")
+                ->warning()
+                ->send();
+            return;
+        }
+
+        $meses = $sub->meses_deuda_count ?: 1;
+        $monto = number_format((float) ($sub->monto_mensual + $sub->deuda_acumulada), 2);
+        $mensaje = "Hola {$sub->cliente_nombre}, le contactamos del equipo de DataPlus (Asistencia Técnica). Le informamos que presenta {$meses} meses pendientes de pago correspondientes a su servicio de Gestión Remota, acumulando un total de \${$monto} {$sub->moneda}. Le solicitamos realizar la liquidación o reportar su comprobante a este chat a la brevedad. Quedamos a su disposición para cualquier aclaración.";
+
+        /** @var ChatwootService $chatwoot */
+        $chatwoot = app(ChatwootService::class);
+        $resultado = $chatwoot->enviarMensaje($sub->cliente_nombre, $sub->cliente_telefono, $mensaje);
+
+        if ($resultado['success']) {
+            Notification::make()
+                ->title('Notificación enviada vía Chatwoot')
+                ->body("Recordatorio formal de cobro enviado a {$sub->cliente_nombre} ({$sub->cliente_telefono}).")
+                ->success()
+                ->send();
+        } else {
+            Notification::make()
+                ->title('Error al contactar por Chatwoot')
+                ->body($resultado['message'])
+                ->danger()
+                ->send();
+        }
+    }
+
+    /**
+     * Enviar recibo emitido por WhatsApp a través de Chatwoot
+     */
+    public function enviarReciboChatwoot(): void
+    {
+        if (!$this->reciboActual) {
+            return;
+        }
+
+        $cliente = $this->reciboActual['cliente'];
+        $telefono = $this->reciboActual['telefono'];
+
+        if (empty($telefono) || $telefono === 'No especificado') {
+            Notification::make()
+                ->title('Teléfono no disponible')
+                ->body('El cliente no tiene un número de WhatsApp asociado a este recibo.')
+                ->warning()
+                ->send();
+            return;
+        }
+
+        $mensaje = "Estimado(a) {$cliente}, le compartimos el comprobante oficial de su pago en DataPlus:\n\n" .
+            "🧾 Folio: {$this->reciboActual['folio']}\n" .
+            "📅 Fecha: {$this->reciboActual['fecha']}\n" .
+            "🔧 Servicio: {$this->reciboActual['servicio']} ({$this->reciboActual['solucion']})\n" .
+            "💰 Monto Total: {$this->reciboActual['total']}\n" .
+            "💳 Método: {$this->reciboActual['metodo']} (Ref: {$this->reciboActual['transaccion']})\n" .
+            "👤 Recibido por: {$this->reciboActual['receptor']}\n\n" .
+            "¡Agradecemos su confianza en nuestros servicios!";
+
+        /** @var ChatwootService $chatwoot */
+        $chatwoot = app(ChatwootService::class);
+        $resultado = $chatwoot->enviarMensaje($cliente, $telefono, $mensaje);
+
+        if ($resultado['success']) {
+            Notification::make()
+                ->title('Recibo enviado por WhatsApp (Chatwoot)')
+                ->body("Comprobante enviado exitosamente a {$cliente} ({$telefono}).")
+                ->success()
+                ->send();
+        } else {
+            Notification::make()
+                ->title('Error al enviar recibo')
+                ->body($resultado['message'])
+                ->danger()
+                ->send();
+        }
     }
 }

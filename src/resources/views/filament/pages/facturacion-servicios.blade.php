@@ -13,6 +13,7 @@
          ============================================================ --}}
     <style>
         [x-cloak] { display: none !important; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
         .dp-fact-wrap {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -782,11 +783,25 @@
                                                     $tel = preg_replace('/[^0-9]/', '', $sub->cliente_telefono);
                                                     $msg = rawurlencode("Hola {$sub->cliente_nombre}, le contactamos de DataPlus para recordarle el pago de su servicio mensual de Gestión Remota por un total de $" . number_format($sub->monto_a_cobrar, 2) . " {$sub->moneda}. Recuerde enviar el comprobante de su transferencia a este chat. ¡Muchas gracias!");
                                                 @endphp
+                                                <button type="button"
+                                                        wire:click="enviarWhatsAppChatwoot({{ $sub->id }})"
+                                                        wire:loading.attr="disabled"
+                                                        title="Enviar recordatorio oficial por WhatsApp (Chatwoot Asistencia Técnica)"
+                                                        style="display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; padding: 0.45rem 0.65rem; border-radius: 0.5rem; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.75rem; font-weight: 600; cursor: pointer; text-decoration: none;">
+                                                    <span wire:loading.remove wire:target="enviarWhatsAppChatwoot({{ $sub->id }})" style="display: inline-flex; align-items: center; gap: 0.25rem;">
+                                                        <x-heroicon-m-chat-bubble-left-ellipsis style="width: 1rem; height: 1rem;" />
+                                                        <span>Chatwoot</span>
+                                                    </span>
+                                                    <span wire:loading wire:target="enviarWhatsAppChatwoot({{ $sub->id }})" style="display: none; align-items: center; gap: 0.25rem;">
+                                                        <svg style="animation: spin 1s linear infinite; width: 0.85rem; height: 0.85rem;" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" style="opacity: 0.25;"></circle><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" style="opacity: 0.75;"></path></svg>
+                                                        <span>Enviando...</span>
+                                                    </span>
+                                                </button>
                                                 <a href="https://wa.me/{{ $tel }}?text={{ $msg }}"
                                                    target="_blank"
-                                                   title="Contactar y Cobrar por WhatsApp"
-                                                   style="display: inline-flex; align-items: center; justify-content: center; padding: 0.45rem; border-radius: 0.5rem; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); text-decoration: none;">
-                                                    <x-heroicon-m-chat-bubble-left-ellipsis style="width: 1rem; height: 1rem;" />
+                                                   title="Abrir en WhatsApp Web directo"
+                                                   style="display: inline-flex; align-items: center; justify-content: center; padding: 0.45rem; border-radius: 0.5rem; background: rgba(100, 116, 139, 0.2); color: #94a3b8; border: 1px solid rgba(100, 116, 139, 0.3); text-decoration: none;">
+                                                    <x-heroicon-m-arrow-top-right-on-square style="width: 0.85rem; height: 0.85rem;" />
                                                 </a>
                                             @endif
                                         </div>
@@ -915,11 +930,25 @@
                                             $telD = preg_replace('/[^0-9]/', '', $d->cliente_telefono);
                                             $msgD = rawurlencode("Hola {$d->cliente_nombre}, le contactamos de DataPlus para recordarle que presenta {$d->meses_deuda_count} meses pendientes de pago por su servicio de Gestión Remota. El monto total es de $" . number_format($d->monto_a_cobrar, 2) . " {$d->moneda}. Le solicitamos realizar la liquidación a la brevedad.");
                                         @endphp
+                                        <button type="button"
+                                                wire:click="enviarWhatsAppDeudorChatwoot({{ $d->id }})"
+                                                wire:loading.attr="disabled"
+                                                title="Enviar aviso por WhatsApp desde la cuenta de Asistencia Técnica"
+                                                style="display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; padding: 0.45rem 0.65rem; border-radius: 0.5rem; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.75rem; font-weight: 600; cursor: pointer;">
+                                            <span wire:loading.remove wire:target="enviarWhatsAppDeudorChatwoot({{ $d->id }})" style="display: inline-flex; align-items: center; gap: 0.25rem;">
+                                                <x-heroicon-m-chat-bubble-left-ellipsis style="width: 1rem; height: 1rem;" />
+                                                <span>Avisar Chatwoot</span>
+                                            </span>
+                                            <span wire:loading wire:target="enviarWhatsAppDeudorChatwoot({{ $d->id }})" style="display: none; align-items: center; gap: 0.25rem;">
+                                                <svg style="animation: spin 1s linear infinite; width: 0.85rem; height: 0.85rem;" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" style="opacity: 0.25;"></circle><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" style="opacity: 0.75;"></path></svg>
+                                                <span>Enviando...</span>
+                                            </span>
+                                        </button>
                                         <a href="https://wa.me/{{ $telD }}?text={{ $msgD }}"
                                            target="_blank"
-                                           title="Contactar vía WhatsApp"
-                                           style="display: inline-flex; align-items: center; justify-content: center; padding: 0.5rem; border-radius: 0.5rem; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); text-decoration: none;">
-                                            <x-heroicon-m-chat-bubble-left-ellipsis style="width: 1rem; height: 1rem;" />
+                                           title="Abrir en WhatsApp Web directo"
+                                           style="display: inline-flex; align-items: center; justify-content: center; padding: 0.45rem; border-radius: 0.5rem; background: rgba(100, 116, 139, 0.2); color: #94a3b8; border: 1px solid rgba(100, 116, 139, 0.3); text-decoration: none;">
+                                            <x-heroicon-m-arrow-top-right-on-square style="width: 0.85rem; height: 0.85rem;" />
                                         </a>
                                     @endif
                                     <button type="button"
@@ -1303,13 +1332,31 @@
                             $msgR = rawurlencode("*DATAPLUS - RECIBO DE PAGO*\nRecibo: {$reciboActual['codigo_pago']}\nCliente: {$reciboActual['cliente_nombre']}\nMes: {$reciboActual['mes_nombre']}\nMonto: $" . number_format($reciboActual['monto_pagado'] ?? 0, 2) . " {$reciboActual['moneda']}\n¡Pago verificado y registrado exitosamente!");
                             $linkWpRecibo = "https://wa.me/{$telR}?text={$msgR}";
                         @endphp
-                        <a href="{{ $linkWpRecibo }}"
-                           target="_blank"
-                           class="dp-btn-emerald"
-                           style="text-decoration: none;">
-                            <x-heroicon-m-share style="width: 1rem; height: 1rem;" />
-                            <span>Enviar por WhatsApp</span>
-                        </a>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <button type="button"
+                                    wire:click="enviarReciboChatwoot"
+                                    wire:loading.attr="disabled"
+                                    class="dp-btn-emerald"
+                                    title="Enviar comprobante oficial por WhatsApp desde la cuenta de Asistencia Técnica">
+                                <span wire:loading.remove wire:target="enviarReciboChatwoot" style="display: inline-flex; align-items: center; gap: 0.35rem;">
+                                    <x-heroicon-m-chat-bubble-left-ellipsis style="width: 1rem; height: 1rem;" />
+                                    <span>Enviar por WhatsApp (Chatwoot)</span>
+                                </span>
+                                <span wire:loading wire:target="enviarReciboChatwoot" style="display: none; align-items: center; gap: 0.35rem;">
+                                    <svg style="animation: spin 1s linear infinite; width: 0.9rem; height: 0.9rem;" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" style="opacity: 0.25;"></circle><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" style="opacity: 0.75;"></path></svg>
+                                    <span>Enviando...</span>
+                                </span>
+                            </button>
+
+                            <a href="{{ $linkWpRecibo }}"
+                               target="_blank"
+                               class="dp-btn-secondary"
+                               style="text-decoration: none; padding: 0.5rem 0.75rem;"
+                               title="Abrir en WhatsApp Web directo">
+                                <x-heroicon-m-arrow-top-right-on-square style="width: 0.9rem; height: 0.9rem;" />
+                                <span>Web</span>
+                            </a>
+                        </div>
 
                         <button type="button" wire:click="$set('modalReciboOpen', false)" class="dp-btn-secondary">
                             Cerrar
