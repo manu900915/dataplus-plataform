@@ -565,14 +565,48 @@
                     </select>
                 </div>
 
-                <div class="dp-input-group">
-                    <label class="dp-input-label" style="opacity: 0;">Acción</label>
-                    <div class="dp-btn-group-actions">
+                <div class="dp-input-group" style="min-width: 320px;">
+                    <label class="dp-input-label" style="opacity: 0;">Acciones de Gestión</label>
+                    <div class="dp-btn-group-actions" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <button type="button"
+                                wire:click="sincronizarClientes"
+                                wire:loading.attr="disabled"
+                                class="dp-btn-secondary"
+                                style="height: 38px; padding: 0.45rem 0.75rem; font-size: 0.75rem; border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;"
+                                title="Sincronizar todos los clientes registrados hacia Facturación (Base 0)">
+                            <span wire:loading.remove wire:target="sincronizarClientes" style="display: inline-flex; align-items: center; gap: 0.35rem;">
+                                <x-heroicon-m-arrow-path style="width: 0.95rem; height: 0.95rem;" />
+                                <span>Sincronizar Clientes</span>
+                            </span>
+                            <span wire:loading wire:target="sincronizarClientes" style="display: none; align-items: center; gap: 0.35rem;">
+                                <svg style="animation: spin 1s linear infinite; width: 0.85rem; height: 0.85rem;" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" style="opacity: 0.25;"></circle><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" style="opacity: 0.75;"></path></svg>
+                                <span>Sincronizando...</span>
+                            </span>
+                        </button>
+
+                        <button type="button"
+                                wire:click="reiniciarDatosFacturacion"
+                                wire:confirm="¿Estás seguro de que deseas reiniciar los datos de facturación? Se limpiarán los cobros de prueba y todos los clientes quedarán listados con mensualidad y deuda en $0.00 para llenado contable."
+                                wire:loading.attr="disabled"
+                                class="dp-btn-secondary"
+                                style="height: 38px; padding: 0.45rem 0.75rem; font-size: 0.75rem; border-color: rgba(244, 63, 94, 0.35); color: #fb7185;"
+                                title="Limpiar datos de prueba y comenzar con clientes en base 0">
+                            <span wire:loading.remove wire:target="reiniciarDatosFacturacion" style="display: inline-flex; align-items: center; gap: 0.35rem;">
+                                <x-heroicon-m-trash style="width: 0.95rem; height: 0.95rem;" />
+                                <span>Limpiar y Base 0</span>
+                            </span>
+                            <span wire:loading wire:target="reiniciarDatosFacturacion" style="display: none; align-items: center; gap: 0.35rem;">
+                                <svg style="animation: spin 1s linear infinite; width: 0.85rem; height: 0.85rem;" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" style="opacity: 0.25;"></circle><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" style="opacity: 0.75;"></path></svg>
+                                <span>Limpiando...</span>
+                            </span>
+                        </button>
+
                         <button type="button"
                                 wire:click="$set('modalNuevaSubOpen', true)"
                                 class="dp-btn-primary"
+                                style="height: 38px; padding: 0.45rem 0.85rem; font-size: 0.75rem;"
                                 title="Crear nueva suscripción de servicio de Gestión Remota">
-                            <x-heroicon-m-plus style="width: 1.1rem; height: 1.1rem; stroke-width: 2.5;" />
+                            <x-heroicon-m-plus style="width: 1rem; height: 1rem; stroke-width: 2.5;" />
                             <span>Nueva Suscripción</span>
                         </button>
                     </div>
@@ -759,7 +793,16 @@
                                         @endif
                                     </td>
                                     <td style="text-align: center;">
-                                        <div style="display: inline-flex; align-items: center; gap: 0.4rem; justify-content: center;">
+                                        <div style="display: inline-flex; align-items: center; gap: 0.35rem; justify-content: center;">
+                                            <button type="button"
+                                                    wire:click="abrirModalEditar({{ $sub->id }})"
+                                                    class="dp-btn-secondary"
+                                                    style="height: 32px; padding: 0.35rem 0.65rem; font-size: 0.75rem; border-color: rgba(56, 189, 248, 0.35); color: #38bdf8;"
+                                                    title="Editar mensualidad, deuda previa y parámetros contables de este cliente">
+                                                <x-heroicon-m-pencil-square style="width: 0.9rem; height: 0.9rem;" />
+                                                <span>Editar</span>
+                                            </button>
+
                                             @if($esCobrado)
                                                 <button type="button"
                                                         wire:click="abrirModalRecibo({{ $sub->id }})"
@@ -952,6 +995,14 @@
                                         </a>
                                     @endif
                                     <button type="button"
+                                            wire:click="abrirModalEditar({{ $d->id }})"
+                                            class="dp-btn-secondary"
+                                            style="height: 32px; padding: 0.4rem 0.65rem; font-size: 0.75rem; border-color: rgba(56, 189, 248, 0.35); color: #38bdf8;"
+                                            title="Editar parámetros contables y deuda de este cliente">
+                                        <x-heroicon-m-pencil-square style="width: 0.85rem; height: 0.85rem;" />
+                                        <span>Editar</span>
+                                    </button>
+                                    <button type="button"
                                             wire:click="abrirModalPago({{ $d->id }})"
                                             class="dp-btn-primary"
                                             style="height: 32px; padding: 0.4rem 0.85rem; font-size: 0.75rem; background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%); box-shadow: 0 4px 10px rgba(244, 63, 94, 0.3);">
@@ -1037,32 +1088,47 @@
 
                     @php
                         $filas = $reporteTemporal['filas'] ?? [];
-                        $cantPuntos = max(count($filas), 1);
+                        $cantPuntos = count($filas);
                         $svgW = 860;
                         $svgH = 220;
-                        $padX = 50;
-                        $padY = 30;
+                        $padX = 55;
+                        $padY = 32;
                         $innerW = $svgW - ($padX * 2);
                         $innerH = $svgH - ($padY * 2);
-                        $maxCUP = 28000;
-                        $metaY = $svgH - $padY - ((24500 / $maxCUP) * $innerH);
+
+                        // Escala dinámica según los valores máximos del periodo seleccionado
+                        $montosCUP = array_map(fn($f) => floatval($f['cup_cobrado'] ?? 0), $filas);
+                        $montosCUP[] = 25000;
+                        $maxCUP = max(max($montosCUP), 1000) * 1.18;
+
+                        // Meta según periodo
+                        $metaMonto = ($periodoReporte === 'anual') 
+                            ? 294000 
+                            : (($periodoReporte === 'semestral') 
+                                ? 147000 
+                                : (($periodoReporte === 'trimestral') ? 73500 : 24500));
+                        $metaY = max($padY, min($svgH - $padY, $svgH - $padY - (($metaMonto / $maxCUP) * $innerH)));
 
                         $puntos = [];
                         foreach ($filas as $idx => $f) {
-                            $x = $padX + ($idx / max($cantPuntos - 1, 1)) * $innerW;
+                            $x = ($cantPuntos > 1) 
+                                ? $padX + ($idx / ($cantPuntos - 1)) * $innerW 
+                                : $padX + ($innerW / 2);
                             $monto = floatval($f['cup_cobrado'] ?? 0);
-                            $y = $svgH - $padY - (($monto / $maxCUP) * $innerH);
+                            $y = max($padY, min($svgH - $padY, $svgH - $padY - (($monto / $maxCUP) * $innerH)));
                             $puntos[] = [
                                 'x' => $x,
                                 'y' => $y,
                                 'monto' => $monto,
                                 'usd' => floatval($f['usd_cobrado'] ?? 0),
-                                'label' => $f['etiqueta'] ?? "P{$idx}",
-                                'pct' => $f['porcentaje_meta'] ?? 0
+                                'label' => $f['etiqueta'] ?? $f['periodo'] ?? "P{$idx}",
+                                'pct' => intval($f['porcentaje_meta'] ?? rtrim($f['cumplimiento'] ?? '0', '%'))
                             ];
                         }
                         $polylinePoints = implode(' ', array_map(fn($p) => "{$p['x']},{$p['y']}", $puntos));
-                        $areaPoints = "{$padX}," . ($svgH - $padY) . " " . $polylinePoints . " " . ($svgW - $padX) . "," . ($svgH - $padY);
+                        $areaPoints = ($cantPuntos > 0)
+                            ? "{$puntos[0]['x']}," . ($svgH - $padY) . " " . $polylinePoints . " " . (end($puntos)['x']) . "," . ($svgH - $padY)
+                            : "";
                     @endphp
 
                     <div style="width: 100%; overflow-x: auto;">
@@ -1081,7 +1147,7 @@
                                     $valG = $maxCUP - ($g * ($maxCUP / 4));
                                 @endphp
                                 <line x1="{{ $padX }}" y1="{{ $gy }}" x2="{{ $svgW - $padX }}" y2="{{ $gy }}" stroke="#1e293b" stroke-width="1" stroke-dasharray="3 3" />
-                                <text x="{{ $padX - 8 }}" y="{{ $gy + 4 }}" fill="#64748b" font-size="9" text-anchor="end" font-family="monospace">${{ number_format($valG / 1000) }}k</text>
+                                <text x="{{ $padX - 8 }}" y="{{ $gy + 4 }}" fill="#64748b" font-size="9" text-anchor="end" font-family="monospace">${{ number_format($valG / 1000, 1) }}k</text>
                             @endfor
 
                             {{-- Línea de Meta --}}
@@ -1089,8 +1155,12 @@
                             <text x="{{ $svgW - $padX + 8 }}" y="{{ $metaY + 3 }}" fill="#fbbf24" font-size="9" font-family="monospace">Meta</text>
 
                             {{-- Área y Línea continua --}}
-                            <polygon points="{{ $areaPoints }}" fill="url(#chartGradient)" />
-                            <polyline points="{{ $polylinePoints }}" fill="none" stroke="#10b981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+                            @if(!empty($areaPoints))
+                                <polygon points="{{ $areaPoints }}" fill="url(#chartGradient)" />
+                            @endif
+                            @if(!empty($polylinePoints))
+                                <polyline points="{{ $polylinePoints }}" fill="none" stroke="#10b981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+                            @endif
 
                             {{-- Nodos interactivos --}}
                             @foreach($puntos as $pt)
@@ -1117,19 +1187,24 @@
                         <tbody>
                             @foreach($filas as $f)
                                 <tr>
-                                    <td style="font-weight: 700; color: #ffffff;">{{ $f['etiqueta'] }}</td>
+                                    <td style="font-weight: 700; color: #ffffff;">
+                                        {{ $f['periodo'] ?? $f['etiqueta'] ?? 'Período' }}
+                                    </td>
                                     <td style="text-align: right; font-family: ui-monospace, monospace; color: #34d399; font-weight: 700;">
-                                        ${{ number_format($f['cup_cobrado'], 2) }} CUP
+                                        ${{ number_format(floatval($f['cup_cobrado'] ?? 0), 2) }} CUP
                                     </td>
                                     <td style="text-align: right; font-family: ui-monospace, monospace; color: #38bdf8;">
-                                        ${{ number_format($f['usd_cobrado'], 2) }} USD
+                                        ${{ number_format(floatval($f['usd_cobrado'] ?? 0), 2) }} USD
                                     </td>
                                     <td style="text-align: right; font-family: ui-monospace, monospace; color: #e2e8f0;">
-                                        {{ $f['total_cobros'] }}
+                                        {{ $f['total_cobros'] ?? 0 }}
                                     </td>
                                     <td style="text-align: center;">
-                                        <span class="dp-badge {{ $f['porcentaje_meta'] >= 80 ? 'dp-badge-emerald' : 'dp-badge-amber' }}">
-                                            {{ $f['porcentaje_meta'] }}%
+                                        @php
+                                            $pct = intval($f['porcentaje_meta'] ?? rtrim($f['cumplimiento'] ?? '0', '%'));
+                                        @endphp
+                                        <span class="dp-badge {{ $pct >= 80 ? 'dp-badge-emerald' : 'dp-badge-amber' }}">
+                                            {{ $pct }}%
                                         </span>
                                     </td>
                                 </tr>
@@ -1438,6 +1513,132 @@
                         <button type="button" wire:click="guardarNuevaSub" class="dp-btn-primary">
                             <x-heroicon-m-check style="width: 1.1rem; height: 1.1rem; stroke-width: 2.5;" />
                             <span>Crear Suscripción</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        @endif
+
+        {{-- ─── MODAL 5: EDITAR SUSCRIPCIÓN (CONTADORA / FINANZAS) ─── --}}
+        @if($modalEditarSubOpen)
+            <div x-data
+                 x-on:click.self="$wire.set('modalEditarSubOpen', false)"
+                 x-on:keydown.escape.window="$wire.set('modalEditarSubOpen', false)"
+                 class="dp-modal-overlay">
+                <div x-on:click.stop class="dp-modal-card" style="max-width: 600px;">
+                    <div class="dp-modal-header">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <x-heroicon-o-pencil-square style="width: 1.35rem; height: 1.35rem; color: #38bdf8;" />
+                            <div>
+                                <h3 class="dp-modal-title">Editar Parámetros de Facturación</h3>
+                                <p style="font-size: 0.75rem; color: #94a3b8; margin: 0.2rem 0 0;">
+                                    Asignar mensualidad, deuda previa y datos técnicos del cliente
+                                </p>
+                            </div>
+                        </div>
+                        <button type="button" wire:click="$set('modalEditarSubOpen', false)" class="dp-modal-close-btn">
+                            <x-heroicon-m-x-mark style="width: 1.25rem; height: 1.25rem;" />
+                        </button>
+                    </div>
+
+                    {{-- Tarjeta de Identificación del Cliente --}}
+                    <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid #1e293b; border-radius: 0.5rem; padding: 0.75rem 1rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <span style="font-size: 0.7rem; text-transform: uppercase; color: #64748b; font-weight: 700;">Cliente</span>
+                            <div style="font-size: 0.95rem; font-weight: 800; color: #ffffff;">
+                                {{ $editSubClienteNombre }}
+                            </div>
+                        </div>
+                        <span class="dp-badge dp-badge-sky" style="font-family: monospace;">
+                            ID #{{ $editSubId }}
+                        </span>
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 0.85rem; font-size: 0.8rem;">
+                        {{-- Mensualidad y Moneda --}}
+                        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 0.75rem;">
+                            <div class="dp-input-group">
+                                <label class="dp-input-label">Mensualidad a Cobrar</label>
+                                <input wire:model="editSubMonto" type="number" step="0.01" min="0" class="dp-input-field" style="font-family: monospace; font-weight: 800; font-size: 0.95rem; color: #34d399;" />
+                            </div>
+                            <div class="dp-input-group">
+                                <label class="dp-input-label">Moneda</label>
+                                <select wire:model="editSubMoneda" class="dp-input-field dp-select-field">
+                                    <option value="CUP">CUP ($)</option>
+                                    <option value="USD">USD ($)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {{-- Deuda Previa y Meses de Mora --}}
+                        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 0.75rem;">
+                            <div class="dp-input-group">
+                                <label class="dp-input-label">Deuda Previa Acumulada</label>
+                                <input wire:model="editSubDeuda" type="number" step="0.01" min="0" class="dp-input-field" style="font-family: monospace; font-weight: 800; font-size: 0.95rem; color: #fb7185;" />
+                            </div>
+                            <div class="dp-input-group">
+                                <label class="dp-input-label">Meses de Mora</label>
+                                <input wire:model="editSubMesesDeuda" type="number" step="1" min="0" class="dp-input-field" />
+                            </div>
+                        </div>
+
+                        {{-- Cuadro Informativo de Total Exigible --}}
+                        @php
+                            $calcMonto = floatval($editSubMonto);
+                            $calcDeuda = floatval($editSubDeuda);
+                            $calcTotal = $calcMonto + $calcDeuda;
+                        @endphp
+                        <div style="background: rgba(30, 41, 59, 0.4); border: 1px dashed rgba(56, 189, 248, 0.3); border-radius: 0.5rem; padding: 0.65rem 0.85rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem;">
+                            <span style="color: #94a3b8;">Total Exigible al Cliente en el mes:</span>
+                            <span style="font-family: monospace; font-size: 1rem; font-weight: 800; color: #38bdf8;">
+                                ${{ number_format($calcTotal, 2) }} {{ $editSubMoneda }}
+                            </span>
+                        </div>
+
+                        {{-- Teléfono WhatsApp y SIM --}}
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                            <div class="dp-input-group">
+                                <label class="dp-input-label">Teléfono (WhatsApp / Chatwoot)</label>
+                                <input wire:model="editSubClienteTelefono" type="text" placeholder="+53 5284 9102" class="dp-input-field" />
+                            </div>
+                            <div class="dp-input-group">
+                                <label class="dp-input-label">Número de SIM / Línea</label>
+                                <input wire:model="editSubSim" type="text" placeholder="5352849102" class="dp-input-field" />
+                            </div>
+                        </div>
+
+                        {{-- Solución y Día Límite --}}
+                        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 0.75rem;">
+                            <div class="dp-input-group">
+                                <label class="dp-input-label">Solución Técnica / Router</label>
+                                <input wire:model="editSubSolucion" type="text" placeholder="Router 4G LTE Huawei B310" class="dp-input-field" />
+                            </div>
+                            <div class="dp-input-group">
+                                <label class="dp-input-label">Día Límite de Cobro</label>
+                                <input wire:model="editSubDiaLimite" type="number" min="1" max="31" class="dp-input-field" />
+                            </div>
+                        </div>
+
+                        {{-- Notas Contables --}}
+                        <div class="dp-input-group">
+                            <label class="dp-input-label">Observaciones Contables / Historial</label>
+                            <input wire:model="editSubNotas" type="text" placeholder="Ej. Tarifa acordada en contrato. Liquidar vía Transfermóvil." class="dp-input-field" />
+                        </div>
+
+                        {{-- Estado Activo --}}
+                        <label style="display: inline-flex; align-items: center; gap: 0.5rem; color: #e2e8f0; font-size: 0.75rem; cursor: pointer; margin-top: 0.25rem;">
+                            <input wire:model="editSubActivo" type="checkbox" style="width: 1rem; height: 1rem; accent-color: #38bdf8;" />
+                            <span>Servicio activo y facturable para este cliente</span>
+                        </label>
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #1e293b;">
+                        <button type="button" wire:click="$set('modalEditarSubOpen', false)" class="dp-btn-secondary">
+                            Cancelar
+                        </button>
+                        <button type="button" wire:click="guardarEdicionSuscripcion" class="dp-btn-primary">
+                            <x-heroicon-m-check style="width: 1.1rem; height: 1.1rem; stroke-width: 2.5;" />
+                            <span>Guardar Parámetros</span>
                         </button>
                     </div>
                 </div>

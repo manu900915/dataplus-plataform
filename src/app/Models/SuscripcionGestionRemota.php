@@ -57,6 +57,27 @@ class SuscripcionGestionRemota extends Model
 
     public function getTotalCobrarAttribute(): float
     {
-        return (float) $this->monto_mensual + (float) $this->deuda_acumulada;
+        return (float) ($this->monto_mensual ?? 0) + (float) ($this->deuda_acumulada ?? 0);
+    }
+
+    public function getTarifaMensualAttribute(): float
+    {
+        return (float) ($this->monto_mensual ?? 0);
+    }
+
+    public function getMontoACobrarAttribute(): float
+    {
+        return (float) ($this->monto_mensual ?? 0) + (float) ($this->deuda_acumulada ?? 0);
+    }
+
+    public function getEstadoCobroMesActualAttribute(): string
+    {
+        if ($this->tiene_deuda || (float) $this->deuda_acumulada > 0 || (int) $this->meses_deuda_count > 0) {
+            return 'En_Mora';
+        }
+        if ($this->estado_cobro === 'cobrado' || $this->estado_cobro === 'al_dia') {
+            return 'Al_Dia';
+        }
+        return 'Pendiente';
     }
 }
