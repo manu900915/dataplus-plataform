@@ -624,10 +624,10 @@
                     <h1 class="dp-rep-hero-title">Facturación de Gestión Remota & Servicios Recurrentes</h1>
                     <p class="dp-rep-hero-sub">
                         DataPlus S.R.L. · 
-                        @if($metricas['periodo_vencido'])
+                        @if($metricas['periodo_vencido'] ?? $metricas['periodoVencido'] ?? false)
                             <strong style="color: #fecdd3;">Plazo Vencido: Cuentas no liquidadas en mora</strong>
                         @else
-                            Plazo en curso: <strong style="color: #bae6fd;">{{ $metricas['dias_restantes_15'] }} días restantes</strong> (Día {{ $metricas['dia_del_mes'] }} de 15)
+                            Plazo en curso: <strong style="color: #bae6fd;">{{ $metricas['dias_restantes_15'] ?? $metricas['diasRestantes15'] ?? 0 }} días restantes</strong> (Día {{ $metricas['dia_del_mes'] ?? $metricas['diaDelMes'] ?? 1 }} de 15)
                         @endif
                         · Norma operativa: Liquidación en los primeros 15 días del mes.
                     </p>
@@ -635,11 +635,11 @@
                 <div class="dp-rep-hero-badge">
                     <p style="font-size: 0.65rem; text-transform: uppercase; font-weight: 700; color: #e0f2fe; margin: 0;">Recaudado Mes en Curso</p>
                     <p style="font-size: 1.65rem; font-weight: 800; color: #ffffff; margin: 0.25rem 0 0; line-height: 1; font-family: ui-monospace, monospace;">
-                        ${{ number_format($metricas['recaudado_cup'], 2) }} <span style="font-size: 0.85rem; color: #7dd3fc;">CUP</span>
+                        ${{ number_format($metricas['recaudado_cup'] ?? $metricas['recaudadoCup'] ?? 0, 2) }} <span style="font-size: 0.85rem; color: #7dd3fc;">CUP</span>
                     </p>
-                    @if($metricas['recaudado_usd'] > 0)
+                    @if(($metricas['recaudado_usd'] ?? $metricas['recaudadoUsd'] ?? 0) > 0)
                         <p style="font-size: 0.8rem; font-weight: 700; color: #38bdf8; margin: 0.35rem 0 0; font-family: ui-monospace, monospace;">
-                            +${{ number_format($metricas['recaudado_usd'], 2) }} USD
+                            +${{ number_format($metricas['recaudado_usd'] ?? $metricas['recaudadoUsd'] ?? 0, 2) }} USD
                         </p>
                     @endif
                 </div>
@@ -656,9 +656,9 @@
                         <x-heroicon-o-banknotes style="width: 1.1rem; height: 1.1rem;" />
                     </div>
                 </div>
-                <p class="dp-stat-num" style="color: #34d399;">${{ number_format($metricas['recaudado_cup'], 2) }}</p>
+                <p class="dp-stat-num" style="color: #34d399;">${{ number_format($metricas['recaudado_cup'] ?? $metricas['recaudadoCup'] ?? 0, 2) }}</p>
                 <p class="dp-stat-hint">
-                    Pendiente por recaudar: <strong style="color: #fbbf24;">${{ number_format($metricas['pendiente_cup'], 2) }} CUP</strong>
+                    Pendiente por recaudar: <strong style="color: #fbbf24;">${{ number_format($metricas['pendiente_cup'] ?? $metricas['pendienteCup'] ?? 0, 2) }} CUP</strong>
                 </p>
             </div>
 
@@ -670,9 +670,9 @@
                         <x-heroicon-o-currency-dollar style="width: 1.1rem; height: 1.1rem;" />
                     </div>
                 </div>
-                <p class="dp-stat-num" style="color: #38bdf8;">${{ number_format($metricas['recaudado_usd'], 2) }}</p>
+                <p class="dp-stat-num" style="color: #38bdf8;">${{ number_format($metricas['recaudado_usd'] ?? $metricas['recaudadoUsd'] ?? 0, 2) }}</p>
                 <p class="dp-stat-hint">
-                    Pendiente: <strong style="color: #38bdf8;">${{ number_format($metricas['pendiente_usd'], 2) }} USD</strong>
+                    Pendiente: <strong style="color: #38bdf8;">${{ number_format($metricas['pendiente_usd'] ?? $metricas['pendienteUsd'] ?? 0, 2) }} USD</strong>
                 </p>
             </div>
 
@@ -684,11 +684,11 @@
                         <x-heroicon-o-exclamation-triangle style="width: 1.1rem; height: 1.1rem;" />
                     </div>
                 </div>
-                <p class="dp-stat-num" style="color: #fb7185;">${{ number_format($metricas['deuda_cup'], 2) }} <span style="font-size: 0.75rem; color: #94a3b8;">CUP</span></p>
+                <p class="dp-stat-num" style="color: #fb7185;">${{ number_format($metricas['deuda_cup'] ?? $metricas['deudaCup'] ?? 0, 2) }} <span style="font-size: 0.75rem; color: #94a3b8;">CUP</span></p>
                 <p class="dp-stat-hint">
-                    <strong style="color: #fb7185;">{{ $metricas['total_deudores'] }} clientes en mora</strong>
-                    @if($metricas['deuda_usd'] > 0)
-                        <span>(+ ${{ number_format($metricas['deuda_usd'], 2) }} USD)</span>
+                    <strong style="color: #fb7185;">{{ $metricas['total_deudores'] ?? $metricas['totalDeudores'] ?? 0 }} clientes en mora</strong>
+                    @if(($metricas['deuda_usd'] ?? $metricas['deudaUsd'] ?? 0) > 0)
+                        <span>(+ ${{ number_format($metricas['deuda_usd'] ?? $metricas['deudaUsd'] ?? 0, 2) }} USD)</span>
                     @endif
                 </p>
             </div>
@@ -701,9 +701,9 @@
                         <x-heroicon-o-signal style="width: 1.1rem; height: 1.1rem;" />
                     </div>
                 </div>
-                <p class="dp-stat-num" style="color: #c084fc;">{{ $metricas['total_routers'] ?? count($suscripciones) }} <span style="font-size: 0.75rem; color: #94a3b8;">Routers</span></p>
+                <p class="dp-stat-num" style="color: #c084fc;">{{ $metricas['total_routers'] ?? $metricas['totalRouters'] ?? count($suscripciones) }} <span style="font-size: 0.75rem; color: #94a3b8;">Routers</span></p>
                 <p class="dp-stat-hint">
-                    {{ $metricas['al_dia_count'] ?? 0 }} cobros al día ({{ $metricas['porcentaje_al_dia'] ?? 50 }}% cumplimiento)
+                    {{ $metricas['al_dia_count'] ?? $metricas['alDiaCount'] ?? 0 }} cobros al día ({{ $metricas['porcentaje_al_dia'] ?? $metricas['porcentajeAlDia'] ?? 50 }}% cumplimiento)
                 </p>
             </div>
         </div>

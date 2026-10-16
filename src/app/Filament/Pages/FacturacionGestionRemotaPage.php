@@ -148,12 +148,16 @@ class FacturacionGestionRemotaPage extends Page
 
         $metaCup = 24500.0;
         $porcentajeMetaCup = $metaCup > 0 ? min(100, round(($recaudadoCup / $metaCup) * 100)) : 0;
+        $totalSuscripciones = $subs->count();
+        $alDiaCount = $subs->where('estado_cobro', 'cobrado')->count();
+        $porcentajeAlDia = $totalSuscripciones > 0 ? (int) round(($alDiaCount / $totalSuscripciones) * 100) : 100;
 
         return [
+            // camelCase
             "diaDelMes" => $diaDelMes,
             "diasRestantes15" => $diasRestantes15,
             "periodoVencido" => $periodoVencido,
-            "totalSuscripciones" => $subs->count(),
+            "totalSuscripciones" => $totalSuscripciones,
             "totalDeudores" => $totalDeudores,
             "recaudadoCup" => $recaudadoCup,
             "recaudadoUsd" => $recaudadoUsd,
@@ -163,6 +167,27 @@ class FacturacionGestionRemotaPage extends Page
             "deudaUsd" => $deudaUsd,
             "metaCup" => $metaCup,
             "porcentajeMetaCup" => $porcentajeMetaCup,
+            "totalRouters" => $totalSuscripciones,
+            "alDiaCount" => $alDiaCount,
+            "porcentajeAlDia" => $porcentajeAlDia,
+
+            // snake_case
+            "dia_del_mes" => $diaDelMes,
+            "dias_restantes_15" => $diasRestantes15,
+            "periodo_vencido" => $periodoVencido,
+            "total_suscripciones" => $totalSuscripciones,
+            "total_deudores" => $totalDeudores,
+            "recaudado_cup" => $recaudadoCup,
+            "recaudado_usd" => $recaudadoUsd,
+            "pendiente_cup" => $pendienteCup,
+            "pendiente_usd" => $pendienteUsd,
+            "deuda_cup" => $deudaCup,
+            "deuda_usd" => $deudaUsd,
+            "meta_cup" => $metaCup,
+            "porcentaje_meta_cup" => $porcentajeMetaCup,
+            "total_routers" => $totalSuscripciones,
+            "al_dia_count" => $alDiaCount,
+            "porcentaje_al_dia" => $porcentajeAlDia,
         ];
     }
 
