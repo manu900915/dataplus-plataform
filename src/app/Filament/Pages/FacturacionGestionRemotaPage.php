@@ -399,7 +399,79 @@ class FacturacionGestionRemotaPage extends Page
      */
     public function sincronizarClientes(): void
     {
-        // 1. Si no hay clientes en la base de datos, importar desde CSV listado único
+        // 1. Sincronizar prioritariamente los clientes con Servicio de Gestión Remota activo
+        $serviciosGR = Servicio::where('tipo', 'Gestion_Remota')
+            ->with(['ubicacion.cliente'])
+            ->get();
+
+        $agregados = 0;
+        $actualizados = 0;
+
+        if ($serviciosGR->isNotEmpty()) {
+            foreach ($serviciosGR as $srv) {
+                $cliente = $srv->cliente;
+                if (!$cliente && $srv->cliente_ubicacion_id) {
+                    $ub = ClienteUbicacion::find($srv->cliente_ubicacion_id);
+                    $cliente = $ub ? Cliente::find($ub->cliente_id) : null;
+                }
+                if (!$cliente) continue;
+
+                $nombre = trim($cliente->nombre);
+                $tel = $cliente->telefono ?: ($cliente->contactos()->first()?->telefono ?? '');
+                $solucion = $srv->gr_tipo_solucion ?: ($srv->gr_marca_modelo ?: 'Router 4G LTE');
+                $sim = $srv->gr_sim_numero ?: '';
+                $tarifa = (float) ($srv->gr_recarga_monto ?? 0);
+
+                $sub = SuscripcionGestionRemota::where('cliente_id', $cliente->id)
+                    ->orWhere('cliente_nombre', $nombre)
+                    ->first();
+
+                if (!$sub) {
+                    $codigo = "SUB-" . str_pad((string) (SuscripcionGestionRemota::count() + 1), 3, "0", STR_PAD_LEFT);
+                    SuscripcionGestionRemota::create([
+                        'codigo' => $codigo,
+                        'cliente_id' => $cliente->id,
+                        'cliente_nombre' => $nombre,
+                        'cliente_telefono' => $tel,
+                        'servicio_tipo' => 'Gestion_Remota',
+                        'tipo_solucion' => $solucion,
+                        'sim_numero' => $sim,
+                        'moneda' => 'CUP',
+                        'monto_mensual' => $tarifa,
+                        'dia_pago_limite' => 15,
+                        'mes_adelantado' => true,
+                        'tiene_deuda' => false,
+                        'meses_deuda_count' => 0,
+                        'meses_deuda_detalle' => json_encode([]),
+                        'deuda_acumulada' => 0.00,
+                        'ultimo_mes_pagado' => null,
+                        'estado_cobro' => 'al_dia',
+                        'activo' => true,
+                        'notas' => 'Sincronizado automáticamente desde Servicio de Gestión Remota.',
+                    ]);
+                    $agregados++;
+                } else {
+                    $cambios = [];
+                    if (!$sub->cliente_id) $cambios['cliente_id'] = $cliente->id;
+                    if (empty($sub->sim_numero) && !empty($sim)) $cambios['sim_numero'] = $sim;
+                    if (empty($sub->tipo_solucion) && !empty($solucion)) $cambios['tipo_solucion'] = $solucion;
+                    if (empty($sub->cliente_telefono) && !empty($tel)) $cambios['cliente_telefono'] = $tel;
+                    if (!empty($cambios)) {
+                        $sub->update($cambios);
+                        $actualizados++;
+                    }
+                }
+            }
+
+            Notification::make()
+                ->title('Clientes con Gestión Remota Sincronizados')
+                ->body("{$serviciosGR->count()} servicios de Gestión Remota procesados. {$agregados} clientes agregados a facturación (base 0) y {$actualizados} actualizados.")
+                ->success()
+                ->send();
+            return;
+        }
+
+        // 2. Si no hay servicios creados aún, sincronizar desde Directorio de Clientes
         if (Cliente::count() === 0) {
             try {
                 /** @var ClienteSyncService $syncService */
@@ -419,9 +491,6 @@ class FacturacionGestionRemotaPage extends Page
                 ->send();
             return;
         }
-
-        $agregados = 0;
-        $actualizados = 0;
 
         foreach ($clientes as $c) {
             $nombre = trim($c->nombre);

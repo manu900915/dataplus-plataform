@@ -354,10 +354,115 @@ export const App: React.FC = () => {
       codigo: code
     };
     setServicios([newSrv, ...servicios]);
+
+    // Sincronización automática con Facturación de Gestión Remota
+    if (newSrv.tipo === 'Gestion_Remota') {
+      const cli = clientes.find(c => c.id === newSrv.cliente_id);
+      const clienteNombre = cli ? cli.nombre : (newSrv.cliente_nombre || 'Cliente');
+      const clienteTel = cli?.telefono || '';
+      const solucion = newSrv.gr_tipo_solucion || newSrv.gr_marca_modelo || 'Router 4G LTE';
+      const sim = newSrv.gr_sim_numero || '';
+      const tarifa = newSrv.gr_recarga_monto ? Number(newSrv.gr_recarga_monto) : 0;
+
+      setSuscripciones(prev => {
+        const existingIdx = prev.findIndex(
+          s => s.cliente_id === newSrv.cliente_id || s.cliente_nombre.toLowerCase() === clienteNombre.toLowerCase()
+        );
+        if (existingIdx >= 0) {
+          const updated = [...prev];
+          updated[existingIdx] = {
+            ...updated[existingIdx],
+            sim_numero: sim || updated[existingIdx].sim_numero,
+            tipo_solucion: solucion || updated[existingIdx].tipo_solucion,
+            cliente_telefono: clienteTel || updated[existingIdx].cliente_telefono,
+            tarifa_mensual: updated[existingIdx].tarifa_mensual || tarifa,
+          };
+          return updated;
+        }
+
+        const subCode = `SUB-${String(prev.length + 1).padStart(3, '0')}`;
+        const newSub: SuscripcionServicio = {
+          id: `sub-${Date.now()}`,
+          codigo: subCode,
+          cliente_id: newSrv.cliente_id,
+          cliente_nombre: clienteNombre,
+          cliente_telefono: clienteTel,
+          servicio_tipo: 'Gestion_Remota',
+          tipo_solucion: solucion,
+          sim_numero: sim,
+          moneda: 'CUP',
+          tarifa_mensual: tarifa,
+          dia_pago_limite: 15,
+          mes_adelantado: true,
+          tiene_deuda: false,
+          meses_deuda_count: 0,
+          meses_deuda_detalle: [],
+          deuda_acumulada: 0,
+          ultimo_mes_pagado: '',
+          estado_cobro_mes_actual: 'Al_Dia',
+          monto_a_cobrar: tarifa,
+          activo: true,
+          historial_pagos: [],
+          notas: 'Añadido automáticamente al registrar el servicio de Gestión Remota.'
+        };
+        return [newSub, ...prev];
+      });
+    }
   };
 
   const handleUpdateServicio = (actualizado: Servicio) => {
     setServicios(servicios.map(s => s.id === actualizado.id ? actualizado : s));
+
+    if (actualizado.tipo === 'Gestion_Remota') {
+      const cli = clientes.find(c => c.id === actualizado.cliente_id);
+      const clienteNombre = cli ? cli.nombre : (actualizado.cliente_nombre || 'Cliente');
+      const clienteTel = cli?.telefono || '';
+      const solucion = actualizado.gr_tipo_solucion || actualizado.gr_marca_modelo || 'Router 4G LTE';
+      const sim = actualizado.gr_sim_numero || '';
+
+      setSuscripciones(prev => {
+        const existingIdx = prev.findIndex(
+          s => s.cliente_id === actualizado.cliente_id || s.cliente_nombre.toLowerCase() === clienteNombre.toLowerCase()
+        );
+        if (existingIdx >= 0) {
+          const updated = [...prev];
+          updated[existingIdx] = {
+            ...updated[existingIdx],
+            sim_numero: sim || updated[existingIdx].sim_numero,
+            tipo_solucion: solucion || updated[existingIdx].tipo_solucion,
+            cliente_telefono: clienteTel || updated[existingIdx].cliente_telefono,
+          };
+          return updated;
+        }
+
+        const subCode = `SUB-${String(prev.length + 1).padStart(3, '0')}`;
+        const newSub: SuscripcionServicio = {
+          id: `sub-${Date.now()}`,
+          codigo: subCode,
+          cliente_id: actualizado.cliente_id,
+          cliente_nombre: clienteNombre,
+          cliente_telefono: clienteTel,
+          servicio_tipo: 'Gestion_Remota',
+          tipo_solucion: solucion,
+          sim_numero: sim,
+          moneda: 'CUP',
+          tarifa_mensual: actualizado.gr_recarga_monto ? Number(actualizado.gr_recarga_monto) : 0,
+          dia_pago_limite: 15,
+          mes_adelantado: true,
+          tiene_deuda: false,
+          meses_deuda_count: 0,
+          meses_deuda_detalle: [],
+          deuda_acumulada: 0,
+          ultimo_mes_pagado: '',
+          estado_cobro_mes_actual: 'Al_Dia',
+          monto_a_cobrar: actualizado.gr_recarga_monto ? Number(actualizado.gr_recarga_monto) : 0,
+          activo: true,
+          historial_pagos: [],
+          notas: 'Añadido automáticamente al actualizar a Gestión Remota.'
+        };
+        return [newSub, ...prev];
+      });
+    }
   };
 
   const handleDeleteServicio = (id: string) => {
@@ -525,6 +630,7 @@ export const App: React.FC = () => {
                 ventas={ventas}
                 gastos={gastos}
                 clientes={clientes}
+                servicios={servicios}
                 suscripciones={suscripciones}
                 pagosServicio={pagosServicio}
                 onAddVenta={(v) => setVentas([...ventas, { ...v, id: `vta-${Date.now()}`, codigo: `VTA-${String(ventas.length + 1).padStart(3, '0')}` }])}

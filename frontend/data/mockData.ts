@@ -227,7 +227,110 @@ export const INITIAL_INCIDENCIAS: Incidencia[] = [];
 export const INITIAL_VENTAS: Venta[] = [];
 export const INITIAL_GASTOS: Gasto[] = [];
 export const INITIAL_CONTRATOS: Contrato[] = [];
-export const INITIAL_SERVICIOS: Servicio[] = [];
+export const INITIAL_SERVICIOS: Servicio[] = [
+  {
+    id: 'srv-001',
+    codigo: 'SRV-0001',
+    cliente_id: 'cli-moraima',
+    cliente_nombre: 'Moraima Guanabo',
+    tipo: 'Gestion_Remota',
+    estado: 'Activo',
+    fecha_instalacion: '2026-01-01',
+    gr_tipo_solucion: 'Router4g',
+    gr_marca_modelo: 'Huawei B310 4G LTE',
+    gr_sim_numero: '5352849102',
+    gr_tipo_internet: 'Filtrado',
+    gr_recarga_por: 'Nosotros',
+    gr_recarga_monto: 3500,
+    gr_ultima_recarga: '2026-10-01',
+    notas: 'Servicio de enlace y gestión remota activo.'
+  },
+  {
+    id: 'srv-002',
+    codigo: 'SRV-0002',
+    cliente_id: 'cli-dainet',
+    cliente_nombre: 'Dainet Playa',
+    tipo: 'Gestion_Remota',
+    estado: 'Activo',
+    fecha_instalacion: '2026-02-15',
+    gr_tipo_solucion: 'Router+Modem',
+    gr_marca_modelo: 'MikroTik hEX S + Módem 4G',
+    gr_sim_numero: '5353418820',
+    gr_tipo_internet: 'Abierto',
+    gr_recarga_por: 'Nosotros',
+    gr_recarga_monto: 4200,
+    gr_ultima_recarga: '2026-10-01',
+    notas: 'Enlace de respaldo para cámaras y facturación.'
+  },
+  {
+    id: 'srv-003',
+    codigo: 'SRV-0003',
+    cliente_id: 'cli-el-biky',
+    cliente_nombre: 'Restaurante El Biky',
+    tipo: 'Gestion_Remota',
+    estado: 'Activo',
+    fecha_instalacion: '2026-03-10',
+    gr_tipo_solucion: 'Router4g',
+    gr_marca_modelo: 'Teltonika RUT240 Industrial',
+    gr_sim_numero: '5359114422',
+    gr_tipo_internet: 'Cerrado',
+    gr_recarga_por: 'Cliente',
+    gr_recarga_monto: 75,
+    gr_ultima_recarga: '2026-09-01',
+    notas: 'VPN túnel seguro a central de monitoreo.'
+  },
+  {
+    id: 'srv-004',
+    codigo: 'SRV-0004',
+    cliente_id: 'cli-habana-bella',
+    cliente_nombre: 'Hostal Habana Bella',
+    tipo: 'Gestion_Remota',
+    estado: 'Activo',
+    fecha_instalacion: '2026-04-05',
+    gr_tipo_solucion: 'Router4g',
+    gr_marca_modelo: 'TP-Link Archer MR600 4G Cat6',
+    gr_sim_numero: '5352147789',
+    gr_tipo_internet: 'Abierto',
+    gr_recarga_por: 'Nosotros',
+    gr_recarga_monto: 60,
+    gr_ultima_recarga: '2026-09-01',
+    notas: 'Acceso a huéspedes y monitoreo CCTV.'
+  },
+  {
+    id: 'srv-005',
+    codigo: 'SRV-0005',
+    cliente_id: 'cli-la-ceiba',
+    cliente_nombre: 'Taller Automotriz La Ceiba',
+    tipo: 'Gestion_Remota',
+    estado: 'Activo',
+    fecha_instalacion: '2026-05-12',
+    gr_tipo_solucion: 'Router4g',
+    gr_marca_modelo: 'Huawei B315s-22',
+    gr_sim_numero: '5354091123',
+    gr_tipo_internet: 'Filtrado',
+    gr_recarga_por: 'Nosotros',
+    gr_recarga_monto: 3800,
+    gr_ultima_recarga: '2026-08-01',
+    notas: 'Telemetría y control de acceso vehicular.'
+  },
+  {
+    id: 'srv-006',
+    codigo: 'SRV-0006',
+    cliente_id: 'cli-caribe',
+    cliente_nombre: 'Distribuidora del Caribe',
+    tipo: 'Gestion_Remota',
+    estado: 'Activo',
+    fecha_instalacion: '2026-06-20',
+    gr_tipo_solucion: 'Router+Modem',
+    gr_marca_modelo: 'Balanceador Dual SIM 4G',
+    gr_sim_numero: '5351002299',
+    gr_tipo_internet: 'Abierto',
+    gr_recarga_por: 'Nosotros',
+    gr_recarga_monto: 80,
+    gr_ultima_recarga: '2026-07-01',
+    notas: 'Doble enlace para alta disponibilidad logística.'
+  }
+];
 
 // Helper SVG para generar comprobantes realistas de transferencias de WhatsApp (Transfermóvil / EnZona / Zelle)
 export const createSampleVoucher = (

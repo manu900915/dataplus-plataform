@@ -32,7 +32,8 @@ import {
   RegistroPagoServicio, 
   Cliente, 
   Moneda, 
-  MetodoPagoServicio 
+  MetodoPagoServicio,
+  Servicio
 } from '../types';
 import { createSampleVoucher } from '../data/mockData';
 
@@ -40,6 +41,7 @@ interface FacturacionServiciosViewProps {
   suscripciones: SuscripcionServicio[];
   pagos: RegistroPagoServicio[];
   clientes: Cliente[];
+  servicios?: Servicio[];
   onAddPago: (pago: Omit<RegistroPagoServicio, 'id' | 'codigo_pago' | 'created_at'>) => void;
   onAddSuscripcion: (sub: Omit<SuscripcionServicio, 'id' | 'codigo'>) => void;
   onUpdateSuscripcion: (sub: SuscripcionServicio) => void;
@@ -49,6 +51,7 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
   suscripciones,
   pagos,
   clientes,
+  servicios = [],
   onAddPago,
   onAddSuscripcion,
   onUpdateSuscripcion
@@ -176,9 +179,67 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
     setIsEditModalOpen(false);
   };
 
-  // Sincronizar clientes que no estén en la lista de facturación con Base $0.00
+  // Sincronizar clientes con Servicio de Gestión Remota en la lista de facturación
   const handleSyncClientes = () => {
+    // 1. Filtrar los clientes que tienen un servicio de Gestión Remota instalado
+    const serviciosGR = servicios?.filter(s => s.tipo === 'Gestion_Remota') || [];
     let agregados = 0;
+    let actualizados = 0;
+
+    if (serviciosGR.length > 0) {
+      serviciosGR.forEach(srv => {
+        const c = clientes.find(cli => cli.id === srv.cliente_id);
+        const clienteNombre = c ? c.nombre : (srv.cliente_nombre || 'Cliente');
+        const clienteTel = c?.telefono || '';
+        const solucion = srv.gr_tipo_solucion || srv.gr_marca_modelo || 'Router 4G LTE Huawei B310';
+        const sim = srv.gr_sim_numero || '';
+        const tarifa = srv.gr_recarga_monto ? Number(srv.gr_recarga_monto) : 0;
+
+        const subExistente = suscripciones.find(
+          s => s.cliente_id === srv.cliente_id || s.cliente_nombre.trim().toLowerCase() === clienteNombre.trim().toLowerCase()
+        );
+
+        if (!subExistente) {
+          const codeNumber = suscripciones.length + agregados + 1;
+          const code = `SUB-${String(codeNumber).padStart(3, '0')}`;
+          const newSub: SuscripcionServicio = {
+            id: `sub-${Date.now()}-${agregados}`,
+            codigo: code,
+            cliente_id: srv.cliente_id,
+            cliente_nombre: clienteNombre,
+            cliente_telefono: clienteTel,
+            servicio_tipo: 'Gestion_Remota',
+            tipo_solucion: solucion,
+            sim_numero: sim,
+            moneda: 'CUP',
+            tarifa_mensual: tarifa,
+            dia_pago_limite: 15,
+            mes_adelantado: true,
+            tiene_deuda: false,
+            meses_deuda_count: 0,
+            meses_deuda_detalle: [],
+            deuda_acumulada: 0,
+            monto_a_cobrar: tarifa,
+            estado_cobro_mes_actual: 'Al_Dia',
+            activo: true,
+            notas: 'Sincronizado desde servicio de Gestión Remota activo.'
+          };
+          onAddSuscripcion(newSub);
+          agregados++;
+        } else {
+          // Si ya existe pero le faltan datos técnicos, actualizarlos
+          if (!subExistente.sim_numero && sim) {
+            onUpdateSuscripcion({ ...subExistente, sim_numero: sim });
+            actualizados++;
+          }
+        }
+      });
+
+      alert(`Sincronización completada: ${serviciosGR.length} servicios de Gestión Remota procesados. ${agregados} clientes agregados a Facturación y ${actualizados} actualizados.`);
+      return;
+    }
+
+    // 2. Si aún no hay servicios cargados, sincronizar desde Directorio de Clientes en base 0
     clientes.forEach(c => {
       const yaExiste = suscripciones.some(
         s => s.cliente_id === c.id || s.cliente_nombre.trim().toLowerCase() === c.nombre.trim().toLowerCase()

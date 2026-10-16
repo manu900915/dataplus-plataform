@@ -39,53 +39,114 @@ class SyncFacturacionClientesCommand extends Command
             }
         }
 
-        $clientes = Cliente::where('activo', true)->orderBy('nombre')->get();
-        $this->line("📋 Clientes activos encontrados: " . $clientes->count());
+        // 1. Sincronizar clientes con servicios de Gestión Remota
+        $serviciosGR = \App\Models\Servicio::where('tipo', 'Gestion_Remota')->with(['ubicacion.cliente'])->get();
+        $this->line("📡 Servicios de Gestión Remota encontrados: " . $serviciosGR->count());
 
         $agregados = 0;
         $actualizados = 0;
 
-        foreach ($clientes as $c) {
-            $nombre = trim($c->nombre);
-            if (empty($nombre)) continue;
+        if ($serviciosGR->isNotEmpty()) {
+            foreach ($serviciosGR as $srv) {
+                $c = $srv->cliente;
+                if (!$c && $srv->cliente_ubicacion_id) {
+                    $ub = \App\Models\ClienteUbicacion::find($srv->cliente_ubicacion_id);
+                    $c = $ub ? Cliente::find($ub->cliente_id) : null;
+                }
+                if (!$c) continue;
 
-            $tel = $c->telefono ?: ($c->contactos()->first()?->telefono ?? '');
+                $nombre = trim($c->nombre);
+                $tel = $c->telefono ?: ($c->contactos()->first()?->telefono ?? '');
+                $solucion = $srv->gr_tipo_solucion ?: ($srv->gr_marca_modelo ?: 'Router 4G LTE');
+                $sim = $srv->gr_sim_numero ?: '';
+                $tarifa = (float) ($srv->gr_recarga_monto ?? 0);
 
-            $sub = SuscripcionGestionRemota::where('cliente_id', $c->id)
-                ->orWhere('cliente_nombre', $nombre)
-                ->first();
+                $sub = SuscripcionGestionRemota::where('cliente_id', $c->id)
+                    ->orWhere('cliente_nombre', $nombre)
+                    ->first();
 
-            if (!$sub) {
-                $codigo = "SUB-" . str_pad((string) (SuscripcionGestionRemota::count() + 1), 3, "0", STR_PAD_LEFT);
-                SuscripcionGestionRemota::create([
-                    'codigo' => $codigo,
-                    'cliente_id' => $c->id,
-                    'cliente_nombre' => $nombre,
-                    'cliente_telefono' => $tel,
-                    'servicio_tipo' => 'Gestion_Remota',
-                    'tipo_solucion' => 'Router 4G LTE',
-                    'sim_numero' => '',
-                    'moneda' => 'CUP',
-                    'monto_mensual' => 0.00,
-                    'dia_pago_limite' => 15,
-                    'mes_adelantado' => true,
-                    'tiene_deuda' => false,
-                    'meses_deuda_count' => 0,
-                    'meses_deuda_detalle' => json_encode([]),
-                    'deuda_acumulada' => 0.00,
-                    'ultimo_mes_pagado' => null,
-                    'estado_cobro' => 'al_dia',
-                    'activo' => true,
-                    'notas' => 'Sincronizado desde Directorio de Clientes. Tarifa inicial en $0.00 CUP para asignación por contabilidad.',
-                ]);
-                $agregados++;
-            } else {
-                $cambios = [];
-                if (!$sub->cliente_id) $cambios['cliente_id'] = $c->id;
-                if (empty($sub->cliente_telefono) && !empty($tel)) $cambios['cliente_telefono'] = $tel;
-                if (!empty($cambios)) {
-                    $sub->update($cambios);
-                    $actualizados++;
+                if (!$sub) {
+                    $codigo = "SUB-" . str_pad((string) (SuscripcionGestionRemota::count() + 1), 3, "0", STR_PAD_LEFT);
+                    SuscripcionGestionRemota::create([
+                        'codigo' => $codigo,
+                        'cliente_id' => $c->id,
+                        'cliente_nombre' => $nombre,
+                        'cliente_telefono' => $tel,
+                        'servicio_tipo' => 'Gestion_Remota',
+                        'tipo_solucion' => $solucion,
+                        'sim_numero' => $sim,
+                        'moneda' => 'CUP',
+                        'monto_mensual' => $tarifa,
+                        'dia_pago_limite' => 15,
+                        'mes_adelantado' => true,
+                        'tiene_deuda' => false,
+                        'meses_deuda_count' => 0,
+                        'meses_deuda_detalle' => json_encode([]),
+                        'deuda_acumulada' => 0.00,
+                        'ultimo_mes_pagado' => null,
+                        'estado_cobro' => 'al_dia',
+                        'activo' => true,
+                        'notas' => 'Sincronizado desde Servicio de Gestión Remota.',
+                    ]);
+                    $agregados++;
+                } else {
+                    $cambios = [];
+                    if (!$sub->cliente_id) $cambios['cliente_id'] = $c->id;
+                    if (empty($sub->sim_numero) && !empty($sim)) $cambios['sim_numero'] = $sim;
+                    if (empty($sub->tipo_solucion) && !empty($solucion)) $cambios['tipo_solucion'] = $solucion;
+                    if (empty($sub->cliente_telefono) && !empty($tel)) $cambios['cliente_telefono'] = $tel;
+                    if (!empty($cambios)) {
+                        $sub->update($cambios);
+                        $actualizados++;
+                    }
+                }
+            }
+        } else {
+            $clientes = Cliente::where('activo', true)->orderBy('nombre')->get();
+            $this->line("📋 Clientes activos encontrados: " . $clientes->count());
+
+            foreach ($clientes as $c) {
+                $nombre = trim($c->nombre);
+                if (empty($nombre)) continue;
+
+                $tel = $c->telefono ?: ($c->contactos()->first()?->telefono ?? '');
+
+                $sub = SuscripcionGestionRemota::where('cliente_id', $c->id)
+                    ->orWhere('cliente_nombre', $nombre)
+                    ->first();
+
+                if (!$sub) {
+                    $codigo = "SUB-" . str_pad((string) (SuscripcionGestionRemota::count() + 1), 3, "0", STR_PAD_LEFT);
+                    SuscripcionGestionRemota::create([
+                        'codigo' => $codigo,
+                        'cliente_id' => $c->id,
+                        'cliente_nombre' => $nombre,
+                        'cliente_telefono' => $tel,
+                        'servicio_tipo' => 'Gestion_Remota',
+                        'tipo_solucion' => 'Router 4G LTE',
+                        'sim_numero' => '',
+                        'moneda' => 'CUP',
+                        'monto_mensual' => 0.00,
+                        'dia_pago_limite' => 15,
+                        'mes_adelantado' => true,
+                        'tiene_deuda' => false,
+                        'meses_deuda_count' => 0,
+                        'meses_deuda_detalle' => json_encode([]),
+                        'deuda_acumulada' => 0.00,
+                        'ultimo_mes_pagado' => null,
+                        'estado_cobro' => 'al_dia',
+                        'activo' => true,
+                        'notas' => 'Sincronizado desde Directorio de Clientes. Tarifa inicial en $0.00 CUP para asignación por contabilidad.',
+                    ]);
+                    $agregados++;
+                } else {
+                    $cambios = [];
+                    if (!$sub->cliente_id) $cambios['cliente_id'] = $c->id;
+                    if (empty($sub->cliente_telefono) && !empty($tel)) $cambios['cliente_telefono'] = $tel;
+                    if (!empty($cambios)) {
+                        $sub->update($cambios);
+                        $actualizados++;
+                    }
                 }
             }
         }

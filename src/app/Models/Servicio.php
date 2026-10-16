@@ -98,4 +98,76 @@ class Servicio extends Model
     {
         return $this->belongsTo(User::class, 'tecnico_id');
     }
+
+    protected static function booted(): void
+    {
+        static::saved(function (Servicio $servicio) {
+            if ($servicio->tipo === 'Gestion_Remota') {
+                $servicio->sincronizarFacturacion();
+            }
+        });
+    }
+
+    /**
+     * Sincronizar automáticamente este servicio de Gestión Remota en la tabla de facturación
+     */
+    public function sincronizarFacturacion(): void
+    {
+        try {
+            $cliente = $this->cliente;
+            if (!$cliente && $this->cliente_ubicacion_id) {
+                $ub = ClienteUbicacion::find($this->cliente_ubicacion_id);
+                $cliente = $ub ? Cliente::find($ub->cliente_id) : null;
+            }
+
+            if (!$cliente) {
+                return;
+            }
+
+            $sub = SuscripcionGestionRemota::where('cliente_id', $cliente->id)
+                ->orWhere('cliente_nombre', $cliente->nombre)
+                ->first();
+
+            $solucion = $this->gr_tipo_solucion ?: ($this->gr_marca_modelo ?: 'Router 4G LTE');
+            $sim = $this->gr_sim_numero ?: '';
+            $tel = $cliente->telefono ?: ($cliente->contactos()->first()?->telefono ?? '');
+            $tarifa = (float) ($this->gr_recarga_monto ?? 0);
+
+            if (!$sub) {
+                $codigo = "SUB-" . str_pad((string) (SuscripcionGestionRemota::count() + 1), 3, "0", STR_PAD_LEFT);
+                SuscripcionGestionRemota::create([
+                    'codigo' => $codigo,
+                    'cliente_id' => $cliente->id,
+                    'cliente_nombre' => $cliente->nombre,
+                    'cliente_telefono' => $tel,
+                    'servicio_tipo' => 'Gestion_Remota',
+                    'tipo_solucion' => $solucion,
+                    'sim_numero' => $sim,
+                    'moneda' => 'CUP',
+                    'monto_mensual' => $tarifa,
+                    'dia_pago_limite' => 15,
+                    'mes_adelantado' => true,
+                    'tiene_deuda' => false,
+                    'meses_deuda_count' => 0,
+                    'meses_deuda_detalle' => json_encode([]),
+                    'deuda_acumulada' => 0.00,
+                    'ultimo_mes_pagado' => null,
+                    'estado_cobro' => 'al_dia',
+                    'activo' => true,
+                    'notas' => 'Sincronizado automáticamente al registrar Servicio de Gestión Remota.',
+                ]);
+            } else {
+                $cambios = [];
+                if (!$sub->cliente_id) $cambios['cliente_id'] = $cliente->id;
+                if (empty($sub->sim_numero) && !empty($sim)) $cambios['sim_numero'] = $sim;
+                if (empty($sub->tipo_solucion) && !empty($solucion)) $cambios['tipo_solucion'] = $solucion;
+                if (empty($sub->cliente_telefono) && !empty($tel)) $cambios['cliente_telefono'] = $tel;
+                if (!empty($cambios)) {
+                    $sub->update($cambios);
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Error sincronizando servicio {$this->id} en facturación: " . $e->getMessage());
+        }
+    }
 }

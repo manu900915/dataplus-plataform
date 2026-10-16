@@ -15,13 +15,14 @@ import {
   X,
   Radio
 } from 'lucide-react';
-import { Venta, Gasto, Cliente, SuscripcionServicio, RegistroPagoServicio } from '../types';
+import { Venta, Gasto, Cliente, SuscripcionServicio, RegistroPagoServicio, Servicio } from '../types';
 import { FacturacionServiciosView } from './FacturacionServiciosView';
 
 interface FinanzasViewProps {
   ventas: Venta[];
   gastos: Gasto[];
   clientes: Cliente[];
+  servicios?: Servicio[];
   suscripciones?: SuscripcionServicio[];
   pagosServicio?: RegistroPagoServicio[];
   onAddVenta: (v: Omit<Venta, 'id' | 'codigo'>) => void;
@@ -36,6 +37,7 @@ export const FinanzasView: React.FC<FinanzasViewProps> = ({
   ventas,
   gastos,
   clientes,
+  servicios = [],
   suscripciones = [],
   pagosServicio = [],
   onAddVenta,
@@ -219,6 +221,7 @@ export const FinanzasView: React.FC<FinanzasViewProps> = ({
           suscripciones={suscripciones}
           pagos={pagosServicio}
           clientes={clientes}
+          servicios={servicios}
           onAddPago={onAddPagoServicio || (() => {})}
           onAddSuscripcion={onAddSuscripcion || (() => {})}
           onUpdateSuscripcion={onUpdateSuscripcion || (() => {})}
