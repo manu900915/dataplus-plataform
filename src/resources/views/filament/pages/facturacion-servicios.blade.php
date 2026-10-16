@@ -1066,6 +1066,14 @@
                 {{-- Contenedor de la Gráfica --}}
                 <div style="background: rgba(2, 6, 23, 0.75); border: 1px solid #1e293b; border-radius: 0.75rem; padding: 1.5rem; margin-bottom: 1.5rem;">
                     {{-- Leyenda --}}
+                    @php
+                        $metaTexto = match($periodoReporte) {
+                            'anual' => 'Meta Anual ($294k CUP)',
+                            'semestral' => 'Meta Semestral ($147k CUP)',
+                            'trimestral' => 'Meta Trimestral ($73.5k CUP)',
+                            default => 'Meta Mensual (~$24.5k CUP)',
+                        };
+                    @endphp
                     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 0.75rem; margin-bottom: 1rem; font-size: 0.75rem;">
                         <div style="display: flex; gap: 1.5rem; align-items: center;">
                             <div style="display: flex; align-items: center; gap: 0.4rem;">
@@ -1078,7 +1086,7 @@
                             </div>
                             <div style="display: flex; align-items: center; gap: 0.4rem;">
                                 <span style="width: 14px; height: 1.5px; border-bottom: 1.5px dotted #fbbf24;"></span>
-                                <span style="color: #94a3b8;">Meta Mensual (~$24,500 CUP)</span>
+                                <span style="color: #94a3b8;">{{ $metaTexto }}</span>
                             </div>
                         </div>
                         <div style="color: #94a3b8; font-family: ui-monospace, monospace;">
@@ -1096,17 +1104,18 @@
                         $innerW = $svgW - ($padX * 2);
                         $innerH = $svgH - ($padY * 2);
 
-                        // Escala dinámica según los valores máximos del periodo seleccionado
-                        $montosCUP = array_map(fn($f) => floatval($f['cup_cobrado'] ?? 0), $filas);
-                        $montosCUP[] = 25000;
-                        $maxCUP = max(max($montosCUP), 1000) * 1.18;
-
                         // Meta según periodo
-                        $metaMonto = ($periodoReporte === 'anual') 
-                            ? 294000 
-                            : (($periodoReporte === 'semestral') 
-                                ? 147000 
-                                : (($periodoReporte === 'trimestral') ? 73500 : 24500));
+                        $metaMonto = match($periodoReporte) {
+                            'anual' => 294000,
+                            'semestral' => 147000,
+                            'trimestral' => 73500,
+                            default => 24500,
+                        };
+
+                        // Escala dinámica según los valores máximos del periodo seleccionado y la meta
+                        $montosCUP = array_map(fn($f) => floatval($f['cup_cobrado'] ?? 0), $filas);
+                        $montosCUP[] = $metaMonto;
+                        $maxCUP = max(max($montosCUP), 1000) * 1.15;
                         $metaY = max($padY, min($svgH - $padY, $svgH - $padY - (($metaMonto / $maxCUP) * $innerH)));
 
                         $puntos = [];

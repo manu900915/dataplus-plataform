@@ -8,3 +8,5 @@ src/vendor/
 backups/
 proyecto-backup-*.tar.gz
 actions-runner/
+dist/
+.aistudio/

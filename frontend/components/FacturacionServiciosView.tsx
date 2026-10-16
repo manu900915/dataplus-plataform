@@ -22,7 +22,10 @@ import {
   Filter,
   DollarSign,
   ArrowUpRight,
-  ExternalLink
+  ExternalLink,
+  Pencil,
+  RefreshCw,
+  RotateCcw
 } from 'lucide-react';
 import { 
   SuscripcionServicio, 
@@ -61,9 +64,23 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
   // Modales
   const [isPagoModalOpen, setIsPagoModalOpen] = useState(false);
   const [isSubModalOpen, setIsSubModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [previewVoucherUrl, setPreviewVoucherUrl] = useState<{ url: string; cliente: string; codigo: string; op?: string } | null>(null);
   const [reciboModalData, setReciboModalData] = useState<RegistroPagoServicio | null>(null);
   const [copiedReceipt, setCopiedReceipt] = useState(false);
+
+  // Formulario de Edición de Suscripción (Contadora)
+  const [subToEdit, setSubToEdit] = useState<SuscripcionServicio | null>(null);
+  const [editTarifa, setEditTarifa] = useState<number>(0);
+  const [editMoneda, setEditMoneda] = useState<Moneda>('CUP');
+  const [editDeuda, setEditDeuda] = useState<number>(0);
+  const [editMesesDeuda, setEditMesesDeuda] = useState<number>(0);
+  const [editTelefono, setEditTelefono] = useState<string>('');
+  const [editSim, setEditSim] = useState<string>('');
+  const [editSolucion, setEditSolucion] = useState<string>('');
+  const [editDiaLimite, setEditDiaLimite] = useState<number>(15);
+  const [editNotas, setEditNotas] = useState<string>('');
+  const [editActivo, setEditActivo] = useState<boolean>(true);
 
   // Formulario de Cobro
   const [pagoSubId, setPagoSubId] = useState<string>('');
@@ -104,6 +121,7 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
       if (e.key === 'Escape') {
         setIsPagoModalOpen(false);
         setIsSubModalOpen(false);
+        setIsEditModalOpen(false);
         setPreviewVoucherUrl(null);
         setReciboModalData(null);
       }
@@ -111,6 +129,109 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  // Abrir modal de edición para contabilidad
+  const handleOpenEdit = (sub: SuscripcionServicio) => {
+    setSubToEdit(sub);
+    setEditTarifa(sub.tarifa_mensual);
+    setEditMoneda(sub.moneda);
+    setEditDeuda(sub.deuda_acumulada);
+    setEditMesesDeuda(sub.meses_deuda_count || 0);
+    setEditTelefono(sub.cliente_telefono || '');
+    setEditSim(sub.sim_numero || '');
+    setEditSolucion(sub.tipo_solucion || 'Router 4G Huawei B310');
+    setEditDiaLimite(sub.dia_pago_limite || 15);
+    setEditNotas(sub.notas || '');
+    setEditActivo(sub.activo);
+    setIsEditModalOpen(true);
+  };
+
+  // Guardar cambios de edición de suscripción
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!subToEdit) return;
+    const montoTotal = Number(editTarifa) + Number(editDeuda);
+    const tieneDeuda = Number(editDeuda) > 0 || Number(editMesesDeuda) > 0;
+    const estado = tieneDeuda 
+      ? 'En_Mora' 
+      : (Number(editTarifa) > 0 ? (subToEdit.estado_cobro_mes_actual || 'Pendiente') : 'Al_Dia');
+
+    const updated: SuscripcionServicio = {
+      ...subToEdit,
+      tarifa_mensual: Number(editTarifa),
+      moneda: editMoneda,
+      deuda_acumulada: Number(editDeuda),
+      meses_deuda_count: Number(editMesesDeuda),
+      monto_a_cobrar: montoTotal,
+      tiene_deuda: tieneDeuda,
+      estado_cobro_mes_actual: estado,
+      cliente_telefono: editTelefono,
+      sim_numero: editSim,
+      tipo_solucion: editSolucion,
+      dia_pago_limite: Number(editDiaLimite) || 15,
+      notas: editNotas,
+      activo: editActivo
+    };
+    onUpdateSuscripcion(updated);
+    setIsEditModalOpen(false);
+  };
+
+  // Sincronizar clientes que no estén en la lista de facturación con Base $0.00
+  const handleSyncClientes = () => {
+    let agregados = 0;
+    clientes.forEach(c => {
+      const yaExiste = suscripciones.some(
+        s => s.cliente_id === c.id || s.cliente_nombre.trim().toLowerCase() === c.nombre.trim().toLowerCase()
+      );
+      if (!yaExiste) {
+        const codeNumber = suscripciones.length + agregados + 1;
+        const code = `SUB-${String(codeNumber).padStart(3, '0')}`;
+        const newSub: SuscripcionServicio = {
+          id: `sub-${Date.now()}-${agregados}`,
+          codigo: code,
+          cliente_id: c.id,
+          cliente_nombre: c.nombre,
+          cliente_telefono: c.telefono || '',
+          servicio_tipo: 'Gestion_Remota',
+          tipo_solucion: 'Router 4G LTE Huawei B310',
+          sim_numero: '',
+          moneda: 'CUP',
+          tarifa_mensual: 0,
+          dia_pago_limite: 15,
+          mes_adelantado: true,
+          tiene_deuda: false,
+          meses_deuda_count: 0,
+          meses_deuda_detalle: [],
+          deuda_acumulada: 0,
+          monto_a_cobrar: 0,
+          estado_cobro_mes_actual: 'Al_Dia',
+          activo: true,
+          notas: 'Sincronizado desde Directorio. Mensualidad y deuda en $0.00 para asignación por contabilidad.'
+        };
+        onAddSuscripcion(newSub);
+        agregados++;
+      }
+    });
+    alert(`Sincronización completada: ${agregados} clientes agregados a Facturación con mensualidad y deuda en $0.00.`);
+  };
+
+  // Reiniciar a base 0 para que la contadora ingrese datos limpios
+  const handleResetBaseCero = () => {
+    if (window.confirm('¿Reiniciar todos los registros de Facturación a base $0.00? Esto pondrá mensualidades y deudas en $0.00 para permitir la carga contable limpia.')) {
+      suscripciones.forEach(s => {
+        onUpdateSuscripcion({
+          ...s,
+          tarifa_mensual: 0,
+          deuda_acumulada: 0,
+          meses_deuda_count: 0,
+          monto_a_cobrar: 0,
+          tiene_deuda: false,
+          estado_cobro_mes_actual: 'Al_Dia',
+          notas: 'Inicializado en Base $0.00 para carga de datos contables.'
+        });
+      });
+    }
+  };
 
   // Suscripción seleccionada actualmente para cobro
   const selectedSub = useMemo(() => {
@@ -469,7 +590,25 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleSyncClientes}
+            className="flex items-center gap-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-teal-300 border border-teal-500/30 font-bold px-3 py-2 text-xs transition-all cursor-pointer shadow-sm"
+            title="Importar todos los clientes del directorio que falten con mensualidad en $0.00"
+          >
+            <RefreshCw className="h-4 w-4 text-teal-400" />
+            Sincronizar Clientes
+          </button>
+
+          <button
+            onClick={handleResetBaseCero}
+            className="flex items-center gap-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 font-bold px-3 py-2 text-xs transition-all cursor-pointer shadow-sm"
+            title="Poner todas las mensualidades y deudas en $0.00 para carga limpia por contabilidad"
+          >
+            <RotateCcw className="h-4 w-4 text-amber-400" />
+            Limpiar / Base 0
+          </button>
+
           <button
             onClick={() => {
               setSubClienteId(clientes[0]?.id || '');
@@ -832,6 +971,14 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
                                   <span>Cobrar</span>
                                 </button>
                               )}
+
+                              <button
+                                onClick={() => handleOpenEdit(sub)}
+                                title="Editar mensualidad, deuda y parámetros contables"
+                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-400 border border-slate-700 transition-colors cursor-pointer"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
 
                               <button
                                 onClick={() => handleOpenWhatsAppReminder(sub)}
@@ -1611,6 +1758,201 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
                 Cerrar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. MODAL EDITAR PARÁMETROS DE FACTURACIÓN (CONTADORA) */}
+      {isEditModalOpen && subToEdit && (
+        <div 
+          onClick={() => setIsEditModalOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 overflow-y-auto cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl my-8 text-slate-100 cursor-default"
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-5">
+              <div className="flex items-center gap-2">
+                <div className="rounded-lg bg-sky-500/10 p-2 text-sky-400 border border-sky-500/20">
+                  <Pencil className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Editar Parámetros de Facturación</h3>
+                  <p className="text-xs text-slate-400">Asignar tarifa mensual, deuda y datos técnicos</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsEditModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Ficha Cliente */}
+            <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3 mb-4 flex justify-between items-center">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-500">Cliente</span>
+                <p className="text-sm font-bold text-white">{subToEdit.cliente_nombre}</p>
+              </div>
+              <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                {subToEdit.codigo}
+              </span>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="space-y-4 text-xs">
+              {/* Tarifa y Moneda */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-medium mb-1">Mensualidad a Cobrar</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={editTarifa}
+                    onChange={(e) => setEditTarifa(parseFloat(e.target.value) || 0)}
+                    className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-emerald-400 font-mono font-bold focus:border-sky-500 focus:outline-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-medium mb-1">Moneda</label>
+                  <select
+                    value={editMoneda}
+                    onChange={(e) => setEditMoneda(e.target.value as Moneda)}
+                    className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white focus:border-sky-500 focus:outline-none"
+                  >
+                    <option value="CUP">CUP ($)</option>
+                    <option value="USD">USD ($)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Deuda y Meses de Mora */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-medium mb-1">Deuda Previa Acumulada</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={editDeuda}
+                    onChange={(e) => setEditDeuda(parseFloat(e.target.value) || 0)}
+                    className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-rose-400 font-mono font-bold focus:border-sky-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-medium mb-1">Meses en Mora</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={editMesesDeuda}
+                    onChange={(e) => setEditMesesDeuda(parseInt(e.target.value) || 0)}
+                    className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white font-mono focus:border-sky-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Cuadro de Total Exigible */}
+              <div className="bg-sky-500/10 border border-sky-500/30 rounded-xl p-3 flex justify-between items-center">
+                <span className="text-slate-300 font-semibold">Total Exigible al Cliente en el mes:</span>
+                <span className="font-mono text-sm font-extrabold text-sky-400">
+                  ${(Number(editTarifa) + Number(editDeuda)).toLocaleString()} {editMoneda}
+                </span>
+              </div>
+
+              {/* Teléfono y SIM */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-medium mb-1">Teléfono (WhatsApp)</label>
+                  <input
+                    type="text"
+                    value={editTelefono}
+                    onChange={(e) => setEditTelefono(e.target.value)}
+                    placeholder="+53 5284 9102"
+                    className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white focus:border-sky-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-medium mb-1">SIM Número</label>
+                  <input
+                    type="text"
+                    value={editSim}
+                    onChange={(e) => setEditSim(e.target.value)}
+                    placeholder="5352849102"
+                    className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white focus:border-sky-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Solución y Día Límite */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-medium mb-1">Solución Técnica</label>
+                  <input
+                    type="text"
+                    value={editSolucion}
+                    onChange={(e) => setEditSolucion(e.target.value)}
+                    placeholder="Router 4G LTE Huawei B310"
+                    className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white focus:border-sky-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-medium mb-1">Día Límite de Cobro</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="31"
+                    value={editDiaLimite}
+                    onChange={(e) => setEditDiaLimite(parseInt(e.target.value) || 15)}
+                    className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white focus:border-sky-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Observaciones */}
+              <div>
+                <label className="block text-slate-400 font-medium mb-1">Notas / Observaciones Contables</label>
+                <input
+                  type="text"
+                  value={editNotas}
+                  onChange={(e) => setEditNotas(e.target.value)}
+                  placeholder="Detalles sobre tarifa acordada, historial o condiciones de pago"
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white focus:border-sky-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Activo */}
+              <label className="flex items-center gap-2 cursor-pointer pt-1">
+                <input
+                  type="checkbox"
+                  checked={editActivo}
+                  onChange={(e) => setEditActivo(e.target.checked)}
+                  className="rounded border-slate-700 bg-slate-950 text-sky-500 focus:ring-0"
+                />
+                <span className="text-slate-300">Servicio activo y facturable para este cliente</span>
+              </label>
+
+              {/* Botones de acción */}
+              <div className="flex justify-end gap-2 pt-4 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 font-semibold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold cursor-pointer"
+                >
+                  <Check className="h-4 w-4 stroke-[2.5]" />
+                  <span>Guardar Parámetros</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
