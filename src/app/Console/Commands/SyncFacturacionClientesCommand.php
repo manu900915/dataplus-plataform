@@ -48,25 +48,31 @@ class SyncFacturacionClientesCommand extends Command
 
         if ($serviciosGR->isNotEmpty()) {
             foreach ($serviciosGR as $srv) {
-                $c = $srv->cliente;
+                $c = $srv->ubicacion?->cliente;
                 if (!$c && $srv->cliente_ubicacion_id) {
                     $ub = \App\Models\ClienteUbicacion::find($srv->cliente_ubicacion_id);
                     $c = $ub ? Cliente::find($ub->cliente_id) : null;
                 }
                 if (!$c) continue;
 
-                $nombre = trim($c->nombre);
-                $tel = $c->telefono ?: ($c->contactos()->first()?->telefono ?? '');
-                $solucion = $srv->gr_tipo_solucion ?: ($srv->gr_marca_modelo ?: 'Router 4G LTE');
-                $sim = $srv->gr_sim_numero ?: '';
-                $tarifa = (float) ($srv->gr_recarga_monto ?? 0);
+                $nombre = trim($c->nombre ?: ($c->nombre_comercial ?: ('Cliente #' . $c->id)));
+                $tel = trim($c->telefono ?: ($c->contactos()->first()?->telefono ?? ''));
+                $solucion = trim($srv->gr_tipo_solucion ?: ($srv->gr_marca_modelo ?: 'Router 4G LTE'));
+                $sim = trim($srv->gr_sim_numero ?: '');
+                $tarifa = max(0, (float) ($srv->gr_recarga_monto ?? 0));
 
                 $sub = SuscripcionGestionRemota::where('cliente_id', $c->id)
-                    ->orWhere('cliente_nombre', $nombre)
+                    ->orWhereRaw('LOWER(TRIM(cliente_nombre)) = ?', [strtolower($nombre)])
                     ->first();
 
                 if (!$sub) {
-                    $codigo = "SUB-" . str_pad((string) (SuscripcionGestionRemota::count() + 1), 3, "0", STR_PAD_LEFT);
+                    $nextNum = ((int) (SuscripcionGestionRemota::max('id') ?? 0)) + 1;
+                    $codigo = "SUB-" . str_pad((string) $nextNum, 3, "0", STR_PAD_LEFT);
+                    while (SuscripcionGestionRemota::where('codigo', $codigo)->exists()) {
+                        $nextNum++;
+                        $codigo = "SUB-" . str_pad((string) $nextNum, 3, "0", STR_PAD_LEFT);
+                    }
+
                     SuscripcionGestionRemota::create([
                         'codigo' => $codigo,
                         'cliente_id' => $c->id,
@@ -84,7 +90,7 @@ class SyncFacturacionClientesCommand extends Command
                         'meses_deuda_detalle' => json_encode([]),
                         'deuda_acumulada' => 0.00,
                         'ultimo_mes_pagado' => null,
-                        'estado_cobro' => 'al_dia',
+                        'estado_cobro' => 'pendiente',
                         'activo' => true,
                         'notas' => 'Sincronizado desde Servicio de Gestión Remota.',
                     ]);
@@ -106,17 +112,23 @@ class SyncFacturacionClientesCommand extends Command
             $this->line("📋 Clientes activos encontrados: " . $clientes->count());
 
             foreach ($clientes as $c) {
-                $nombre = trim($c->nombre);
+                $nombre = trim($c->nombre ?: ('Cliente #' . $c->id));
                 if (empty($nombre)) continue;
 
-                $tel = $c->telefono ?: ($c->contactos()->first()?->telefono ?? '');
+                $tel = trim($c->telefono ?: ($c->contactos()->first()?->telefono ?? ''));
 
                 $sub = SuscripcionGestionRemota::where('cliente_id', $c->id)
-                    ->orWhere('cliente_nombre', $nombre)
+                    ->orWhereRaw('LOWER(TRIM(cliente_nombre)) = ?', [strtolower($nombre)])
                     ->first();
 
                 if (!$sub) {
-                    $codigo = "SUB-" . str_pad((string) (SuscripcionGestionRemota::count() + 1), 3, "0", STR_PAD_LEFT);
+                    $nextNum = ((int) (SuscripcionGestionRemota::max('id') ?? 0)) + 1;
+                    $codigo = "SUB-" . str_pad((string) $nextNum, 3, "0", STR_PAD_LEFT);
+                    while (SuscripcionGestionRemota::where('codigo', $codigo)->exists()) {
+                        $nextNum++;
+                        $codigo = "SUB-" . str_pad((string) $nextNum, 3, "0", STR_PAD_LEFT);
+                    }
+
                     SuscripcionGestionRemota::create([
                         'codigo' => $codigo,
                         'cliente_id' => $c->id,
@@ -134,7 +146,7 @@ class SyncFacturacionClientesCommand extends Command
                         'meses_deuda_detalle' => json_encode([]),
                         'deuda_acumulada' => 0.00,
                         'ultimo_mes_pagado' => null,
-                        'estado_cobro' => 'al_dia',
+                        'estado_cobro' => 'pendiente',
                         'activo' => true,
                         'notas' => 'Sincronizado desde Directorio de Clientes. Tarifa inicial en $0.00 CUP para asignación por contabilidad.',
                     ]);

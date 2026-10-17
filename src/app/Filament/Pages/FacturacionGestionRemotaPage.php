@@ -411,25 +411,31 @@ class FacturacionGestionRemotaPage extends Page
 
         if ($serviciosGR->isNotEmpty()) {
             foreach ($serviciosGR as $srv) {
-                $cliente = $srv->cliente;
+                $cliente = $srv->ubicacion?->cliente;
                 if (!$cliente && $srv->cliente_ubicacion_id) {
                     $ub = ClienteUbicacion::find($srv->cliente_ubicacion_id);
                     $cliente = $ub ? Cliente::find($ub->cliente_id) : null;
                 }
                 if (!$cliente) continue;
 
-                $nombre = trim($cliente->nombre);
-                $tel = $cliente->telefono ?: ($cliente->contactos()->first()?->telefono ?? '');
-                $solucion = $srv->gr_tipo_solucion ?: ($srv->gr_marca_modelo ?: 'Router 4G LTE');
-                $sim = $srv->gr_sim_numero ?: '';
-                $tarifa = (float) ($srv->gr_recarga_monto ?? 0);
+                $nombre = trim($cliente->nombre ?: ($cliente->nombre_comercial ?: ('Cliente #' . $cliente->id)));
+                $tel = trim($cliente->telefono ?: ($cliente->contactos()->first()?->telefono ?? ''));
+                $solucion = trim($srv->gr_tipo_solucion ?: ($srv->gr_marca_modelo ?: 'Router 4G LTE'));
+                $sim = trim($srv->gr_sim_numero ?: '');
+                $tarifa = max(0, (float) ($srv->gr_recarga_monto ?? 0));
 
                 $sub = SuscripcionGestionRemota::where('cliente_id', $cliente->id)
-                    ->orWhere('cliente_nombre', $nombre)
+                    ->orWhereRaw('LOWER(TRIM(cliente_nombre)) = ?', [strtolower($nombre)])
                     ->first();
 
                 if (!$sub) {
-                    $codigo = "SUB-" . str_pad((string) (SuscripcionGestionRemota::count() + 1), 3, "0", STR_PAD_LEFT);
+                    $nextNum = ((int) (SuscripcionGestionRemota::max('id') ?? 0)) + 1;
+                    $codigo = "SUB-" . str_pad((string) $nextNum, 3, "0", STR_PAD_LEFT);
+                    while (SuscripcionGestionRemota::where('codigo', $codigo)->exists()) {
+                        $nextNum++;
+                        $codigo = "SUB-" . str_pad((string) $nextNum, 3, "0", STR_PAD_LEFT);
+                    }
+
                     SuscripcionGestionRemota::create([
                         'codigo' => $codigo,
                         'cliente_id' => $cliente->id,
@@ -447,7 +453,7 @@ class FacturacionGestionRemotaPage extends Page
                         'meses_deuda_detalle' => json_encode([]),
                         'deuda_acumulada' => 0.00,
                         'ultimo_mes_pagado' => null,
-                        'estado_cobro' => 'al_dia',
+                        'estado_cobro' => 'pendiente',
                         'activo' => true,
                         'notas' => 'Sincronizado automáticamente desde Servicio de Gestión Remota.',
                     ]);
@@ -467,7 +473,7 @@ class FacturacionGestionRemotaPage extends Page
 
             Notification::make()
                 ->title('Clientes con Gestión Remota Sincronizados')
-                ->body("{$serviciosGR->count()} servicios de Gestión Remota procesados. {$agregados} clientes agregados a facturación (base 0) y {$actualizados} actualizados.")
+                ->body("{$serviciosGR->count()} servicios de Gestión Remota procesados. {$agregados} clientes agregados a facturación y {$actualizados} actualizados.")
                 ->success()
                 ->send();
             return;
@@ -495,17 +501,23 @@ class FacturacionGestionRemotaPage extends Page
         }
 
         foreach ($clientes as $c) {
-            $nombre = trim($c->nombre);
+            $nombre = trim($c->nombre ?: ('Cliente #' . $c->id));
             if (empty($nombre)) continue;
 
-            $tel = $c->telefono ?: ($c->contactos()->first()?->telefono ?? '');
+            $tel = trim($c->telefono ?: ($c->contactos()->first()?->telefono ?? ''));
 
             $sub = SuscripcionGestionRemota::where('cliente_id', $c->id)
-                ->orWhere('cliente_nombre', $nombre)
+                ->orWhereRaw('LOWER(TRIM(cliente_nombre)) = ?', [strtolower($nombre)])
                 ->first();
 
             if (!$sub) {
-                $codigo = "SUB-" . str_pad((string) (SuscripcionGestionRemota::count() + 1), 3, "0", STR_PAD_LEFT);
+                $nextNum = ((int) (SuscripcionGestionRemota::max('id') ?? 0)) + 1;
+                $codigo = "SUB-" . str_pad((string) $nextNum, 3, "0", STR_PAD_LEFT);
+                while (SuscripcionGestionRemota::where('codigo', $codigo)->exists()) {
+                    $nextNum++;
+                    $codigo = "SUB-" . str_pad((string) $nextNum, 3, "0", STR_PAD_LEFT);
+                }
+
                 SuscripcionGestionRemota::create([
                     'codigo' => $codigo,
                     'cliente_id' => $c->id,
@@ -523,7 +535,7 @@ class FacturacionGestionRemotaPage extends Page
                     'meses_deuda_detalle' => json_encode([]),
                     'deuda_acumulada' => 0.00,
                     'ultimo_mes_pagado' => null,
-                    'estado_cobro' => 'al_dia',
+                    'estado_cobro' => 'pendiente',
                     'activo' => true,
                     'notas' => 'Sincronizado desde Directorio de Clientes. Tarifa y deuda en $0.00 CUP para asignación por contabilidad.',
                 ]);
@@ -614,15 +626,15 @@ class FacturacionGestionRemotaPage extends Page
         $meses = max(0, intval($this->editSubMesesDeuda));
         $tieneDeuda = ($deuda > 0 || $meses > 0);
 
-        // Actualizar estado de cobro automáticamente según los nuevos valores
-        $estado = 'al_dia';
+        // Actualizar estado de cobro automáticamente según los nuevos valores (enum: cobrado, pendiente, vencido)
+        $estado = 'pendiente';
         if ($tieneDeuda) {
             $estado = 'vencido';
         } elseif ($monto > 0) {
             $yaPago = $sub->pagos()->where('mes_servicio', 'like', '%' . now()->format('Y') . '%')->exists();
             $estado = $yaPago ? 'cobrado' : 'pendiente';
         } else {
-            $estado = 'al_dia';
+            $estado = 'pendiente';
         }
 
         $sub->update([
@@ -736,7 +748,12 @@ class FacturacionGestionRemotaPage extends Page
             return;
         }
 
-        $codigo = "SUB-" . str_pad((string) (SuscripcionGestionRemota::count() + 1), 3, "0", STR_PAD_LEFT);
+        $nextNum = ((int) (SuscripcionGestionRemota::max('id') ?? 0)) + 1;
+        $codigo = "SUB-" . str_pad((string) $nextNum, 3, "0", STR_PAD_LEFT);
+        while (SuscripcionGestionRemota::where('codigo', $codigo)->exists()) {
+            $nextNum++;
+            $codigo = "SUB-" . str_pad((string) $nextNum, 3, "0", STR_PAD_LEFT);
+        }
 
         SuscripcionGestionRemota::create([
             "codigo" => $codigo,
@@ -754,7 +771,7 @@ class FacturacionGestionRemotaPage extends Page
             "meses_deuda_detalle" => json_encode([]),
             "deuda_acumulada" => 0.00,
             "ultimo_mes_pagado" => now()->format("Y-m"),
-            "estado_cobro" => ((float) $this->newSubMonto > 0) ? "pendiente" : "al_dia",
+            "estado_cobro" => "pendiente",
             "activo" => true,
             "notas" => $this->newSubNotas,
         ]);

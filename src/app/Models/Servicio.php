@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 
 class Servicio extends Model
 {
@@ -77,7 +78,7 @@ class Servicio extends Model
         return $this->belongsTo(ClienteUbicacion::class, 'cliente_ubicacion_id');
     }
 
-    public function cliente(): BelongsTo
+    public function cliente(): HasOneThrough
     {
         return $this->hasOneThrough(
             Cliente::class,
@@ -85,7 +86,7 @@ class Servicio extends Model
             'id',
             'id',
             'cliente_ubicacion_id',
-            'cliente_id',
+            'cliente_id'
         );
     }
 
@@ -114,7 +115,7 @@ class Servicio extends Model
     public function sincronizarFacturacion(): void
     {
         try {
-            $cliente = $this->cliente;
+            $cliente = $this->ubicacion?->cliente;
             if (!$cliente && $this->cliente_ubicacion_id) {
                 $ub = ClienteUbicacion::find($this->cliente_ubicacion_id);
                 $cliente = $ub ? Cliente::find($ub->cliente_id) : null;
@@ -124,21 +125,29 @@ class Servicio extends Model
                 return;
             }
 
+            $nombre = trim($cliente->nombre ?: ($cliente->nombre_comercial ?: ('Cliente #' . $cliente->id)));
+
             $sub = SuscripcionGestionRemota::where('cliente_id', $cliente->id)
-                ->orWhere('cliente_nombre', $cliente->nombre)
+                ->orWhereRaw('LOWER(TRIM(cliente_nombre)) = ?', [strtolower($nombre)])
                 ->first();
 
-            $solucion = $this->gr_tipo_solucion ?: ($this->gr_marca_modelo ?: 'Router 4G LTE');
-            $sim = $this->gr_sim_numero ?: '';
-            $tel = $cliente->telefono ?: ($cliente->contactos()->first()?->telefono ?? '');
-            $tarifa = (float) ($this->gr_recarga_monto ?? 0);
+            $solucion = trim($this->gr_tipo_solucion ?: ($this->gr_marca_modelo ?: 'Router 4G LTE'));
+            $sim = trim($this->gr_sim_numero ?: '');
+            $tel = trim($cliente->telefono ?: ($cliente->contactos()->first()?->telefono ?? ''));
+            $tarifa = max(0, (float) ($this->gr_recarga_monto ?? 0));
 
             if (!$sub) {
-                $codigo = "SUB-" . str_pad((string) (SuscripcionGestionRemota::count() + 1), 3, "0", STR_PAD_LEFT);
+                $nextNum = ((int) (SuscripcionGestionRemota::max('id') ?? 0)) + 1;
+                $codigo = "SUB-" . str_pad((string) $nextNum, 3, "0", STR_PAD_LEFT);
+                while (SuscripcionGestionRemota::where('codigo', $codigo)->exists()) {
+                    $nextNum++;
+                    $codigo = "SUB-" . str_pad((string) $nextNum, 3, "0", STR_PAD_LEFT);
+                }
+
                 SuscripcionGestionRemota::create([
                     'codigo' => $codigo,
                     'cliente_id' => $cliente->id,
-                    'cliente_nombre' => $cliente->nombre,
+                    'cliente_nombre' => $nombre,
                     'cliente_telefono' => $tel,
                     'servicio_tipo' => 'Gestion_Remota',
                     'tipo_solucion' => $solucion,
@@ -152,7 +161,7 @@ class Servicio extends Model
                     'meses_deuda_detalle' => json_encode([]),
                     'deuda_acumulada' => 0.00,
                     'ultimo_mes_pagado' => null,
-                    'estado_cobro' => 'al_dia',
+                    'estado_cobro' => 'pendiente',
                     'activo' => true,
                     'notas' => 'Sincronizado automáticamente al registrar Servicio de Gestión Remota.',
                 ]);
