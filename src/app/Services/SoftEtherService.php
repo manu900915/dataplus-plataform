@@ -17,12 +17,92 @@ class SoftEtherService
 
     public function __construct()
     {
-        $this->host = (string) (config('services.softether.host') ?: env('SOFTETHER_HOST') ?: getenv('SOFTETHER_HOST') ?: '127.0.0.1');
-        $this->port = (int) (config('services.softether.port') ?: env('SOFTETHER_PORT') ?: getenv('SOFTETHER_PORT') ?: 5555);
-        $this->hub = (string) (config('services.softether.hub') ?: env('SOFTETHER_HUB') ?: getenv('SOFTETHER_HUB') ?: 'DEFAULT');
-        $this->adminPassword = (string) (config('services.softether.admin_password') ?: env('SOFTETHER_ADMIN_PASSWORD') ?: getenv('SOFTETHER_ADMIN_PASSWORD') ?: '');
+        $rawHost = (string) (config('services.softether.host') ?: env('SOFTETHER_HOST') ?: getenv('SOFTETHER_HOST') ?: '');
+        $rawPort = (string) (config('services.softether.port') ?: env('SOFTETHER_PORT') ?: getenv('SOFTETHER_PORT') ?: '');
+        $rawHub = (string) (config('services.softether.hub') ?: env('SOFTETHER_HUB') ?: getenv('SOFTETHER_HUB') ?: '');
+        $rawPassword = (string) (config('services.softether.admin_password') ?: env('SOFTETHER_ADMIN_PASSWORD') ?: getenv('SOFTETHER_ADMIN_PASSWORD') ?: '');
+
+        $this->host = trim(explode('#', $rawHost)[0]);
+        $this->port = (int) trim(explode('#', $rawPort)[0]);
+        $this->hub = trim(explode('#', $rawHub)[0]);
+        $this->adminPassword = trim($rawPassword);
+
+        // Fallback: Si la caché de Laravel o variables de entorno están enmascaradas, leer directamente del archivo .env
+        $this->loadDirectlyFromEnvFiles();
+
+        if (empty($this->host)) {
+            $this->host = '127.0.0.1';
+        }
+        if ($this->port <= 0) {
+            $this->port = 5555;
+        }
+        if (empty($this->hub)) {
+            $this->hub = 'DEFAULT';
+        }
+
         $this->rpcUrl = (string) (config('services.softether.rpc_url') ?: env('SOFTETHER_RPC_URL') ?: getenv('SOFTETHER_RPC_URL') ?: "https://{$this->host}:{$this->port}/api/");
         $this->verifySsl = (bool) (config('services.softether.verify_ssl') ?: env('SOFTETHER_VERIFY_SSL') ?: getenv('SOFTETHER_VERIFY_SSL') ?: false);
+    }
+
+    /**
+     * Carga de respaldo leyendo directamente los archivos .env si config() está cacheado o vacío
+     */
+    protected function loadDirectlyFromEnvFiles(): void
+    {
+        $candidatePaths = [
+            function_exists('base_path') ? base_path('.env') : null,
+            function_exists('base_path') ? dirname(base_path()) . '/.env' : null,
+            '/opt/dataplus-platform/src/.env',
+            '/opt/dataplus-platform/.env',
+            '.env',
+        ];
+
+        foreach (array_filter($candidatePaths) as $path) {
+            if (!file_exists($path) || !is_readable($path)) {
+                continue;
+            }
+
+            $lines = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if (empty($line) || str_starts_with($line, '#')) {
+                    continue;
+                }
+
+                if (str_starts_with($line, 'SOFTETHER_HOST=')) {
+                    $val = trim(substr($line, strlen('SOFTETHER_HOST=')));
+                    $clean = trim(explode('#', trim($val, '"\''))[0]);
+                    if (!empty($clean)) {
+                        $this->host = $clean;
+                    }
+                } elseif (str_starts_with($line, 'SOFTETHER_PORT=')) {
+                    $val = trim(substr($line, strlen('SOFTETHER_PORT=')));
+                    $clean = (int) trim(explode('#', trim($val, '"\''))[0]);
+                    if ($clean > 0) {
+                        $this->port = $clean;
+                    }
+                } elseif (str_starts_with($line, 'SOFTETHER_HUB=')) {
+                    $val = trim(substr($line, strlen('SOFTETHER_HUB=')));
+                    $clean = trim(explode('#', trim($val, '"\''))[0]);
+                    if (!empty($clean)) {
+                        $this->hub = $clean;
+                    }
+                } elseif (str_starts_with($line, 'SOFTETHER_ADMIN_PASSWORD=')) {
+                    $val = trim(substr($line, strlen('SOFTETHER_ADMIN_PASSWORD=')));
+                    // Solo separar por # si está precedido por espacio
+                    $clean = preg_replace('/\s+#.*$/', '', $val);
+                    $clean = trim($clean, '"\'');
+                    if (!empty($clean)) {
+                        $this->adminPassword = $clean;
+                    }
+                }
+            }
+
+            // Si ya encontramos la contraseña, terminamos
+            if (!empty($this->adminPassword)) {
+                break;
+            }
+        }
     }
 
     /**
