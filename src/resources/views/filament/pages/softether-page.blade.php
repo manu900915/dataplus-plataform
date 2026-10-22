@@ -501,44 +501,94 @@
                     <strong>Regla de Oro de Seguridad:</strong> NUNCA coloques contraseñas maestras de SoftEther ni IPs privadas en el código fuente de la aplicación ni en GitHub. Los commits quedan guardados para siempre en el historial de Git.
                 </div>
 
+                <!-- DIAGNÓSTICO EN VIVO DETECTADO POR LARAVEL -->
+                <div style="background: #090e1a; border: 1px solid #1e293b; border-radius: 0.75rem; padding: 1.25rem; margin-bottom: 1.5rem;">
+                    <h3 style="font-size: 0.95rem; font-weight: 600; color: #38bdf8; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+                        <svg style="width: 1.2rem; height: 1.2rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        Diagnóstico Actual: Valores que Laravel está leyendo de tu servidor
+                    </h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; font-size: 0.825rem;">
+                        <div style="background: #0f172a; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid #1e293b;">
+                            <div style="color: #94a3b8; font-size: 0.75rem;">SOFTETHER_HOST</div>
+                            <div style="color: #ffffff; font-weight: 600; font-family: monospace; margin-top: 0.25rem;">
+                                {{ $connectionDetails['host'] ?? '127.0.0.1' }}
+                            </div>
+                        </div>
+                        <div style="background: #0f172a; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid #1e293b;">
+                            <div style="color: #94a3b8; font-size: 0.75rem;">SOFTETHER_PORT</div>
+                            <div style="color: #ffffff; font-weight: 600; font-family: monospace; margin-top: 0.25rem;">
+                                {{ $connectionDetails['port'] ?? 5555 }}
+                            </div>
+                        </div>
+                        <div style="background: #0f172a; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid #1e293b;">
+                            <div style="color: #94a3b8; font-size: 0.75rem;">SOFTETHER_HUB</div>
+                            <div style="color: #ffffff; font-weight: 600; font-family: monospace; margin-top: 0.25rem;">
+                                {{ $connectionDetails['hub'] ?? 'DEFAULT' }}
+                            </div>
+                        </div>
+                        <div style="background: #0f172a; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid #1e293b;">
+                            <div style="color: #94a3b8; font-size: 0.75rem;">SOFTETHER_ADMIN_PASSWORD</div>
+                            <div style="margin-top: 0.25rem;">
+                                @if(!empty($connectionDetails['has_password']))
+                                    <span class="se-badge se-badge-emerald">✅ Detectada ({{ $connectionDetails['password_mask'] ?? '••••••••' }})</span>
+                                @else
+                                    <span class="se-badge se-badge-rose">❌ No detectada o vacía</span>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <h3 style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin: 1rem 0 0.5rem 0;">
-                    Paso 1: Conéctate por SSH a tu servidor VPS
+                    Comprobación 1: Verificar desde la terminal de tu VPS si las variables existen
                 </h3>
+                <p style="color: #94a3b8; font-size: 0.825rem; margin-bottom: 0.5rem;">
+                    Ejecuta este comando en la terminal de tu VPS para ver si el archivo <code>.env</code> tiene las variables escritas:
+                </p>
                 <div class="se-code-block">
-ssh root@tu-servidor-vps
-cd /opt/dataplus-platform/src
-nano .env
+grep -i SOFTETHER /opt/dataplus-platform/.env /opt/dataplus-platform/src/.env 2>/dev/null
                 </div>
 
                 <h3 style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin: 1.25rem 0 0.5rem 0;">
-                    Paso 2: Pega este bloque al final de tu archivo <code>.env</code>
+                    Comprobación 2: Limpiar la caché de configuración en Docker
                 </h3>
+                <p style="color: #94a3b8; font-size: 0.825rem; margin-bottom: 0.5rem;">
+                    En Laravel, si la configuración está cacheada, los cambios del <code>.env</code> no se aplican hasta limpiar la caché. Ejecuta:
+                </p>
                 <div class="se-code-block">
+# Limpiar caché de Laravel dentro del contenedor
+docker exec dp-prod-app php artisan config:clear
+docker exec dp-prod-app php artisan cache:clear
+
+# Verificar qué valores tiene cargados Laravel exactamente:
+docker exec dp-prod-app php artisan tinker --execute="dump(config('services.softether'));"
+                </div>
+
+                <h3 style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin: 1.25rem 0 0.5rem 0;">
+                    Comprobación 3: ¿Dónde colocar el bloque en el VPS?
+                </h3>
+                <p style="color: #94a3b8; font-size: 0.825rem; margin-bottom: 0.5rem;">
+                    Edita el archivo <code>.env</code> tanto en la raíz como en <code>src/</code>:
+                </p>
+                <div class="se-code-block">
+nano /opt/dataplus-platform/src/.env
+# y también en la raíz por si docker-compose lo inyecta:
+nano /opt/dataplus-platform/.env
+                </div>
+                <div class="se-code-block" style="margin-top: 0.5rem;">
 # ============================================================
 # SoftEther VPN Server (Credenciales Privadas)
 # ============================================================
-SOFTETHER_HOST=127.0.0.1
+SOFTETHER_HOST=host.docker.internal   # o 127.0.0.1 si corre en la misma red
 SOFTETHER_PORT=5555
 SOFTETHER_HUB=DEFAULT
 SOFTETHER_ADMIN_PASSWORD=tu_contraseña_maestra_aqui
-SOFTETHER_RPC_URL=https://127.0.0.1:5555/api/
+SOFTETHER_RPC_URL=https://host.docker.internal:5555/api/
 SOFTETHER_VERIFY_SSL=false
                 </div>
 
-                <h3 style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin: 1.25rem 0 0.5rem 0;">
-                    Paso 3: Guarda el archivo y reinicia el servicio
-                </h3>
-                <div class="se-code-block">
-# Si usas Laravel con Docker:
-docker compose restart app
-
-# Si usas PHP directamente:
-php artisan config:clear
-php artisan cache:clear
-                </div>
-
                 <p style="color: #94a3b8; font-size: 0.825rem; margin-top: 1rem;">
-                    Una vez configurado en el archivo <code>.env</code> de tu servidor, regresa a esta pestaña y presiona <strong>"Probar Conectividad"</strong>. La plataforma consultará directamente tu servidor SoftEther en tiempo real.
+                    Una vez guardado y limpiada la caché, regresa al botón <strong>"Probar Conectividad"</strong> arriba.
                 </p>
             </div>
         @endif

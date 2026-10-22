@@ -17,12 +17,12 @@ class SoftEtherService
 
     public function __construct()
     {
-        $this->host = (string) (config('services.softether.host') ?: env('SOFTETHER_HOST', '127.0.0.1'));
-        $this->port = (int) (config('services.softether.port') ?: env('SOFTETHER_PORT', 5555));
-        $this->hub = (string) (config('services.softether.hub') ?: env('SOFTETHER_HUB', 'DEFAULT'));
-        $this->adminPassword = (string) (config('services.softether.admin_password') ?: env('SOFTETHER_ADMIN_PASSWORD', ''));
-        $this->rpcUrl = (string) (config('services.softether.rpc_url') ?: env('SOFTETHER_RPC_URL', "https://{$this->host}:{$this->port}/api/"));
-        $this->verifySsl = (bool) (config('services.softether.verify_ssl') ?: env('SOFTETHER_VERIFY_SSL', false));
+        $this->host = (string) (config('services.softether.host') ?: env('SOFTETHER_HOST') ?: getenv('SOFTETHER_HOST') ?: '127.0.0.1');
+        $this->port = (int) (config('services.softether.port') ?: env('SOFTETHER_PORT') ?: getenv('SOFTETHER_PORT') ?: 5555);
+        $this->hub = (string) (config('services.softether.hub') ?: env('SOFTETHER_HUB') ?: getenv('SOFTETHER_HUB') ?: 'DEFAULT');
+        $this->adminPassword = (string) (config('services.softether.admin_password') ?: env('SOFTETHER_ADMIN_PASSWORD') ?: getenv('SOFTETHER_ADMIN_PASSWORD') ?: '');
+        $this->rpcUrl = (string) (config('services.softether.rpc_url') ?: env('SOFTETHER_RPC_URL') ?: getenv('SOFTETHER_RPC_URL') ?: "https://{$this->host}:{$this->port}/api/");
+        $this->verifySsl = (bool) (config('services.softether.verify_ssl') ?: env('SOFTETHER_VERIFY_SSL') ?: getenv('SOFTETHER_VERIFY_SSL') ?: false);
     }
 
     /**
@@ -30,7 +30,7 @@ class SoftEtherService
      */
     public function isConfigured(): bool
     {
-        return !empty($this->adminPassword) && !empty($this->host) && $this->host !== '127.0.0.1';
+        return !empty($this->adminPassword) && !empty($this->host);
     }
 
     /**
@@ -44,8 +44,11 @@ class SoftEtherService
             'hub' => $this->hub,
             'is_configured' => $this->isConfigured(),
             'has_password' => !empty($this->adminPassword),
+            'password_mask' => !empty($this->adminPassword) ? str_repeat('•', min(8, strlen($this->adminPassword))) : 'No detectada',
             'rpc_url' => $this->rpcUrl,
             'verify_ssl' => $this->verifySsl,
+            'env_file_path' => function_exists('base_path') ? base_path('.env') : '.env',
+            'env_file_exists' => function_exists('base_path') ? file_exists(base_path('.env')) : false,
         ];
     }
 
@@ -58,10 +61,19 @@ class SoftEtherService
         $latencyMs = null;
 
         if (!$this->isConfigured()) {
+            $missing = [];
+            if (empty($this->adminPassword)) {
+                $missing[] = 'SOFTETHER_ADMIN_PASSWORD';
+            }
+            if (empty($this->host)) {
+                $missing[] = 'SOFTETHER_HOST';
+            }
+            $missingStr = implode(' y ', $missing);
+
             return [
                 'success' => false,
                 'status' => 'not_configured',
-                'message' => 'El servidor SoftEther aún no tiene credenciales en el archivo .env de la plataforma.',
+                'message' => "Falta configurar {$missingStr} en el archivo .env. Si ya lo agregaste en el servidor, ejecuta 'php artisan config:clear' para refrescar la caché.",
                 'latency_ms' => null,
                 'server_info' => null,
             ];
@@ -98,10 +110,22 @@ class SoftEtherService
                     'server_info' => null,
                 ];
             } else {
+                $extraHint = '';
+                if (in_array($this->host, ['127.0.0.1', 'localhost'])) {
+                    // Probar si host.docker.internal está disponible (cuando app corre en contenedor y SoftEther en el host del VPS)
+                    $fallbackSocket = @fsockopen('host.docker.internal', $this->port, $fErrno, $fErrstr, 1.5);
+                    if ($fallbackSocket) {
+                        fclose($fallbackSocket);
+                        $extraHint = " ¡Atención! Detectamos que 'host.docker.internal:{$this->port}' sí responde. Como la app corre en Docker, configure SOFTETHER_HOST=host.docker.internal en su archivo .env.";
+                    } else {
+                        $extraHint = " Nota: Si la aplicación corre dentro de Docker y SoftEther está instalado en el host del VPS, '127.0.0.1' apunta al contenedor. Pruebe con SOFTETHER_HOST=host.docker.internal o la IP del VPS.";
+                    }
+                }
+
                 return [
                     'success' => false,
                     'status' => 'unreachable',
-                    'message' => "No se pudo conectar a {$this->host}:{$this->port}. Error: {$errstr} ({$errno})",
+                    'message' => "No se pudo conectar a {$this->host}:{$this->port}. Error: {$errstr} ({$errno}).{$extraHint}",
                     'latency_ms' => null,
                     'server_info' => null,
                 ];
