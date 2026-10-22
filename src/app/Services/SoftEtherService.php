@@ -41,7 +41,17 @@ class SoftEtherService
         }
 
         $this->rpcUrl = (string) (config('services.softether.rpc_url') ?: env('SOFTETHER_RPC_URL') ?: getenv('SOFTETHER_RPC_URL') ?: "https://{$this->host}:{$this->port}/api/");
-        $this->verifySsl = (bool) (config('services.softether.verify_ssl') ?: env('SOFTETHER_VERIFY_SSL') ?: getenv('SOFTETHER_VERIFY_SSL') ?: false);
+
+        // En SoftEther VPN, el certificado SSL en el puerto 5555 siempre es autofirmado (self-signed).
+        // filter_var asegura que strings como 'false', '0', 'off' se evalúen como FALSE.
+        $rawVerify = config('services.softether.verify_ssl');
+        if ($rawVerify === null) {
+            $rawVerify = env('SOFTETHER_VERIFY_SSL');
+        }
+        if ($rawVerify === null) {
+            $rawVerify = getenv('SOFTETHER_VERIFY_SSL');
+        }
+        $this->verifySsl = filter_var($rawVerify, FILTER_VALIDATE_BOOLEAN) ?: false;
     }
 
     /**
@@ -94,6 +104,15 @@ class SoftEtherService
                     $clean = trim($clean, '"\'');
                     if (!empty($clean)) {
                         $this->adminPassword = $clean;
+                    }
+                } elseif (str_starts_with($line, 'SOFTETHER_VERIFY_SSL=')) {
+                    $val = trim(substr($line, strlen('SOFTETHER_VERIFY_SSL=')));
+                    $this->verifySsl = filter_var(trim($val, '"\''), FILTER_VALIDATE_BOOLEAN) ?: false;
+                } elseif (str_starts_with($line, 'SOFTETHER_RPC_URL=')) {
+                    $val = trim(substr($line, strlen('SOFTETHER_RPC_URL=')));
+                    $clean = trim(explode('#', trim($val, '"\''))[0]);
+                    if (!empty($clean)) {
+                        $this->rpcUrl = $clean;
                     }
                 }
             }
@@ -255,12 +274,14 @@ class SoftEtherService
         }
 
         try {
-            $response = Http::withOptions([
-                'verify' => (bool) $this->verifySsl,
-                'timeout' => 8,
-            ])
-            ->withHeaders($headers)
-            ->post($url, [
+            $client = Http::timeout(8)->withHeaders($headers);
+
+            // Si verifySsl es false (por defecto para certificados autofirmados de SoftEther), omitir validación SSL
+            if (!$this->verifySsl) {
+                $client = $client->withoutVerifying();
+            }
+
+            $response = $client->post($url, [
                 'jsonrpc' => '2.0',
                 'id' => (string) time(),
                 'method' => $method,
