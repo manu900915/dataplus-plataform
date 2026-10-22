@@ -37,7 +37,7 @@ class SoftEtherPage extends Page
         $this->loadData();
     }
 
-    public function loadData(): void
+    public function loadData(bool $notify = false): void
     {
         /** @var SoftEtherService $service */
         $service = app(SoftEtherService::class);
@@ -48,6 +48,14 @@ class SoftEtherPage extends Page
         $this->virtualHubs = $service->getVirtualHubs();
         $this->secureNat = $service->getSecureNatStatus();
         $this->connectionDetails = $service->getConnectionDetails();
+
+        if ($notify) {
+            Notification::make()
+                ->title('Datos de SoftEther actualizados')
+                ->body('Se sincronizaron sesiones, usuarios y estado del Virtual Hub.')
+                ->success()
+                ->send();
+        }
     }
 
     public function setActiveTab(string $tab): void
@@ -61,6 +69,7 @@ class SoftEtherPage extends Page
         $service = app(SoftEtherService::class);
 
         $this->testResult = $service->testConnection();
+        $this->loadData();
 
         if ($this->testResult['success']) {
             Notification::make()
