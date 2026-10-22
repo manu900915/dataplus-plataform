@@ -1,0 +1,54 @@
+name: SoftEther Feature CI/CD
+
+on:
+  push:
+    branches: [ feature/softether-management ]
+  pull_request:
+    branches: [ feature/softether-management ]
+  workflow_dispatch:
+
+jobs:
+  # ============================================================
+  # 1. Validación y Compilación de Assets
+  # ============================================================
+  build:
+    name: Build & Validate SoftEther Module
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Dependencies & Build Frontend
+        working-directory: ./src
+        run: |
+          npm install
+          npm run build
+
+  # ============================================================
+  # 2. Despliegue automático de la rama en VPS
+  # ============================================================
+  deploy:
+    name: Deploy SoftEther Branch to VPS
+    needs: build
+    if: github.ref == 'refs/heads/feature/softether-management' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: self-hosted
+
+    steps:
+      - name: Run Deploy Script on VPS
+        run: |
+          echo "🚀 Desplegando rama feature/softether-management en VPS..."
+          cd "${{ secrets.SERVER_PATH || '/opt/dataplus-platform' }}"
+          git fetch origin
+          git checkout feature/softether-management
+          git pull origin feature/softether-management
+          
+          if [ -f "deploy.sh" ]; then
+            bash ./deploy.sh
+          fi
+          
+          echo "✅ Despliegue de feature/softether-management completado con éxito."

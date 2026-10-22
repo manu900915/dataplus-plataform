@@ -42,4 +42,13 @@ return [
         'inbox_id' => (int) env('CHATWOOT_INBOX_ID', 1),
     ],
 
+    'softether' => [
+        'host' => env('SOFTETHER_HOST', '127.0.0.1'),
+        'port' => (int) env('SOFTETHER_PORT', 5555),
+        'hub' => env('SOFTETHER_HUB', 'DEFAULT'),
+        'admin_password' => env('SOFTETHER_ADMIN_PASSWORD', ''),
+        'rpc_url' => env('SOFTETHER_RPC_URL', ''),
+        'verify_ssl' => (bool) env('SOFTETHER_VERIFY_SSL', false),
+    ],
+
 ];
