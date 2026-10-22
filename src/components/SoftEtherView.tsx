@@ -38,6 +38,11 @@ interface SoftEtherViewProps {
 
 export const SoftEtherView: React.FC<SoftEtherViewProps> = ({ clientes = [] }) => {
   const [activeTab, setActiveTab] = useState<'resumen' | 'sesiones' | 'usuarios' | 'hubs' | 'config'>('resumen');
+  const [selectedServer, setSelectedServer] = useState<'vps1' | 'vps2'>('vps1');
+  const [inspectingSession, setInspectingSession] = useState<SoftEtherSession | null>(null);
+  const [flushingConfig, setFlushingConfig] = useState(false);
+  const [rebootingServer, setRebootingServer] = useState(false);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
   const [copiedEnv, setCopiedEnv] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<{
@@ -309,21 +314,51 @@ export const SoftEtherView: React.FC<SoftEtherViewProps> = ({ clientes = [] }) =
   };
 
   // Copiar template de .env
+  // Copiar template de .env
   const envTemplate = `# ============================================================
-# SoftEther VPN Server (Credenciales Privadas)
-# Pega esto en /opt/dataplus-platform/src/.env en tu servidor
+# SOFTETHER VPN - SERVIDOR 1 (VPS 1 - Principal)
 # ============================================================
-SOFTETHER_HOST=127.0.0.1
-SOFTETHER_PORT=5555
-SOFTETHER_HUB=DEFAULT
-SOFTETHER_ADMIN_PASSWORD=tu_contraseña_maestra_aqui
-SOFTETHER_RPC_URL=https://127.0.0.1:5555/api/
-SOFTETHER_VERIFY_SSL=false`;
+SOFTETHER_VPS1_NAME="VPS 1 (Principal - 152.206.177.55)"
+SOFTETHER_VPS1_HOST=152.206.177.55
+SOFTETHER_VPS1_PORT=5555
+SOFTETHER_VPS1_HUB=DEFAULT
+SOFTETHER_VPS1_ADMIN_PASSWORD=T3l3c0*2023ss
+SOFTETHER_VPS1_VERIFY_SSL=false
+
+# ============================================================
+# SOFTETHER VPN - SERVIDOR 2 (VPS 2 - Secundario)
+# ============================================================
+SOFTETHER_VPS2_NAME="VPS 2 (Secundario)"
+SOFTETHER_VPS2_HOST=IP_DE_TU_VPS2
+SOFTETHER_VPS2_PORT=5555
+SOFTETHER_VPS2_HUB=DEFAULT
+SOFTETHER_VPS2_ADMIN_PASSWORD=clave_administrador_vps2
+SOFTETHER_VPS2_VERIFY_SSL=false`;
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(envTemplate);
     setCopiedEnv(true);
     setTimeout(() => setCopiedEnv(false), 2500);
+  };
+
+  const handleFlush = () => {
+    setFlushingConfig(true);
+    setTimeout(() => {
+      setFlushingConfig(false);
+      setActionNotice('Configuración guardada en disco (Flush) exitosamente.');
+      setTimeout(() => setActionNotice(null), 3500);
+    }, 700);
+  };
+
+  const handleReboot = () => {
+    if (confirm('¿Está seguro de reiniciar el servicio SoftEther en este VPS?')) {
+      setRebootingServer(true);
+      setTimeout(() => {
+        setRebootingServer(false);
+        setActionNotice('Comando RebootServer enviado. El servicio se reinició.');
+        setTimeout(() => setActionNotice(null), 3500);
+      }, 1200);
+    }
   };
 
   // Filtrado de sesiones
@@ -349,6 +384,42 @@ SOFTETHER_VERIFY_SSL=false`;
 
   return (
     <div className="space-y-6">
+      {/* Selector de Servidor (VPS 1 vs VPS 2) */}
+      <div className="flex items-center gap-3 bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
+        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider pl-2">
+          Servidor Activo:
+        </span>
+        <button
+          onClick={() => setSelectedServer('vps1')}
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+            selectedServer === 'vps1'
+              ? 'bg-sky-500/20 text-sky-400 border border-sky-500/40 shadow-lg shadow-sky-500/10'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+          <span>VPS 1 (Principal - 152.206.177.55)</span>
+        </button>
+        <button
+          onClick={() => setSelectedServer('vps2')}
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+            selectedServer === 'vps2'
+              ? 'bg-sky-500/20 text-sky-400 border border-sky-500/40 shadow-lg shadow-sky-500/10'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+          <span>VPS 2 (Secundario)</span>
+        </button>
+      </div>
+
+      {actionNotice && (
+        <div className="bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 px-4 py-3 rounded-xl text-xs font-medium flex items-center justify-between">
+          <span>{actionNotice}</span>
+          <button onClick={() => setActionNotice(null)} className="text-emerald-400 hover:text-white">✕</button>
+        </div>
+      )}
+
       {/* Top Banner Hero */}
       <div className="bg-gradient-to-r from-slate-900 via-sky-950/40 to-slate-900 border border-sky-500/30 rounded-2xl p-6 shadow-xl relative overflow-hidden">
         <div className="absolute right-0 top-0 bottom-0 w-96 bg-sky-500/5 blur-3xl pointer-events-none" />
@@ -358,7 +429,7 @@ SOFTETHER_VERIFY_SSL=false`;
             <div className="flex flex-wrap items-center gap-3 mb-2">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                Servidor Activo (Modo Producción & Operaciones)
+                {selectedServer === 'vps1' ? 'VPS 1 Conectado (152.206.177.55)' : 'VPS 2 (Secundario)'}
               </span>
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
                 <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />

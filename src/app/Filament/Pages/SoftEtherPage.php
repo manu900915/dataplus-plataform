@@ -21,38 +21,63 @@ class SoftEtherPage extends Page
     protected static string $view = 'filament.pages.softether-page';
 
     public string $activeTab = 'resumen'; // resumen, sesiones, usuarios, hubs, config
+    public string $selectedServer = 'vps1'; // vps1 o vps2
 
     public array $serverStatus = [];
     public array $activeSessions = [];
     public array $vpnUsers = [];
     public array $virtualHubs = [];
     public array $secureNat = [];
+    public array $dhcpTable = [];
     public array $connectionDetails = [];
 
     public ?array $testResult = null;
-    public bool $isTesting = false;
+    public ?array $inspectSession = null;
+
+    // Campos modal nuevo usuario
+    public bool $isCreatingUser = false;
+    public string $newUsername = '';
+    public string $newRealname = '';
+    public string $newPassword = '';
+    public string $newNote = '';
 
     public function mount(): void
     {
         $this->loadData();
     }
 
+    public function selectServer(string $serverId): void
+    {
+        $this->selectedServer = $serverId;
+        $this->testResult = null;
+        $this->inspectSession = null;
+        $this->loadData();
+
+        Notification::make()
+            ->title('Servidor seleccionado')
+            ->body("Conmutado al servidor: {$this->connectionDetails['server_name']}")
+            ->info()
+            ->send();
+    }
+
     public function loadData(bool $notify = false): void
     {
         /** @var SoftEtherService $service */
         $service = app(SoftEtherService::class);
+        $service->setServer($this->selectedServer);
 
         $this->serverStatus = $service->getServerStatus();
         $this->activeSessions = $service->getActiveSessions();
         $this->vpnUsers = $service->getUsers();
         $this->virtualHubs = $service->getVirtualHubs();
         $this->secureNat = $service->getSecureNatStatus();
+        $this->dhcpTable = $service->getDhcpTable();
         $this->connectionDetails = $service->getConnectionDetails();
 
         if ($notify) {
             Notification::make()
                 ->title('Datos de SoftEther actualizados')
-                ->body('Se sincronizaron sesiones, usuarios y estado del Virtual Hub.')
+                ->body("Sincronizado con {$this->connectionDetails['server_name']}.")
                 ->success()
                 ->send();
         }
@@ -67,6 +92,7 @@ class SoftEtherPage extends Page
     {
         /** @var SoftEtherService $service */
         $service = app(SoftEtherService::class);
+        $service->setServer($this->selectedServer);
 
         $this->testResult = $service->testConnection();
         $this->loadData();
@@ -86,10 +112,33 @@ class SoftEtherPage extends Page
         }
     }
 
+    public function inspeccionarSesion(string $sessionName): void
+    {
+        /** @var SoftEtherService $service */
+        $service = app(SoftEtherService::class);
+        $service->setServer($this->selectedServer);
+
+        $this->inspectSession = $service->getSessionStatus($sessionName);
+
+        if (empty($this->inspectSession)) {
+            Notification::make()
+                ->title('Información no disponible')
+                ->body("No se pudo obtener el estado detallado de la sesión {$sessionName}.")
+                ->warning()
+                ->send();
+        }
+    }
+
+    public function cerrarModalInspeccion(): void
+    {
+        $this->inspectSession = null;
+    }
+
     public function desconectarSesion(string $sessionName): void
     {
         /** @var SoftEtherService $service */
         $service = app(SoftEtherService::class);
+        $service->setServer($this->selectedServer);
         $res = $service->disconnectSession($sessionName);
 
         if ($res['success']) {
@@ -99,7 +148,6 @@ class SoftEtherPage extends Page
                 ->success()
                 ->send();
 
-            // Filtrar localmente la sesión desconectada
             $this->activeSessions = array_values(array_filter($this->activeSessions, fn ($s) => ($s['session_name'] ?? '') !== $sessionName));
         } else {
             Notification::make()
@@ -110,10 +158,79 @@ class SoftEtherPage extends Page
         }
     }
 
+    public function crearUsuario(): void
+    {
+        if (empty(trim($this->newUsername)) || empty(trim($this->newPassword))) {
+            Notification::make()
+                ->title('Campos requeridos')
+                ->body('Debe especificar usuario y contraseña.')
+                ->warning()
+                ->send();
+            return;
+        }
+
+        /** @var SoftEtherService $service */
+        $service = app(SoftEtherService::class);
+        $service->setServer($this->selectedServer);
+
+        $res = $service->createUser([
+            'username' => trim($this->newUsername),
+            'real_name' => trim($this->newRealname) ?: trim($this->newUsername),
+            'password' => trim($this->newPassword),
+            'note' => trim($this->newNote) ?: 'Cliente VPN DataPlus',
+        ]);
+
+        if ($res['success']) {
+            Notification::make()
+                ->title('Usuario VPN Creado')
+                ->body($res['message'])
+                ->success()
+                ->send();
+
+            $this->isCreatingUser = false;
+            $this->newUsername = '';
+            $this->newRealname = '';
+            $this->newPassword = '';
+            $this->newNote = '';
+            $this->loadData();
+        } else {
+            Notification::make()
+                ->title('Error al crear usuario')
+                ->body($res['message'])
+                ->danger()
+                ->send();
+        }
+    }
+
+    public function eliminarUsuario(string $username): void
+    {
+        /** @var SoftEtherService $service */
+        $service = app(SoftEtherService::class);
+        $service->setServer($this->selectedServer);
+        $res = $service->deleteUser($username);
+
+        if ($res['success']) {
+            Notification::make()
+                ->title('Usuario eliminado')
+                ->body($res['message'])
+                ->success()
+                ->send();
+
+            $this->vpnUsers = array_values(array_filter($this->vpnUsers, fn ($u) => ($u['username'] ?? '') !== $username));
+        } else {
+            Notification::make()
+                ->title('Error al eliminar usuario')
+                ->body($res['message'])
+                ->danger()
+                ->send();
+        }
+    }
+
     public function toggleUsuario(string $username, bool $nuevoEstado): void
     {
         /** @var SoftEtherService $service */
         $service = app(SoftEtherService::class);
+        $service->setServer($this->selectedServer);
         $res = $service->toggleUser($username, $nuevoEstado);
 
         if ($res['success']) {
@@ -123,7 +240,6 @@ class SoftEtherPage extends Page
                 ->success()
                 ->send();
 
-            // Actualizar localmente el usuario
             foreach ($this->vpnUsers as &$u) {
                 if (($u['username'] ?? '') === $username) {
                     $u['is_active'] = $nuevoEstado;
@@ -133,6 +249,50 @@ class SoftEtherPage extends Page
         } else {
             Notification::make()
                 ->title('Error al cambiar usuario')
+                ->body($res['message'])
+                ->danger()
+                ->send();
+        }
+    }
+
+    public function guardarEnDisco(): void
+    {
+        /** @var SoftEtherService $service */
+        $service = app(SoftEtherService::class);
+        $service->setServer($this->selectedServer);
+        $res = $service->flushConfig();
+
+        if ($res['success']) {
+            Notification::make()
+                ->title('Configuración guardada (Flush)')
+                ->body($res['message'])
+                ->success()
+                ->send();
+        } else {
+            Notification::make()
+                ->title('Error al guardar configuración')
+                ->body($res['message'])
+                ->danger()
+                ->send();
+        }
+    }
+
+    public function reiniciarServicio(): void
+    {
+        /** @var SoftEtherService $service */
+        $service = app(SoftEtherService::class);
+        $service->setServer($this->selectedServer);
+        $res = $service->rebootServer();
+
+        if ($res['success']) {
+            Notification::make()
+                ->title('Servicio Reiniciado')
+                ->body($res['message'])
+                ->warning()
+                ->send();
+        } else {
+            Notification::make()
+                ->title('Error al reiniciar')
                 ->body($res['message'])
                 ->danger()
                 ->send();
