@@ -1,0 +1,419 @@
+export type Priority = 'Baja' | 'Media' | 'Alta' | 'Critica';
+export type IncidentStatus = 'Pendiente' | 'Asignada' | 'En_Progreso' | 'En_Espera' | 'Resuelta' | 'Cerrada' | 'Cancelada';
+export type IncidentType = 'CCTV' | 'SACI' | 'Redes' | 'Gestion_Remota';
+
+export type ProjectStatus = 'borrador' | 'en_progreso' | 'completado' | 'cancelado';
+export type KanbanStatus = 'por_hacer' | 'en_progreso' | 'en_revision' | 'completado';
+export type BudgetLineType = 'equipamiento' | 'material' | 'mano_obra' | 'transporte' | 'alimentacion' | 'otro';
+
+export type MovementType = 'entrada' | 'salida' | 'ajuste' | 'devolucion';
+export type ItemCategoryType = 'equipamiento' | 'material' | 'ambos';
+
+export interface Cliente {
+  id: string;
+  codigo: string;
+  tipo_persona: 'natural' | 'juridica';
+  documento?: string;
+  nombre: string;
+  nombre_comercial?: string;
+  email?: string;
+  telefono?: string;
+  direccion?: string;
+  provincia?: string;
+  municipio?: string;
+  notas?: string;
+  activo: boolean;
+  ubicaciones: ClienteUbicacion[];
+  contactos?: ContactoCliente[];
+  created_at: string;
+}
+
+export interface ClienteUbicacion {
+  id: string;
+  cliente_id: string;
+  nombre: string;
+  tipo: 'residencial' | 'negocio';
+  tipo_negocio_nombre?: string;
+  direccion?: string;
+  provincia?: string;
+  municipio?: string;
+  contacto_nombre?: string;
+  contacto_telefono?: string;
+  notas?: string;
+  activo: boolean;
+}
+
+export interface ContactoCliente {
+  id: string;
+  cliente_id: string;
+  nombre: string;
+  cargo?: string;
+  telefono?: string;
+  email?: string;
+}
+
+export interface LineaPresupuesto {
+  id: string;
+  proyecto_id: string;
+  tipo_linea: BudgetLineType;
+  item_id?: string;
+  descripcion: string;
+  cantidad: number;
+  costo_unitario: number;
+  subtotal: number;
+  descontar_inventario: boolean;
+}
+
+export interface Proyecto {
+  id: string;
+  codigo: string;
+  nombre: string;
+  tipo_proyecto_nombre: string;
+  tipo_seguimiento: 'investigacion' | 'instalacion' | 'mantenimiento';
+  cliente_id?: string;
+  cliente_nombre?: string;
+  cliente_ubicacion_id?: string;
+  cliente_ubicacion_nombre?: string;
+  responsable_nombre: string;
+  estado: ProjectStatus;
+  estado_kanban: KanbanStatus;
+  fecha_inicio?: string;
+  fecha_fin?: string;
+  presupuesto_total: number;
+  progreso: number; // 0 - 100
+  descripcion?: string;
+  lineas_presupuesto: LineaPresupuesto[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TipoProyecto {
+  id: string;
+  nombre: string;
+  descripcion?: string;
+  activo: boolean;
+  proyectos_count: number;
+}
+
+export interface TipoNegocio {
+  id: string;
+  nombre: string;
+  descripcion?: string;
+  activo: boolean;
+  negocios_count: number;
+}
+
+export interface Incidencia {
+  id: string;
+  codigo: string;
+  tipo: IncidentType;
+  cliente_id: string;
+  cliente_nombre: string;
+  ubicacion_nombre?: string;
+  direccion_incidencia?: string;
+  contacto_local?: string;
+  telefono_local?: string;
+  titulo: string;
+  descripcion: string;
+  diagnostico?: string;
+  tecnico_id?: string;
+  tecnico_nombre?: string;
+  estado: IncidentStatus;
+  prioridad: Priority;
+  fecha_reporte: string;
+  fecha_limite?: string;
+  fecha_resolucion?: string;
+  solucion?: string;
+  costo_estimado?: number;
+  gasto_transporte?: number;
+  gasto_almuerzo?: number;
+  cumplio_sla?: boolean;
+  requiere_repuestos: boolean;
+  creado_por: string;
+}
+
+export interface ItemInventario {
+  id: string;
+  codigo: string;
+  nombre: string;
+  categoria_id: string;
+  categoria_nombre: string;
+  descripcion?: string;
+  unidad_medida: string;
+  precio_unitario: number;
+  precio_costo?: number;
+  stock_actual: number;
+  stock_minimo: number;
+  es_equipamiento: boolean;
+  numero_serie?: string;
+  almacen_id: string;
+  almacen_nombre: string;
+}
+
+export interface CategoriaItem {
+  id: string;
+  nombre: string;
+  descripcion?: string;
+  tipo: ItemCategoryType;
+  activo: boolean;
+  items_count: number;
+}
+
+export interface Almacen {
+  id: string;
+  nombre: string;
+  provincia?: string;
+  municipio?: string;
+  responsable?: string;
+  total_items?: number;
+  valor_estimado?: number;
+}
+
+export interface InventarioMovimiento {
+  id: string;
+  fecha: string;
+  item_id: string;
+  item_nombre: string;
+  almacen_id: string;
+  almacen_nombre: string;
+  tipo: MovementType;
+  cantidad: number;
+  costo_unitario?: number;
+  motivo?: string;
+  usuario: string;
+}
+
+export interface Brigada {
+  id: string;
+  nombre: string;
+  lider: string;
+  tecnicos: string[];
+  zona: string;
+  servicios_activos: number;
+  estado: 'disponible' | 'en_terreno' | 'mantenimiento';
+  telefono_contacto: string;
+}
+
+export interface Servicio {
+  id: string;
+  codigo: string;
+  cliente_id: string;
+  cliente_nombre: string;
+  cliente_ubicacion_id?: string;
+  ubicacion_nombre?: string;
+  tipo: 'CCTV' | 'SACI' | 'Gestion_Remota';
+  brigada_id?: string;
+  brigada_nombre?: string;
+  estado: 'Activo' | 'Inactivo' | 'En_Reparacion' | 'Suspendido';
+  fecha_instalacion?: string;
+  notas?: string;
+  // Campos específicos de Gestión Remota (Laravel / Filament)
+  gr_tipo_solucion?: 'Router4g' | 'Router+Modem' | 'Router+ADSL' | 'Otros';
+  gr_sim_numero?: string;
+  gr_marca_modelo?: string;
+  gr_tipo_internet?: 'Abierto' | 'Filtrado' | 'Cerrado';
+  gr_recarga_por?: 'Nosotros' | 'Cliente';
+  gr_recarga_monto?: number;
+  gr_ultima_recarga?: string;
+}
+
+export interface Contrato {
+  id: string;
+  codigo: string;
+  cliente_id: string;
+  cliente_nombre: string;
+  titulo: string;
+  tipo: 'Mantenimiento CCTV' | 'Monitoreo SACI' | 'Gestión Remota & SIM' | 'Soporte Integral';
+  monto_mensual: number;
+  fecha_inicio: string;
+  fecha_vencimiento: string;
+  estado: 'vigente' | 'por_vencer' | 'vencido';
+  renovacion_automatica: boolean;
+}
+
+export interface Venta {
+  id: string;
+  codigo: string;
+  cliente_id: string;
+  cliente_nombre: string;
+  concepto: string;
+  fecha: string;
+  monto_total: number;
+  metodo_pago: 'Transferencia CUP' | 'Efectivo' | 'USD / MLC';
+  estado: 'cobrado' | 'pendiente' | 'anulado';
+}
+
+export interface Gasto {
+  id: string;
+  codigo: string;
+  categoria: 'Insumos y Repuestos' | 'Combustible y Transporte' | 'Dietas y Brigadas' | 'Equipos y Herramientas' | 'Servicios y Telecom';
+  concepto: string;
+  fecha: string;
+  monto: number;
+  responsable: string;
+  comprobante?: string;
+}
+
+export interface UserAccount {
+  id: string;
+  name: string;
+  email: string;
+  role: 'Administrador' | 'Supervisor' | 'Técnico' | 'Vendedor' | 'Contable';
+  activo: boolean;
+  ldap_uid?: string;
+  phone?: string;
+  created_at: string;
+}
+
+export type Moneda = 'CUP' | 'USD';
+export type MetodoPagoServicio = 'Transferencia' | 'Efectivo';
+export type EstadoCobroServicio = 'Al_Dia' | 'Pendiente' | 'En_Mora' | 'Pago_Parcial';
+
+export interface SuscripcionServicio {
+  id: string;
+  codigo: string;
+  cliente_id: string;
+  cliente_nombre: string;
+  cliente_telefono?: string;
+  cliente_email?: string;
+  servicio_id?: string;
+  nombre_servicio: string;
+  tipo_solucion?: string;
+  sim_numero?: string;
+  moneda: Moneda;
+  tarifa_mensual: number;
+  dia_limite_pago: number; // Por defecto 15 (primeros 15 días del mes)
+  activo: boolean;
+  fecha_inicio: string;
+  notas?: string;
+  // Estado de Deuda y Cobro
+  tiene_deuda: boolean;
+  meses_deuda_count: number;
+  meses_deuda_detalle: string[]; // Ej. ["Agosto 2026", "Septiembre 2026"]
+  deuda_acumulada: number;
+  monto_a_cobrar: number; // deuda_acumulada + tarifa_mensual mes adelantado
+  estado_cobro_mes_actual: EstadoCobroServicio;
+  ultimo_pago_fecha?: string;
+  ultimo_pago_monto?: number;
+  ultimo_pago_metodo?: MetodoPagoServicio;
+  ultimo_pago_transaccion?: string;
+}
+
+export interface RegistroPagoServicio {
+  id: string;
+  codigo_pago: string;
+  suscripcion_id: string;
+  cliente_id: string;
+  cliente_nombre: string;
+  cliente_telefono?: string;
+  servicio_nombre: string;
+  mes_periodo: string; // Ej. "2026-10"
+  mes_nombre_legible: string; // Ej. "Octubre 2026"
+  moneda: Moneda;
+  tarifa_servicio: number;
+  deuda_previa: number;
+  meses_deuda_previos: number;
+  meses_deuda_liquidados?: string[];
+  monto_total_exigible: number; // deuda_previa + tarifa_servicio
+  monto_pagado: number;
+  saldo_restante: number;
+  fecha_pago: string; // YYYY-MM-DD
+  dia_pago: number; // Día del mes en que pagó
+  pago_a_tiempo: boolean; // Si día <= 15
+  metodo_pago: MetodoPagoServicio;
+  // Transferencia:
+  plataforma_transferencia?: string; // Transfermóvil, EnZona, Zelle, TropiPay, etc.
+  numero_transaccion?: string;
+  comprobante_imagen_url?: string;
+  comprobante_nombre?: string;
+  // Efectivo:
+  efectivo_quien_recibe?: string;
+  efectivo_quien_entrega?: string;
+  notas?: string;
+  registrado_por: string;
+  created_at: string;
+}
+
+// ============================================================
+// SOFTETHER VPN TYPES
+// ============================================================
+export interface SoftEtherSession {
+  session_name: string;
+  username: string;
+  cliente_nombre: string;
+  tipo_equipo: string;
+  sim_numero?: string;
+  ip_publica_origen: string;
+  ip_virtual_dhcp: string;
+  protocolo: string;
+  duracion: string;
+  tiempo_conectado_segundos: number;
+  trafico_in: string;
+  trafico_out: string;
+  bitrate_actual: string;
+  calidad_enlace: string;
+  estado: 'Conectado' | 'Desconectado';
+}
+
+export interface SoftEtherUser {
+  username: string;
+  real_name: string;
+  cliente_asociado: string;
+  auth_type: string;
+  estado: 'Habilitado' | 'Deshabilitado';
+  is_active: boolean;
+  max_connections: number;
+  expires_at: string;
+  note: string;
+  last_login?: string;
+  currently_connected: boolean;
+}
+
+export interface SoftEtherHub {
+  hub_name: string;
+  status: string;
+  type: string;
+  users_count: number;
+  groups_count: number;
+  active_sessions: number;
+  mac_tables: number;
+  ip_tables: number;
+  secure_nat: string;
+  last_comm: string;
+  traffic: string;
+}
+
+export interface SoftEtherServerStatus {
+  is_live: boolean;
+  server_name: string;
+  version: string;
+  os_name: string;
+  server_type: string;
+  uptime: string;
+  started_at: string;
+  total_sessions: number;
+  total_users: number;
+  total_tcp_connections: number;
+  traffic_total_in: string;
+  traffic_total_out: string;
+  transfer_speed_in: string;
+  transfer_speed_out: string;
+  listeners: Array<{ port: number; protocol: string; status: string }>;
+  virtual_nat_enabled: boolean;
+  virtual_dhcp_enabled: boolean;
+}
+
+export interface SoftEtherSecureNat {
+  hub_name: string;
+  nat_enabled: boolean;
+  dhcp_enabled: boolean;
+  virtual_gateway_ip: string;
+  virtual_subnet_mask: string;
+  dhcp_lease_start: string;
+  dhcp_lease_end: string;
+  dhcp_lease_expire_seconds: number;
+  dns_servers: string[];
+  active_dhcp_leases: number;
+  total_nat_sessions: number;
+}
+
