@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Exception;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -10,6 +11,7 @@ class SoftEtherService
 {
     protected string $activeServerKey = 'vps1';
     protected array $servers = [];
+    protected array $circuitBroken = [];
 
     // Propiedades del servidor activo
     protected string $host = '127.0.0.1';
@@ -346,6 +348,15 @@ class SoftEtherService
             ];
         }
 
+        // Circuit breaker: Si el servidor falló la conexión previamente en esta petición, abortar de inmediato sin demoras
+        if ($this->circuitBroken[$this->activeServerKey] ?? false) {
+            return [
+                'success' => false,
+                'error' => 'Servidor no accesible (circuito cortado para evitar bloqueos)',
+                'data' => null,
+            ];
+        }
+
         $url = rtrim($this->rpcUrl, '/');
         if (!str_ends_with($url, '/api')) {
             $url .= '/api/';
@@ -366,7 +377,10 @@ class SoftEtherService
         }
 
         try {
-            $client = Http::timeout(8)->withHeaders($headers);
+            // Optimización de velocidad: connectTimeout de 1.5s y timeout global de 3.0s
+            $client = Http::connectTimeout(1.5)
+                ->timeout(3.0)
+                ->withHeaders($headers);
 
             // En SoftEther VPN los certificados SSL son siempre autofirmados (self-signed)
             if (!$this->verifySsl) {
@@ -402,13 +416,99 @@ class SoftEtherService
                 'data' => null,
             ];
         } catch (Exception $e) {
-            Log::warning("SoftEther RPC exception on {$method}: " . $e->getMessage());
+            $msg = $e->getMessage();
+            // Si es un error de conectividad o tiempo de espera, activar circuit breaker para este servidor
+            if (str_contains($msg, 'cURL error 7') || str_contains($msg, 'cURL error 28') || str_contains($msg, 'timed out') || str_contains($msg, 'Failed to connect')) {
+                $this->circuitBroken[$this->activeServerKey] = true;
+            }
+
+            Log::warning("SoftEther RPC exception on {$method} ({$this->activeServerKey}): " . $msg);
             return [
                 'success' => false,
-                'error' => $e->getMessage(),
+                'error' => $msg,
                 'data' => null,
             ];
         }
+    }
+
+    /**
+     * Restablece el disyuntor (circuit breaker)
+     */
+    public function resetCircuitBreaker(?string $serverKey = null): void
+    {
+        if ($serverKey) {
+            unset($this->circuitBroken[$serverKey]);
+        } else {
+            $this->circuitBroken = [];
+        }
+    }
+
+    /**
+     * Limpia la caché temporal de telemetría
+     */
+    public function clearCache(?string $serverKey = null): void
+    {
+        $key = $serverKey ?: $this->activeServerKey;
+        try {
+            Cache::forget("softether_telemetry_{$key}");
+        } catch (Exception $e) {
+            // Continuar si la caché de Laravel no está configurada
+        }
+        $this->resetCircuitBreaker($key);
+    }
+
+    /**
+     * Obtiene el paquete completo de telemetría de forma ultra-rápida (con caché de 20s y disyuntor)
+     */
+    public function getTelemetry(bool $forceRefresh = false): array
+    {
+        $cacheKey = "softether_telemetry_{$this->activeServerKey}";
+
+        if (!$forceRefresh) {
+            try {
+                if (Cache::has($cacheKey)) {
+                    $cached = Cache::get($cacheKey);
+                    if (is_array($cached) && !empty($cached)) {
+                        $cached['from_cache'] = true;
+                        return $cached;
+                    }
+                }
+            } catch (Exception $e) {
+                // Si la caché falla, continuar sin error
+            }
+        }
+
+        // Si es refresco forzado, restablecemos el circuit breaker
+        $this->resetCircuitBreaker($this->activeServerKey);
+
+        $serverStatus = $this->getServerStatus();
+        $activeSessions = $this->getActiveSessions();
+        $vpnUsers = $this->getUsers();
+        $virtualHubs = $this->getVirtualHubs();
+        $secureNat = $this->getSecureNatStatus();
+        $dhcpTable = $this->getDhcpTable();
+        $connectionDetails = $this->getConnectionDetails();
+
+        $data = [
+            'serverStatus' => $serverStatus,
+            'activeSessions' => $activeSessions,
+            'vpnUsers' => $vpnUsers,
+            'virtualHubs' => $virtualHubs,
+            'secureNat' => $secureNat,
+            'dhcpTable' => $dhcpTable,
+            'connectionDetails' => $connectionDetails,
+            'from_cache' => false,
+            'updated_at' => date('H:i:s'),
+        ];
+
+        try {
+            // Almacenar durante 20 segundos para cambio de servidor ultra-rápido (0ms)
+            Cache::put($cacheKey, $data, 20);
+        } catch (Exception $e) {
+            // Ignorar fallo de almacenamiento
+        }
+
+        return $data;
     }
 
     /**
@@ -646,6 +746,7 @@ class SoftEtherService
             ]);
 
             if ($res['success']) {
+                $this->clearCache($this->activeServerKey);
                 return [
                     'success' => true,
                     'message' => "Sesión {$sessionName} desconectada exitosamente en {$this->servers[$this->activeServerKey]['name']}.",
@@ -766,6 +867,7 @@ class SoftEtherService
             $res = $this->callRpc('CreateUser', $params);
 
             if ($res['success']) {
+                $this->clearCache($this->activeServerKey);
                 return [
                     'success' => true,
                     'message' => "Usuario VPN '{$username}' creado exitosamente en {$this->servers[$this->activeServerKey]['name']}.",
@@ -798,6 +900,7 @@ class SoftEtherService
             ]);
 
             if ($res['success']) {
+                $this->clearCache($this->activeServerKey);
                 return [
                     'success' => true,
                     'message' => "Usuario VPN '{$username}' eliminado exitosamente en SoftEther.",
@@ -840,6 +943,7 @@ class SoftEtherService
             $res = $this->callRpc('SetUser', $userData);
 
             if ($res['success']) {
+                $this->clearCache($this->activeServerKey);
                 return [
                     'success' => true,
                     'message' => "Usuario VPN {$username} {$accion} correctamente en SoftEther.",
@@ -927,6 +1031,7 @@ class SoftEtherService
         if ($this->isConfigured()) {
             $res = $this->callRpc('Flush');
             if ($res['success']) {
+                $this->clearCache($this->activeServerKey);
                 $bytes = $res['data']['IntValue_u32'] ?? 0;
                 return [
                     'success' => true,
@@ -954,6 +1059,7 @@ class SoftEtherService
         if ($this->isConfigured()) {
             $res = $this->callRpc('RebootServer');
             if ($res['success']) {
+                $this->clearCache($this->activeServerKey);
                 return [
                     'success' => true,
                     'message' => "Comando de reinicio enviado a {$this->servers[$this->activeServerKey]['name']}. El servicio se reiniciará en unos segundos.",

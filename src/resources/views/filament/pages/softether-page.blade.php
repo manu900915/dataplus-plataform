@@ -209,8 +209,16 @@
             @foreach($connectionDetails['available_servers'] ?? [] as $srv)
                 <button type="button" 
                         wire:click="selectServer('{{ $srv['id'] }}')" 
-                        class="se-server-btn {{ $selectedServer === $srv['id'] ? 'active' : '' }}">
-                    <span style="width: 8px; height: 8px; border-radius: 50%; background: {{ $srv['is_configured'] ? '#34d399' : '#f59e0b' }};"></span>
+                        wire:loading.attr="disabled"
+                        wire:target="selectServer('{{ $srv['id'] }}')"
+                        class="se-server-btn {{ $selectedServer === $srv['id'] ? 'active' : '' }}"
+                        style="position: relative;">
+                    <!-- Spinner mientras conmuta servidor -->
+                    <svg wire:loading wire:target="selectServer('{{ $srv['id'] }}')" style="width: 14px; height: 14px; animation: spin 1s linear infinite;" fill="none" viewBox="0 0 24 24">
+                        <circle style="opacity: 0.25;" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path style="opacity: 0.75;" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span wire:loading.remove wire:target="selectServer('{{ $srv['id'] }}')" style="width: 8px; height: 8px; border-radius: 50%; background: {{ $srv['is_configured'] ? '#34d399' : '#f59e0b' }};"></span>
                     <span>{{ $srv['name'] }}</span>
                     @if($srv['is_configured'])
                         <span style="font-size: 0.7rem; opacity: 0.75; font-family: monospace;">({{ $srv['host'] }})</span>
@@ -236,6 +244,13 @@
                         <span class="se-badge se-badge-sky">
                             Host: {{ $connectionDetails['host'] ?? '127.0.0.1' }}:{{ $connectionDetails['port'] ?? 5555 }}
                         </span>
+                        <span wire:loading wire:target="selectServer, loadData" class="se-badge se-badge-amber">
+                            <svg style="width: 12px; height: 12px; animation: spin 1s linear infinite;" fill="none" viewBox="0 0 24 24">
+                                <circle style="opacity: 0.25;" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path style="opacity: 0.75;" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Sincronizando RPC...
+                        </span>
                     </div>
                     <h1 style="font-size: 1.5rem; font-weight: 700; color: #ffffff; margin: 0;">
                         Gestión & Telemetría SoftEther VPN
@@ -247,12 +262,14 @@
 
                 <!-- Botonera de Comandos Rápidos -->
                 <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
-                    <button type="button" wire:click="testConnection" class="se-btn se-btn-sky">
-                        <svg style="width: 1rem; height: 1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                    <button type="button" wire:click="testConnection" wire:loading.attr="disabled" class="se-btn se-btn-sky">
+                        <svg wire:loading.remove wire:target="testConnection" style="width: 1rem; height: 1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                        <svg wire:loading wire:target="testConnection" style="width: 1rem; height: 1rem; animation: spin 1s linear infinite;" fill="none" viewBox="0 0 24 24"><circle style="opacity: 0.25;" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path style="opacity: 0.75;" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                         <span>Probar Conectividad</span>
                     </button>
-                    <button type="button" wire:click="loadData(true)" class="se-btn" style="background: #1e293b; color: #f1f5f9; border: 1px solid #334155;">
-                        <svg style="width: 1rem; height: 1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                    <button type="button" wire:click="loadData(true, true)" wire:loading.attr="disabled" class="se-btn" style="background: #1e293b; color: #f1f5f9; border: 1px solid #334155;">
+                        <svg wire:loading.remove wire:target="loadData" style="width: 1rem; height: 1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                        <svg wire:loading wire:target="loadData" style="width: 1rem; height: 1rem; animation: spin 1s linear infinite;" fill="none" viewBox="0 0 24 24"><circle style="opacity: 0.25;" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path style="opacity: 0.75;" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                         <span>Actualizar Datos</span>
                     </button>
                     <button type="button" wire:click="guardarEnDisco" class="se-btn se-btn-amber" title="Guarda la configuración actual en vpn_server.config inmediatamente">

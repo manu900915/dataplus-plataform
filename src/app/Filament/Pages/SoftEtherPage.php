@@ -51,7 +51,7 @@ class SoftEtherPage extends Page
         $this->selectedServer = $serverId;
         $this->testResult = null;
         $this->inspectSession = null;
-        $this->loadData();
+        $this->loadData(false, false); // Carga instantánea desde caché (0ms)
 
         Notification::make()
             ->title('Servidor seleccionado')
@@ -60,19 +60,21 @@ class SoftEtherPage extends Page
             ->send();
     }
 
-    public function loadData(bool $notify = false): void
+    public function loadData(bool $notify = false, bool $force = false): void
     {
         /** @var SoftEtherService $service */
         $service = app(SoftEtherService::class);
         $service->setServer($this->selectedServer);
 
-        $this->serverStatus = $service->getServerStatus();
-        $this->activeSessions = $service->getActiveSessions();
-        $this->vpnUsers = $service->getUsers();
-        $this->virtualHubs = $service->getVirtualHubs();
-        $this->secureNat = $service->getSecureNatStatus();
-        $this->dhcpTable = $service->getDhcpTable();
-        $this->connectionDetails = $service->getConnectionDetails();
+        $telemetry = $service->getTelemetry($force);
+
+        $this->serverStatus = $telemetry['serverStatus'] ?? [];
+        $this->activeSessions = $telemetry['activeSessions'] ?? [];
+        $this->vpnUsers = $telemetry['vpnUsers'] ?? [];
+        $this->virtualHubs = $telemetry['virtualHubs'] ?? [];
+        $this->secureNat = $telemetry['secureNat'] ?? [];
+        $this->dhcpTable = $telemetry['dhcpTable'] ?? [];
+        $this->connectionDetails = $telemetry['connectionDetails'] ?? [];
 
         if ($notify) {
             Notification::make()
@@ -95,7 +97,7 @@ class SoftEtherPage extends Page
         $service->setServer($this->selectedServer);
 
         $this->testResult = $service->testConnection();
-        $this->loadData();
+        $this->loadData(false, true); // Forzar sincronización en vivo tras el test
 
         if ($this->testResult['success']) {
             Notification::make()
