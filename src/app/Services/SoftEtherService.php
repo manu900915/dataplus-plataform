@@ -121,61 +121,67 @@ class SoftEtherService
                 }
 
                 // Servidor 1 (o genérico)
-                if (str_starts_with($line, 'SOFTETHER_VPS1_HOST=') || (empty($this->servers['vps1']['host']) && str_starts_with($line, 'SOFTETHER_HOST='))) {
-                    $val = trim(substr($line, strpos($line, '=') + 1));
-                    $clean = trim(explode('#', trim($val, '"\''))[0]);
+                if (preg_match('/^\s*(SOFTETHER_VPS1_HOST|SOFTETHER_HOST)\s*=\s*(.*)$/i', $line, $m)) {
+                    $clean = trim(explode('#', trim($m[2], '"\''))[0]);
                     if (!empty($clean)) {
                         $this->servers['vps1']['host'] = $clean;
                     }
-                } elseif (str_starts_with($line, 'SOFTETHER_VPS1_PORT=') || str_starts_with($line, 'SOFTETHER_PORT=')) {
-                    $val = trim(substr($line, strpos($line, '=') + 1));
-                    $clean = (int) trim(explode('#', trim($val, '"\''))[0]);
+                } elseif (preg_match('/^\s*(SOFTETHER_VPS1_PORT|SOFTETHER_PORT)\s*=\s*(.*)$/i', $line, $m)) {
+                    $clean = (int) trim(explode('#', trim($m[2], '"\''))[0]);
                     if ($clean > 0) {
                         $this->servers['vps1']['port'] = $clean;
                     }
-                } elseif (str_starts_with($line, 'SOFTETHER_VPS1_HUB=') || str_starts_with($line, 'SOFTETHER_HUB=')) {
-                    $val = trim(substr($line, strpos($line, '=') + 1));
-                    $clean = trim(explode('#', trim($val, '"\''))[0]);
+                } elseif (preg_match('/^\s*(SOFTETHER_VPS1_HUB|SOFTETHER_HUB)\s*=\s*(.*)$/i', $line, $m)) {
+                    $clean = trim(explode('#', trim($m[2], '"\''))[0]);
                     if (!empty($clean)) {
                         $this->servers['vps1']['hub'] = $clean;
                     }
-                } elseif (str_starts_with($line, 'SOFTETHER_VPS1_ADMIN_PASSWORD=') || (empty($this->servers['vps1']['admin_password']) && str_starts_with($line, 'SOFTETHER_ADMIN_PASSWORD='))) {
-                    $val = trim(substr($line, strpos($line, '=') + 1));
-                    $clean = preg_replace('/\s+#.*$/', '', $val);
+                } elseif (preg_match('/^\s*(SOFTETHER_VPS1_ADMIN_PASSWORD|SOFTETHER_ADMIN_PASSWORD|SOFTETHER_PASSWORD)\s*=\s*(.*)$/i', $line, $m)) {
+                    $clean = preg_replace('/\s+#.*$/', '', $m[2]);
                     $clean = trim($clean, '"\'');
                     if (!empty($clean)) {
                         $this->servers['vps1']['admin_password'] = $clean;
                     }
+                } elseif (preg_match('/^\s*(SOFTETHER_VPS1_VERIFY_SSL|SOFTETHER_VERIFY_SSL)\s*=\s*(.*)$/i', $line, $m)) {
+                    $clean = trim(explode('#', trim($m[2], '"\''))[0]);
+                    $this->servers['vps1']['verify_ssl'] = filter_var($clean, FILTER_VALIDATE_BOOLEAN);
                 }
 
                 // Servidor 2
-                if (str_starts_with($line, 'SOFTETHER_VPS2_HOST=')) {
-                    $val = trim(substr($line, strlen('SOFTETHER_VPS2_HOST=')));
-                    $clean = trim(explode('#', trim($val, '"\''))[0]);
+                if (preg_match('/^\s*(SOFTETHER_VPS2_HOST|VPS2_SOFTETHER_HOST)\s*=\s*(.*)$/i', $line, $m)) {
+                    $clean = trim(explode('#', trim($m[2], '"\''))[0]);
                     if (!empty($clean)) {
                         $this->servers['vps2']['host'] = $clean;
                     }
-                } elseif (str_starts_with($line, 'SOFTETHER_VPS2_PORT=')) {
-                    $val = trim(substr($line, strlen('SOFTETHER_VPS2_PORT=')));
-                    $clean = (int) trim(explode('#', trim($val, '"\''))[0]);
+                } elseif (preg_match('/^\s*(SOFTETHER_VPS2_PORT|VPS2_SOFTETHER_PORT)\s*=\s*(.*)$/i', $line, $m)) {
+                    $clean = (int) trim(explode('#', trim($m[2], '"\''))[0]);
                     if ($clean > 0) {
                         $this->servers['vps2']['port'] = $clean;
                     }
-                } elseif (str_starts_with($line, 'SOFTETHER_VPS2_HUB=')) {
-                    $val = trim(substr($line, strlen('SOFTETHER_VPS2_HUB=')));
-                    $clean = trim(explode('#', trim($val, '"\''))[0]);
+                } elseif (preg_match('/^\s*(SOFTETHER_VPS2_HUB|VPS2_SOFTETHER_HUB)\s*=\s*(.*)$/i', $line, $m)) {
+                    $clean = trim(explode('#', trim($m[2], '"\''))[0]);
                     if (!empty($clean)) {
                         $this->servers['vps2']['hub'] = $clean;
                     }
-                } elseif (str_starts_with($line, 'SOFTETHER_VPS2_ADMIN_PASSWORD=')) {
-                    $val = trim(substr($line, strlen('SOFTETHER_VPS2_ADMIN_PASSWORD=')));
-                    $clean = preg_replace('/\s+#.*$/', '', $val);
+                } elseif (preg_match('/^\s*(SOFTETHER_VPS2_ADMIN_PASSWORD|SOFTETHER_VPS2_PASSWORD|SOFTETHER_VPS2_PASS)\s*=\s*(.*)$/i', $line, $m)) {
+                    $clean = preg_replace('/\s+#.*$/', '', $m[2]);
                     $clean = trim($clean, '"\'');
                     if (!empty($clean)) {
                         $this->servers['vps2']['admin_password'] = $clean;
                     }
+                } elseif (preg_match('/^\s*(SOFTETHER_VPS2_VERIFY_SSL|SOFTETHER_VPS2_SSL)\s*=\s*(.*)$/i', $line, $m)) {
+                    $clean = trim(explode('#', trim($m[2], '"\''))[0]);
+                    $this->servers['vps2']['verify_ssl'] = filter_var($clean, FILTER_VALIDATE_BOOLEAN);
                 }
             }
+        }
+
+        // Recalcular URLs RPC con los datos limpios
+        if (!empty($this->servers['vps1']['host'])) {
+            $this->servers['vps1']['rpc_url'] = "https://{$this->servers['vps1']['host']}:{$this->servers['vps1']['port']}/api/";
+        }
+        if (!empty($this->servers['vps2']['host'])) {
+            $this->servers['vps2']['rpc_url'] = "https://{$this->servers['vps2']['host']}:{$this->servers['vps2']['port']}/api/";
         }
     }
 
@@ -562,29 +568,26 @@ class SoftEtherService
             }
         }
 
+        $err = $info['error'] ?? ($status['error'] ?? 'Sin conexión en vivo');
         return [
             'is_live' => false,
-            'server_name' => "{$this->servers[$this->activeServerKey]['name']} (Modo reserva)",
-            'version' => 'Version 4.38 Build 9760',
-            'os_name' => 'Linux 6.1.0-21-amd64 (Debian)',
-            'server_type' => 'Standalone Server',
-            'uptime' => '42 días, 14 horas, 28 minutos',
-            'started_at' => '2026-09-08 08:30:00',
-            'total_sessions' => 3,
-            'total_users' => 4,
-            'total_tcp_connections' => 8,
-            'traffic_total_in' => '142.8 GB',
-            'traffic_total_out' => '98.4 GB',
-            'transfer_speed_in' => '2.4 Mbps',
-            'transfer_speed_out' => '1.8 Mbps',
-            'listeners' => [
-                ['port' => 443, 'protocol' => 'TCP / HTTPS', 'status' => 'Activo'],
-                ['port' => 992, 'protocol' => 'TCP', 'status' => 'Activo'],
-                ['port' => 1194, 'protocol' => 'UDP / OpenVPN', 'status' => 'Activo'],
-                ['port' => 5555, 'protocol' => 'TCP / Admin RPC', 'status' => 'Activo'],
-            ],
-            'virtual_nat_enabled' => true,
-            'virtual_dhcp_enabled' => true,
+            'server_name' => "{$this->servers[$this->activeServerKey]['name']}",
+            'version' => 'No disponible',
+            'os_name' => 'No disponible',
+            'server_type' => 'SoftEther VPN Server',
+            'uptime' => 'Desconectado',
+            'started_at' => 'No disponible',
+            'total_sessions' => 0,
+            'total_users' => 0,
+            'total_tcp_connections' => 0,
+            'traffic_total_in' => '0 B',
+            'traffic_total_out' => '0 B',
+            'transfer_speed_in' => '0 bps',
+            'transfer_speed_out' => '0 bps',
+            'listeners' => [],
+            'virtual_nat_enabled' => false,
+            'virtual_dhcp_enabled' => false,
+            'error_message' => $err,
         ];
     }
 
@@ -610,28 +613,14 @@ class SoftEtherService
                         'mac_tables' => (int) ($h['NumMacTables_u32'] ?? 0),
                         'ip_tables' => (int) ($h['NumIpTables_u32'] ?? 0),
                         'secure_nat' => 'SecureNAT Operativo',
-                        'last_comm' => !empty($h['LastCommTime_dt']) ? $h['LastCommTime_dt'] : date('Y-m-d H:i:s'),
+                        'last_comm' => !empty($h['LastCommTime_dt']) ? $h['LastCommTime_dt'] : 'Sin actividad',
                         'traffic' => $this->formatBytes($recv + $send),
                     ];
                 }, $res['data']['HubList']);
             }
         }
 
-        return [
-            [
-                'hub_name' => 'DEFAULT',
-                'status' => 'Online',
-                'type' => 'Standalone',
-                'users_count' => 4,
-                'groups_count' => 1,
-                'active_sessions' => 3,
-                'mac_tables' => 12,
-                'ip_tables' => 9,
-                'secure_nat' => 'Habilitado (Virtual NAT & DHCP)',
-                'last_comm' => date('Y-m-d H:i:s'),
-                'traffic' => '184.2 GB',
-            ],
-        ];
+        return [];
     }
 
     /**
@@ -647,22 +636,22 @@ class SoftEtherService
                 return array_map(function ($s) {
                     $name = $s['Name_str'] ?? 'SID-UNKNOWN';
                     $user = $s['Username_str'] ?? 'vpn_user';
-                    $ip = $s['ClientIP_ip'] ?? $s['RemoteHostname_str'] ?? '152.206.x.x';
+                    $ip = $s['ClientIP_ip'] ?? $s['RemoteHostname_str'] ?? '127.0.0.1';
                     $proto = !empty($s['LinkMode_bool']) ? 'Cascade Link' : (!empty($s['SecureNATMode_bool']) ? 'SecureNAT' : 'SoftEther VPN');
 
                     return [
                         'session_name' => $name,
                         'username' => $user,
                         'cliente_nombre' => $this->findClientNameForUser($user),
-                        'tipo_equipo' => !empty($s['RemoteHostname_str']) ? $s['RemoteHostname_str'] : 'Router / Cliente 4G',
+                        'tipo_equipo' => !empty($s['RemoteHostname_str']) ? $s['RemoteHostname_str'] : 'Cliente VPN',
                         'sim_numero' => 'Enlace Activo',
                         'ip_publica_origen' => (string) $ip,
                         'ip_virtual_dhcp' => 'Asignada por DHCP',
                         'protocolo' => $proto,
                         'duracion' => !empty($s['CreatedTime_dt']) ? $this->formatDuration($s['CreatedTime_dt']) : 'Conectado',
                         'tiempo_conectado_segundos' => 3600,
-                        'trafico_in' => !empty($s['PacketSize_u64']) ? $this->formatBytes($s['PacketSize_u64']) : '0 MB',
-                        'trafico_out' => '0 MB',
+                        'trafico_in' => !empty($s['PacketSize_u64']) ? $this->formatBytes($s['PacketSize_u64']) : '0 B',
+                        'trafico_out' => '0 B',
                         'bitrate_actual' => 'En línea',
                         'calidad_enlace' => 'Excelente',
                         'estado' => 'Conectado',
@@ -673,42 +662,7 @@ class SoftEtherService
             }
         }
 
-        return [
-            [
-                'session_name' => 'SID-ROUTER-MORAIMA-01',
-                'username' => 'moraima_4g',
-                'cliente_nombre' => 'Moraima Guanabo',
-                'tipo_equipo' => 'Router 4G LTE Huawei B310',
-                'sim_numero' => '5352849102',
-                'ip_publica_origen' => '152.206.112.45',
-                'ip_virtual_dhcp' => '192.168.30.10',
-                'protocolo' => 'SoftEther VPN (Ethernet over HTTPS)',
-                'duracion' => '14 horas, 12 min',
-                'tiempo_conectado_segundos' => 51120,
-                'trafico_in' => '4.8 GB',
-                'trafico_out' => '2.1 GB',
-                'bitrate_actual' => '420 Kbps',
-                'calidad_enlace' => 'Excelente (Ping 48ms)',
-                'estado' => 'Conectado',
-            ],
-            [
-                'session_name' => 'SID-ROUTER-DAINET-02',
-                'username' => 'dainet_playa',
-                'cliente_nombre' => 'Dainet Playa',
-                'tipo_equipo' => 'MikroTik hEX S + Módem 4G LTE',
-                'sim_numero' => '5353418820',
-                'ip_publica_origen' => '152.206.140.89',
-                'ip_virtual_dhcp' => '192.168.30.12',
-                'protocolo' => 'OpenVPN (UDP 1194)',
-                'duracion' => '6 horas, 45 min',
-                'tiempo_conectado_segundos' => 24300,
-                'trafico_in' => '12.4 GB',
-                'trafico_out' => '8.6 GB',
-                'bitrate_actual' => '1.2 Mbps',
-                'calidad_enlace' => 'Estable (Ping 62ms)',
-                'estado' => 'Conectado',
-            ],
-        ];
+        return [];
     }
 
     /**
@@ -807,34 +761,7 @@ class SoftEtherService
             }
         }
 
-        return [
-            [
-                'username' => 'moraima_4g',
-                'real_name' => 'Moraima Guanabo - Router B310',
-                'cliente_asociado' => 'Moraima Guanabo',
-                'auth_type' => 'Contraseña Estándar',
-                'estado' => 'Habilitado',
-                'is_active' => true,
-                'max_connections' => 1,
-                'expires_at' => 'Indefinido',
-                'note' => 'Enlace de Gestión Remota & Telemetría',
-                'last_login' => '2026-10-21 07:01:24',
-                'currently_connected' => true,
-            ],
-            [
-                'username' => 'dainet_playa',
-                'real_name' => 'Dainet Playa - Enlace MikroTik',
-                'cliente_asociado' => 'Dainet Playa',
-                'auth_type' => 'Contraseña Estándar',
-                'estado' => 'Habilitado',
-                'is_active' => true,
-                'max_connections' => 1,
-                'expires_at' => 'Indefinido',
-                'note' => 'VPN túnel seguro a central de monitoreo',
-                'last_login' => '2026-10-21 14:18:10',
-                'currently_connected' => true,
-            ],
-        ];
+        return [];
     }
 
     /**
@@ -881,8 +808,8 @@ class SoftEtherService
         }
 
         return [
-            'success' => true,
-            'message' => "Usuario '{$username}' simulado en modo local.",
+            'success' => false,
+            'message' => 'El servidor no está configurado o no responde.',
         ];
     }
 
@@ -914,8 +841,8 @@ class SoftEtherService
         }
 
         return [
-            'success' => true,
-            'message' => "Usuario '{$username}' eliminado (Modo local).",
+            'success' => false,
+            'message' => 'El servidor no está configurado o no responde.',
         ];
     }
 
@@ -957,52 +884,89 @@ class SoftEtherService
         }
 
         return [
-            'success' => true,
-            'message' => "Usuario VPN {$username} {$accion} (Modo simulación / local).",
+            'success' => false,
+            'message' => 'El servidor no está configurado o no responde.',
         ];
     }
 
     /**
-     * Obtiene el estado de SecureNAT (GetSecureNATStatus, Páginas 115-116)
+     * Obtiene el estado real de SecureNAT (GetSecureNATOption + GetSecureNATStatus, Páginas 111-116)
      */
     public function getSecureNatStatus(?string $hub = null): array
     {
         $hubName = $hub ?: $this->hub;
 
         if ($this->isConfigured()) {
-            $res = $this->callRpc('GetSecureNATStatus', ['HubName_str' => $hubName]);
-            if ($res['success'] && !empty($res['data'])) {
-                $d = $res['data'];
+            // 1. Opciones y configuración real de red IP (Página 111 del manual oficial)
+            $optRes = $this->callRpc('GetSecureNATOption', ['RpcHubName_str' => $hubName]);
+            if (!$optRes['success']) {
+                $optRes = $this->callRpc('GetSecureNATOption', ['HubName_str' => $hubName]);
+            }
+
+            // 2. Estado operativo en vivo de sesiones y leases (Página 115)
+            $statusRes = $this->callRpc('GetSecureNATStatus', ['HubName_str' => $hubName]);
+
+            if ($optRes['success'] || $statusRes['success']) {
+                $opt = $optRes['data'] ?? [];
+                $stat = $statusRes['data'] ?? [];
+
+                $dnsList = array_values(array_filter([
+                    $opt['DhcpDnsServerAddress_ip'] ?? null,
+                    $opt['DhcpDnsServerAddress2_ip'] ?? null,
+                ]));
+
+                $useNat = !empty($opt['UseNat_bool']);
+                $useDhcp = !empty($opt['UseDhcp_bool']);
+                $gwIp = $opt['DhcpGatewayAddress_ip'] ?? null;
+                $subnet = $opt['DhcpSubnetMask_ip'] ?? null;
+                $startIp = $opt['DhcpLeaseIPStart_ip'] ?? null;
+                $endIp = $opt['DhcpLeaseIPEnd_ip'] ?? null;
+
                 return [
                     'hub_name' => $hubName,
-                    'nat_enabled' => true,
-                    'dhcp_enabled' => true,
-                    'virtual_gateway_ip' => '192.168.30.1',
-                    'virtual_subnet_mask' => '255.255.255.0',
-                    'dhcp_lease_start' => '192.168.30.10',
-                    'dhcp_lease_end' => '192.168.30.200',
-                    'dhcp_lease_expire_seconds' => 7200,
-                    'dns_servers' => ['1.1.1.1', '8.8.8.8'],
-                    'active_dhcp_leases' => (int) ($d['NumDhcpClients_u32'] ?? 0),
-                    'total_nat_sessions' => (int) ($d['NumTcpSessions_u32'] ?? 0) + (int) ($d['NumUdpSessions_u32'] ?? 0),
-                    'is_kernel_mode' => !empty($d['IsKernelMode_bool']),
+                    'is_live' => true,
+                    'nat_enabled' => $useNat,
+                    'dhcp_enabled' => $useDhcp,
+                    'virtual_gateway_ip' => $gwIp ?: ($useNat || $useDhcp ? 'No asignada' : 'Inactivo'),
+                    'virtual_subnet_mask' => $subnet ?: '255.255.255.0',
+                    'dhcp_lease_start' => $startIp ?: 'Inactivo',
+                    'dhcp_lease_end' => $endIp ?: 'Inactivo',
+                    'dhcp_lease_expire_seconds' => (int) ($opt['DhcpExpireTimeSpan_u32'] ?? 0),
+                    'dns_servers' => !empty($dnsList) ? $dnsList : [],
+                    'domain_name' => $opt['DhcpDomainName_str'] ?? '',
+                    'active_dhcp_leases' => (int) ($stat['NumDhcpClients_u32'] ?? 0),
+                    'total_nat_sessions' => (int) (($stat['NumTcpSessions_u32'] ?? 0) + ($stat['NumUdpSessions_u32'] ?? 0)),
+                    'tcp_sessions' => (int) ($stat['NumTcpSessions_u32'] ?? 0),
+                    'udp_sessions' => (int) ($stat['NumUdpSessions_u32'] ?? 0),
+                    'icmp_sessions' => (int) ($stat['NumIcmpSessions_u32'] ?? 0),
+                    'dns_sessions' => (int) ($stat['NumDnsSessions_u32'] ?? 0),
+                    'is_kernel_mode' => !empty($stat['IsKernelMode_bool']),
+                    'is_raw_ip_mode' => !empty($stat['IsRawIpMode_bool']),
                 ];
             }
         }
 
+        // Estado cuando no está activo o el servidor no responde (datos reales en 0, sin invenciones)
         return [
             'hub_name' => $hubName,
-            'nat_enabled' => true,
-            'dhcp_enabled' => true,
-            'virtual_gateway_ip' => '192.168.30.1',
-            'virtual_subnet_mask' => '255.255.255.0',
-            'dhcp_lease_start' => '192.168.30.10',
-            'dhcp_lease_end' => '192.168.30.200',
-            'dhcp_lease_expire_seconds' => 7200,
-            'dns_servers' => ['1.1.1.1', '8.8.8.8'],
-            'active_dhcp_leases' => 3,
-            'total_nat_sessions' => 48,
+            'is_live' => false,
+            'nat_enabled' => false,
+            'dhcp_enabled' => false,
+            'virtual_gateway_ip' => 'No disponible',
+            'virtual_subnet_mask' => 'No disponible',
+            'dhcp_lease_start' => 'No disponible',
+            'dhcp_lease_end' => 'No disponible',
+            'dhcp_lease_expire_seconds' => 0,
+            'dns_servers' => [],
+            'domain_name' => '',
+            'active_dhcp_leases' => 0,
+            'total_nat_sessions' => 0,
+            'tcp_sessions' => 0,
+            'udp_sessions' => 0,
+            'icmp_sessions' => 0,
+            'dns_sessions' => 0,
             'is_kernel_mode' => false,
+            'is_raw_ip_mode' => false,
         ];
     }
 

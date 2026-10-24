@@ -345,7 +345,7 @@
                 <div class="se-card">
                     <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 600; text-transform: uppercase;">Tráfico Total Recibido</div>
                     <div style="font-size: 1.75rem; font-weight: 700; color: #a78bfa; margin-top: 0.25rem;">
-                        {{ $serverStatus['traffic_total_in'] ?? '142.8 GB' }}
+                        {{ $serverStatus['traffic_total_in'] ?? '0 B' }}
                     </div>
                     <div style="color: #64748b; font-size: 0.75rem; margin-top: 0.25rem;">Inbound acumulado</div>
                 </div>
@@ -353,7 +353,7 @@
                 <div class="se-card">
                     <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 600; text-transform: uppercase;">Tráfico Total Enviado</div>
                     <div style="font-size: 1.75rem; font-weight: 700; color: #f43f5e; margin-top: 0.25rem;">
-                        {{ $serverStatus['traffic_total_out'] ?? '98.4 GB' }}
+                        {{ $serverStatus['traffic_total_out'] ?? '0 B' }}
                     </div>
                     <div style="color: #64748b; font-size: 0.75rem; margin-top: 0.25rem;">Outbound acumulado</div>
                 </div>
@@ -578,58 +578,99 @@
 
         <!-- TAB 4: VIRTUAL HUBS & SECURENAT -->
         @if($activeTab === 'hubs')
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
                 <div class="se-card">
                     <h3 style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin: 0 0 1rem 0; border-bottom: 1px solid #1e293b; padding-bottom: 0.5rem;">
                         Virtual Hubs en {{ $connectionDetails['server_name'] }}
                     </h3>
                     <div style="display: flex; flex-direction: column; gap: 1rem;">
-                        @foreach($virtualHubs as $hub)
+                        @forelse($virtualHubs as $hub)
                             <div style="background: #090e1a; border: 1px solid #1e293b; border-radius: 0.5rem; padding: 1rem;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                                     <div style="font-weight: 700; color: #38bdf8; font-size: 1.05rem;">{{ $hub['hub_name'] }}</div>
-                                    <span class="se-badge se-badge-emerald">{{ $hub['status'] }}</span>
+                                    <span class="se-badge {{ ($hub['status'] ?? '') === 'Online' ? 'se-badge-emerald' : 'se-badge-amber' }}">
+                                        {{ $hub['status'] ?? 'Desconocido' }}
+                                    </span>
                                 </div>
                                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.8rem; color: #94a3b8;">
-                                    <div>Usuarios: <strong style="color: #ffffff;">{{ $hub['users_count'] }}</strong></div>
-                                    <div>Sesiones: <strong style="color: #ffffff;">{{ $hub['active_sessions'] }}</strong></div>
-                                    <div>Tablas MAC: <strong style="color: #ffffff;">{{ $hub['mac_tables'] }}</strong></div>
-                                    <div>Tablas IP: <strong style="color: #ffffff;">{{ $hub['ip_tables'] }}</strong></div>
+                                    <div>Usuarios: <strong style="color: #ffffff;">{{ $hub['users_count'] ?? 0 }}</strong></div>
+                                    <div>Sesiones: <strong style="color: #ffffff;">{{ $hub['active_sessions'] ?? 0 }}</strong></div>
+                                    <div>Tablas MAC: <strong style="color: #ffffff;">{{ $hub['mac_tables'] ?? 0 }}</strong></div>
+                                    <div>Tablas IP: <strong style="color: #ffffff;">{{ $hub['ip_tables'] ?? 0 }}</strong></div>
+                                    <div>Tráfico: <strong style="color: #38bdf8;">{{ $hub['traffic'] ?? '0 B' }}</strong></div>
+                                    <div>Última com.: <span style="font-size: 0.75rem;">{{ $hub['last_comm'] ?? 'N/D' }}</span></div>
                                 </div>
                             </div>
-                        @endforeach
+                        @empty
+                            <div style="text-align: center; color: #94a3b8; padding: 2rem; background: #090e1a; border: 1px dashed #334155; border-radius: 0.5rem;">
+                                <svg style="width: 2rem; height: 2rem; margin: 0 auto 0.5rem auto; color: #64748b;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                                <div>No se detectaron Virtual Hubs activos en este servidor.</div>
+                                <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.25rem;">Verifique la conexión RPC con el VPS.</div>
+                            </div>
+                        @endforelse
                     </div>
                 </div>
 
                 <div class="se-card">
                     <h3 style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin: 0 0 1rem 0; border-bottom: 1px solid #1e293b; padding-bottom: 0.5rem;">
-                        Estado SecureNAT & DHCP Virtual
+                        Estado SecureNAT & DHCP Virtual (Hub: {{ $connectionDetails['hub'] }})
                     </h3>
-                    <div style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.825rem;">
-                        <div style="display: flex; justify-content: space-between;">
+                    <div style="display: flex; flex-direction: column; gap: 0.85rem; font-size: 0.825rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
                             <span style="color: #94a3b8;">Virtual NAT:</span>
-                            <span class="se-badge se-badge-emerald">Habilitado</span>
+                            <span class="se-badge {{ !empty($secureNat['nat_enabled']) ? 'se-badge-emerald' : 'se-badge-amber' }}">
+                                {{ !empty($secureNat['nat_enabled']) ? 'Habilitado' : 'Deshabilitado' }}
+                            </span>
                         </div>
-                        <div style="display: flex; justify-content: space-between;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
                             <span style="color: #94a3b8;">Virtual DHCP Server:</span>
-                            <span class="se-badge se-badge-emerald">Habilitado</span>
+                            <span class="se-badge {{ !empty($secureNat['dhcp_enabled']) ? 'se-badge-emerald' : 'se-badge-amber' }}">
+                                {{ !empty($secureNat['dhcp_enabled']) ? 'Habilitado' : 'Deshabilitado' }}
+                            </span>
                         </div>
-                        <div style="display: flex; justify-content: space-between;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
                             <span style="color: #94a3b8;">Gateway Virtual:</span>
-                            <span style="font-family: monospace; color: #38bdf8;">{{ $secureNat['virtual_gateway_ip'] ?? '192.168.30.1' }}</span>
+                            <span style="font-family: monospace; color: {{ !empty($secureNat['virtual_gateway_ip']) && $secureNat['virtual_gateway_ip'] !== 'No disponible' ? '#38bdf8' : '#64748b' }};">
+                                {{ $secureNat['virtual_gateway_ip'] ?? 'No disponible' }}
+                            </span>
                         </div>
-                        <div style="display: flex; justify-content: space-between;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
                             <span style="color: #94a3b8;">Rango Asignación DHCP:</span>
-                            <span style="font-family: monospace; color: #34d399;">{{ $secureNat['dhcp_lease_start'] ?? '192.168.30.10' }} - {{ $secureNat['dhcp_lease_end'] ?? '192.168.30.200' }}</span>
+                            <span style="font-family: monospace; color: {{ !empty($secureNat['dhcp_enabled']) ? '#34d399' : '#64748b' }};">
+                                @if(!empty($secureNat['dhcp_enabled']))
+                                    {{ $secureNat['dhcp_lease_start'] ?? 'N/D' }} - {{ $secureNat['dhcp_lease_end'] ?? 'N/D' }}
+                                @else
+                                    Inactivo
+                                @endif
+                            </span>
                         </div>
-                        <div style="display: flex; justify-content: space-between;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: #94a3b8;">Servidores DNS (DHCP):</span>
+                            <span style="font-family: monospace; color: #a78bfa;">
+                                {{ !empty($secureNat['dns_servers']) ? implode(', ', $secureNat['dns_servers']) : 'Por defecto' }}
+                            </span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
                             <span style="color: #94a3b8;">Leases Activos DHCP:</span>
-                            <span style="font-weight: 600; color: #ffffff;">{{ $secureNat['active_dhcp_leases'] ?? count($dhcpTable) }}</span>
+                            <span style="font-weight: 600; color: #ffffff;">{{ $secureNat['active_dhcp_leases'] ?? 0 }}</span>
                         </div>
-                        <div style="display: flex; justify-content: space-between;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
                             <span style="color: #94a3b8;">Sesiones NAT Activas:</span>
-                            <span style="font-weight: 600; color: #ffffff;">{{ $secureNat['total_nat_sessions'] ?? 48 }}</span>
+                            <span style="font-weight: 600; color: #ffffff;">
+                                {{ $secureNat['total_nat_sessions'] ?? 0 }}
+                                @if(($secureNat['total_nat_sessions'] ?? 0) > 0)
+                                    <span style="font-size: 0.75rem; color: #64748b; font-weight: normal;">
+                                        ({{ $secureNat['tcp_sessions'] ?? 0 }} TCP, {{ $secureNat['udp_sessions'] ?? 0 }} UDP)
+                                    </span>
+                                @endif
+                            </span>
                         </div>
+                        @if(!empty($secureNat['is_kernel_mode']))
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="color: #94a3b8;">Modo Kernel:</span>
+                                <span class="se-badge se-badge-sky">Activo</span>
+                            </div>
+                        @endif
                     </div>
                 </div>
             </div>
