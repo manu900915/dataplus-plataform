@@ -73,12 +73,7 @@ class SoftEtherService
             ?: env('SOFTETHER_VPS2_PORT')
             ?: env('VPS2_SOFTETHER_PORT')
             ?: env('SOFTETHER_SECONDARY_PORT')
-            ?: 443);
-
-        // Puerto 443 establecido para VPS 2 según requerimiento
-        if ($vps2Port === 5555 || $vps2Port <= 0) {
-            $vps2Port = 443;
-        }
+            ?: 5555);
 
         $vps2Hub = (string) (config('services.softether.servers.vps2.hub')
             ?: env('SOFTETHER_VPS2_HUB')
@@ -114,7 +109,7 @@ class SoftEtherService
                 'id' => 'vps2',
                 'name' => env('SOFTETHER_VPS2_NAME', 'VPS 2 (Secundario)'),
                 'host' => trim(explode('#', $vps2Host)[0]),
-                'port' => $vps2Port > 0 ? $vps2Port : 443,
+                'port' => $vps2Port > 0 ? $vps2Port : 5555,
                 'hub' => trim(explode('#', $vps2Hub)[0]) ?: 'DEFAULT',
                 'admin_password' => trim($vps2Pass),
                 'rpc_url' => !empty($vps2Host) ? "https://" . trim(explode('#', $vps2Host)[0]) . ":{$vps2Port}/api/" : '',
@@ -199,8 +194,7 @@ class SoftEtherService
                 } elseif (preg_match('/^\s*(SOFTETHER_VPS2_PORT|VPS2_SOFTETHER_PORT|SOFTETHER_VPS_2_PORT|SOFTETHER_SECONDARY_PORT|SOFTETHER_SERVER2_PORT)\s*=\s*(.*)$/i', $line, $m)) {
                     $clean = (int) trim(explode('#', trim($m[2], '"\''))[0]);
                     if ($clean > 0) {
-                        // Si en el archivo .env anterior decía 5555, usamos 443 según instrucción explícita
-                        $this->servers['vps2']['port'] = ($clean === 5555) ? 443 : $clean;
+                        $this->servers['vps2']['port'] = $clean;
                     }
                 } elseif (preg_match('/^\s*(SOFTETHER_VPS2_HUB|VPS2_SOFTETHER_HUB|SOFTETHER_VPS_2_HUB|SOFTETHER_SECONDARY_HUB|SOFTETHER_SERVER2_HUB)\s*=\s*(.*)$/i', $line, $m)) {
                     $clean = trim(explode('#', trim($m[2], '"\''))[0]);
@@ -242,7 +236,7 @@ class SoftEtherService
         $srv = $this->servers[$serverKey];
 
         $this->host = $srv['host'] ?: '127.0.0.1';
-        $this->port = (int) ($srv['port'] ?: ($serverKey === 'vps2' ? 443 : 5555));
+        $this->port = (int) ($srv['port'] ?: 5555);
         $this->hub = !empty($hub) ? trim($hub) : ($srv['hub'] ?: 'DEFAULT');
         $this->adminPassword = $srv['admin_password'] ?: '';
         $this->rpcUrl = "https://{$this->host}:{$this->port}/api/";
@@ -383,7 +377,30 @@ class SoftEtherService
         if ($testRpc['success']) {
             $details[] = "✓ API JSON-RPC respondiendo.";
         } else {
-            $details[] = "✗ API JSON-RPC retornó error: " . ($testRpc['error'] ?? 'Sin respuesta');
+            $err = $testRpc['error'] ?? 'Sin respuesta';
+            if (str_contains($err, '404') && (str_contains(strtolower($err), 'apache') || str_contains(strtolower($err), 'nginx') || str_contains(strtolower($err), 'conflicto') || str_contains(strtolower($err), 'web'))) {
+                $details[] = "✗ ¡Conflicto en puerto {$this->port}! En este puerto responde un servidor web (Apache/Nginx) y no SoftEther VPN. SoftEther escucha en los puertos 5555 o 992.";
+            } else {
+                $details[] = "✗ API JSON-RPC retornó error: " . $err;
+            }
+
+            // Probar puertos alternativos típicos de SoftEther
+            $altPorts = [5555, 992];
+            $openAlts = [];
+            foreach ($altPorts as $altP) {
+                if ($altP !== $this->port) {
+                    $s = @fsockopen($this->host, $altP, $e1, $e2, 1.5);
+                    if ($s) {
+                        fclose($s);
+                        $openAlts[] = $altP;
+                    }
+                }
+            }
+            if (!empty($openAlts)) {
+                $details[] = "★ ¡Detectado! El puerto " . implode(', ', $openAlts) . " está ABIERTO en {$this->host}. SoftEther podría estar escuchando allí. Configura SOFTETHER_VPS2_PORT=" . $openAlts[0] . " en tu .env.";
+            } else {
+                $details[] = "★ El puerto 5555 está cerrado por firewall en {$this->host}. En el VPS 2 ejecuta: 'sudo ufw allow 5555/tcp' y configura el puerto 5555 en tu .env.";
+            }
         }
 
         // 3. Obtener información de servidor "GetServerInfo" (Página 6)
@@ -532,7 +549,13 @@ class SoftEtherService
                 ];
             }
 
-            $httpErr = "HTTP {$response->status()}: " . substr($response->body(), 0, 200);
+            $rawBody = $response->body();
+            if ($response->status() === 404 && (str_contains(strtolower($rawBody), 'apache') || str_contains(strtolower($rawBody), 'nginx') || str_contains(strtolower($rawBody), 'not found'))) {
+                $webServer = str_contains(strtolower($rawBody), 'apache') ? 'Apache' : (str_contains(strtolower($rawBody), 'nginx') ? 'Nginx' : 'Servidor Web');
+                $httpErr = "HTTP 404: En el puerto {$this->port} responde un servidor web {$webServer} (no SoftEther). Configure el puerto 5555 o 992 en su .env.";
+            } else {
+                $httpErr = "HTTP {$response->status()}: " . substr(strip_tags($rawBody), 0, 150);
+            }
             $this->lastError[$this->activeServerKey] = $httpErr;
             return [
                 'success' => false,

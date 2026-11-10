@@ -328,12 +328,12 @@
                                 {{ $serverStatus['error_message'] ?? $connectionDetails['last_error'] ?? 'Tiempo de espera agotado al conectar al puerto ' . ($connectionDetails['port'] ?? 5555) . ' en ' . ($connectionDetails['host'] ?? '') }}
                             </div>
                             <div style="margin-top: 0.65rem; color: #cbd5e1; font-size: 0.8rem; line-height: 1.5;">
-                                <strong>Posibles causas y solución rápida:</strong>
+                                <strong>Diagnóstico y solución:</strong>
                                 <ul style="margin: 0.35rem 0 0.5rem 1.25rem; padding: 0; list-style-type: disc;">
-                                    <li><strong>Firewall bloqueando el puerto {{ $connectionDetails['port'] ?? 5555 }}:</strong> En VPS 2 ejecuta: <code style="color: #38bdf8;">sudo ufw allow {{ $connectionDetails['port'] ?? 5555 }}/tcp</code>. También puedes probar cambiar el puerto a <code style="color: #38bdf8;">443</code> en tu <code style="color: #38bdf8;">.env</code>.</li>
-                                    <li><strong>JSON-RPC deshabilitado:</strong> En <code style="color: #38bdf8;">vpn_server.config</code> en VPS 2 debe estar <code style="color: #38bdf8;">bool DisableJsonRpcWebApi false</code>.</li>
-                                    <li><strong>Contraseña de Administrador incorrecta:</strong> Verifica que <code style="color: #38bdf8;">SOFTETHER_VPS2_ADMIN_PASSWORD</code> coincida con la configurada con <code style="color: #38bdf8;">ServerPasswordSet</code>.</li>
-                                    <li><strong>Nombre del Virtual Hub:</strong> Si el hub en VPS 2 no se llama <code style="color: #38bdf8;">DEFAULT</code>, configúralo en <code style="color: #38bdf8;">SOFTETHER_VPS2_HUB=tu_hub</code>.</li>
+                                    <li><strong>Si el error es HTTP 404 en el puerto 443:</strong> En el puerto 443 de este VPS está corriendo un servidor web <strong>Apache</strong>. SoftEther VPN está corriendo en otro puerto (habitualmente <code style="color: #38bdf8;">5555</code> o <code style="color: #38bdf8;">992</code>).</li>
+                                    <li><strong>Comprobar en qué puertos escucha SoftEther:</strong> En la terminal del VPS 2 ejecuta: <code style="color: #38bdf8;">sudo ss -tulpn | grep vpnserver</code>.</li>
+                                    <li><strong>Abrir el puerto de SoftEther en el firewall del VPS 2:</strong> Ejecuta en VPS 2: <code style="color: #38bdf8;">sudo ufw allow 5555/tcp && sudo ufw allow 992/tcp</code>.</li>
+                                    <li><strong>Configurar el puerto en .env:</strong> En <code style="color: #38bdf8;">/opt/dataplus-platform/.env</code> configura <code style="color: #38bdf8;">SOFTETHER_VPS2_PORT=5555</code> (o <code style="color: #38bdf8;">992</code>).</li>
                                 </ul>
                             </div>
                             <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
@@ -794,20 +794,21 @@ SOFTETHER_VPS1_VERIFY_SSL=false
 # ============================================================
 SOFTETHER_VPS2_NAME="VPS 2 (Secundario)"
 SOFTETHER_VPS2_HOST=152.206.177.165
-SOFTETHER_VPS2_PORT=443
+# Nota: Si Apache ocupa el 443, SoftEther escucha en 5555 o 992
+SOFTETHER_VPS2_PORT=5555
 SOFTETHER_VPS2_HUB=DEFAULT
 SOFTETHER_VPS2_ADMIN_PASSWORD=tu_clave_administrador_vps2
 SOFTETHER_VPS2_VERIFY_SSL=false
                 </div>
 
                 <h3 style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin: 1rem 0 0.5rem 0;">
-                    Comando rápido para probar el JSON-RPC del VPS 2 desde la consola del VPS 1 (Puerto 443):
+                    Comando para probar el JSON-RPC del VPS 2 en el puerto de SoftEther (5555):
                 </h3>
                 <div class="se-code-block" style="margin-bottom: 1.5rem;">
 curl -k -X POST -H "Content-Type: application/json" \
   -H "X-VPNADMIN-PASSWORD: tu_clave_administrador_vps2" \
   -d '{"jsonrpc":"2.0","id":"1","method":"Test","params":{"IntValue_u32":12345}}' \
-  https://152.206.177.165:443/api/
+  https://152.206.177.165:5555/api/
                 </div>
 
                 <h3 style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin: 1rem 0 0.5rem 0;">
