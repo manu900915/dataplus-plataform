@@ -351,15 +351,27 @@ class SoftEtherService
             $tcpSuccess = true;
             $details[] = "✓ Puerto TCP {$this->port} accesible ({$latencyMs} ms).";
         } else {
-            $details[] = "✗ No se pudo conectar al puerto TCP {$this->port} en {$this->host}. Error: {$errstr} ({$errno}).";
+            $details[] = "✗ No se pudo conectar al puerto TCP {$this->port} en {$this->host} (Error {$errno}: {$errstr}). El firewall del servidor o del proveedor está bloqueando los paquetes de entrada hacia el puerto {$this->port}.";
 
-            // Si el puerto 5555 no responde, comprobar si 443 responde
-            if ($this->port !== 443) {
-                $fSocket = @fsockopen($this->host, 443, $fErrno, $fErrstr, 2.0);
-                if ($fSocket) {
-                    fclose($fSocket);
-                    $details[] = "★ ¡Aviso importante! El puerto 443 HTTPS SÍ responde en {$this->host}. SoftEther puede escuchar en el puerto 443 si el puerto {$this->port} está cerrado por firewall. Pruebe configurando SOFTETHER_{$this->activeServerKey}_PORT=443.";
+            // Comprobar si algún otro puerto de SoftEther está accesible (992, 1194, 1195)
+            $checkPorts = [992, 1194, 1195, 443];
+            $openPorts = [];
+            foreach ($checkPorts as $cp) {
+                if ($cp !== $this->port) {
+                    $s = @fsockopen($this->host, $cp, $e1, $e2, 1.2);
+                    if ($s) {
+                        fclose($s);
+                        $openPorts[] = $cp;
+                    }
                 }
+            }
+
+            if (in_array(992, $openPorts, true)) {
+                $details[] = "★ ¡Atención! El puerto TCP 992 (SSL de SoftEther) SÍ está abierto y accesible en {$this->host}. Cambia SOFTETHER_{$this->activeServerKey}_PORT=992 en tu .env para conectar.";
+            } elseif (in_array(443, $openPorts, true)) {
+                $details[] = "★ El puerto 443 responde (Apache), pero los puertos de SoftEther (5555, 992) están filtrados por el firewall. En el VPS 2 ejecuta: 'sudo ufw allow 5555/tcp && sudo ufw allow 992/tcp'.";
+            } else {
+                $details[] = "★ Los puertos 5555 y 992 no responden. En el VPS 2 ejecuta: 'sudo ufw allow 5555/tcp && sudo ufw allow 992/tcp' o 'sudo iptables -I INPUT -p tcp --dport 5555 -j ACCEPT'.";
             }
 
             return [
