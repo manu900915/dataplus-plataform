@@ -330,7 +330,7 @@ SOFTETHER_VPS1_VERIFY_SSL=false
 # ============================================================
 SOFTETHER_VPS2_NAME="VPS 2 (Secundario)"
 SOFTETHER_VPS2_HOST=IP_DE_TU_VPS2
-SOFTETHER_VPS2_PORT=5555
+SOFTETHER_VPS2_PORT=443
 SOFTETHER_VPS2_HUB=DEFAULT
 SOFTETHER_VPS2_ADMIN_PASSWORD=clave_administrador_vps2
 SOFTETHER_VPS2_VERIFY_SSL=false`;
@@ -436,7 +436,7 @@ SOFTETHER_VPS2_VERIFY_SSL=false`;
                 Hub: DEFAULT
               </span>
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
-                Puerto: 5555
+                Puerto: {selectedServer === 'vps1' ? '5555' : '443'}
               </span>
             </div>
             <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">

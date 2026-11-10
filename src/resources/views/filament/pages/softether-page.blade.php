@@ -794,20 +794,20 @@ SOFTETHER_VPS1_VERIFY_SSL=false
 # ============================================================
 SOFTETHER_VPS2_NAME="VPS 2 (Secundario)"
 SOFTETHER_VPS2_HOST=152.206.177.165
-SOFTETHER_VPS2_PORT=5555
+SOFTETHER_VPS2_PORT=443
 SOFTETHER_VPS2_HUB=DEFAULT
 SOFTETHER_VPS2_ADMIN_PASSWORD=tu_clave_administrador_vps2
 SOFTETHER_VPS2_VERIFY_SSL=false
                 </div>
 
                 <h3 style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin: 1rem 0 0.5rem 0;">
-                    Comando rápido para probar el JSON-RPC del VPS 2 desde la consola del VPS 1:
+                    Comando rápido para probar el JSON-RPC del VPS 2 desde la consola del VPS 1 (Puerto 443):
                 </h3>
                 <div class="se-code-block" style="margin-bottom: 1.5rem;">
 curl -k -X POST -H "Content-Type: application/json" \
   -H "X-VPNADMIN-PASSWORD: tu_clave_administrador_vps2" \
   -d '{"jsonrpc":"2.0","id":"1","method":"Test","params":{"IntValue_u32":12345}}' \
-  https://152.206.177.165:5555/api/
+  https://152.206.177.165:443/api/
                 </div>
 
                 <h3 style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin: 1rem 0 0.5rem 0;">

@@ -73,7 +73,12 @@ class SoftEtherService
             ?: env('SOFTETHER_VPS2_PORT')
             ?: env('VPS2_SOFTETHER_PORT')
             ?: env('SOFTETHER_SECONDARY_PORT')
-            ?: 5555);
+            ?: 443);
+
+        // Puerto 443 establecido para VPS 2 según requerimiento
+        if ($vps2Port === 5555 || $vps2Port <= 0) {
+            $vps2Port = 443;
+        }
 
         $vps2Hub = (string) (config('services.softether.servers.vps2.hub')
             ?: env('SOFTETHER_VPS2_HUB')
@@ -109,7 +114,7 @@ class SoftEtherService
                 'id' => 'vps2',
                 'name' => env('SOFTETHER_VPS2_NAME', 'VPS 2 (Secundario)'),
                 'host' => trim(explode('#', $vps2Host)[0]),
-                'port' => $vps2Port > 0 ? $vps2Port : 5555,
+                'port' => $vps2Port > 0 ? $vps2Port : 443,
                 'hub' => trim(explode('#', $vps2Hub)[0]) ?: 'DEFAULT',
                 'admin_password' => trim($vps2Pass),
                 'rpc_url' => !empty($vps2Host) ? "https://" . trim(explode('#', $vps2Host)[0]) . ":{$vps2Port}/api/" : '',
@@ -194,7 +199,8 @@ class SoftEtherService
                 } elseif (preg_match('/^\s*(SOFTETHER_VPS2_PORT|VPS2_SOFTETHER_PORT|SOFTETHER_VPS_2_PORT|SOFTETHER_SECONDARY_PORT|SOFTETHER_SERVER2_PORT)\s*=\s*(.*)$/i', $line, $m)) {
                     $clean = (int) trim(explode('#', trim($m[2], '"\''))[0]);
                     if ($clean > 0) {
-                        $this->servers['vps2']['port'] = $clean;
+                        // Si en el archivo .env anterior decía 5555, usamos 443 según instrucción explícita
+                        $this->servers['vps2']['port'] = ($clean === 5555) ? 443 : $clean;
                     }
                 } elseif (preg_match('/^\s*(SOFTETHER_VPS2_HUB|VPS2_SOFTETHER_HUB|SOFTETHER_VPS_2_HUB|SOFTETHER_SECONDARY_HUB|SOFTETHER_SERVER2_HUB)\s*=\s*(.*)$/i', $line, $m)) {
                     $clean = trim(explode('#', trim($m[2], '"\''))[0]);
@@ -236,7 +242,7 @@ class SoftEtherService
         $srv = $this->servers[$serverKey];
 
         $this->host = $srv['host'] ?: '127.0.0.1';
-        $this->port = (int) ($srv['port'] ?: 5555);
+        $this->port = (int) ($srv['port'] ?: ($serverKey === 'vps2' ? 443 : 5555));
         $this->hub = !empty($hub) ? trim($hub) : ($srv['hub'] ?: 'DEFAULT');
         $this->adminPassword = $srv['admin_password'] ?: '';
         $this->rpcUrl = "https://{$this->host}:{$this->port}/api/";
