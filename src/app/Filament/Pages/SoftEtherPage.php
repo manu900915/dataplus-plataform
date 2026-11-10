@@ -22,6 +22,7 @@ class SoftEtherPage extends Page
 
     public string $activeTab = 'resumen'; // resumen, sesiones, usuarios, hubs, config
     public string $selectedServer = 'vps1'; // vps1 o vps2
+    public string $selectedHub = ''; // Hub seleccionado dinámicamente
 
     public array $serverStatus = [];
     public array $activeSessions = [];
@@ -49,13 +50,27 @@ class SoftEtherPage extends Page
     public function selectServer(string $serverId): void
     {
         $this->selectedServer = $serverId;
+        $this->selectedHub = '';
         $this->testResult = null;
         $this->inspectSession = null;
-        $this->loadData(false, false); // Carga instantánea desde caché (0ms)
+        $this->loadData(false, false); // Carga instantánea desde caché
 
+        $srvName = $this->connectionDetails['server_name'] ?? $serverId;
         Notification::make()
             ->title('Servidor seleccionado')
-            ->body("Conmutado al servidor: {$this->connectionDetails['server_name']}")
+            ->body("Conmutado al servidor: {$srvName}")
+            ->info()
+            ->send();
+    }
+
+    public function selectHub(string $hubName): void
+    {
+        $this->selectedHub = trim($hubName);
+        $this->loadData(false, true);
+
+        Notification::make()
+            ->title('Virtual Hub seleccionado')
+            ->body("Consultando telemetría del hub: {$this->selectedHub}")
             ->info()
             ->send();
     }
@@ -64,7 +79,7 @@ class SoftEtherPage extends Page
     {
         /** @var SoftEtherService $service */
         $service = app(SoftEtherService::class);
-        $service->setServer($this->selectedServer);
+        $service->setServer($this->selectedServer, $this->selectedHub ?: null);
 
         $telemetry = $service->getTelemetry($force);
 
@@ -76,12 +91,24 @@ class SoftEtherPage extends Page
         $this->dhcpTable = $telemetry['dhcpTable'] ?? [];
         $this->connectionDetails = $telemetry['connectionDetails'] ?? [];
 
+        if (empty($this->selectedHub)) {
+            $this->selectedHub = $this->connectionDetails['hub'] ?? 'DEFAULT';
+        }
+
         if ($notify) {
-            Notification::make()
-                ->title('Datos de SoftEther actualizados')
-                ->body("Sincronizado con {$this->connectionDetails['server_name']}.")
-                ->success()
-                ->send();
+            if ($this->serverStatus['is_live'] ?? false) {
+                Notification::make()
+                    ->title('Datos de SoftEther actualizados')
+                    ->body("Sincronizado con {$this->connectionDetails['server_name']} (Hub: {$this->connectionDetails['hub']}).")
+                    ->success()
+                    ->send();
+            } else {
+                Notification::make()
+                    ->title('Sin respuesta RPC')
+                    ->body("No se pudo obtener telemetría de {$this->connectionDetails['server_name']}: " . ($this->serverStatus['error_message'] ?? 'Error de conexión'))
+                    ->warning()
+                    ->send();
+            }
         }
     }
 

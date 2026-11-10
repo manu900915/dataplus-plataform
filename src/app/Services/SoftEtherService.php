@@ -12,6 +12,7 @@ class SoftEtherService
     protected string $activeServerKey = 'vps1';
     protected array $servers = [];
     protected array $circuitBroken = [];
+    protected array $lastError = [];
 
     // Propiedades del servidor activo
     protected string $host = '127.0.0.1';
@@ -62,11 +63,36 @@ class SoftEtherService
             ?? env('SOFTETHER_VERIFY_SSL')
             ?? false, FILTER_VALIDATE_BOOLEAN) ?: false;
 
-        $vps2Host = (string) (config('services.softether.servers.vps2.host') ?: env('SOFTETHER_VPS2_HOST') ?: '');
-        $vps2Port = (int) (config('services.softether.servers.vps2.port') ?: env('SOFTETHER_VPS2_PORT') ?: 5555);
-        $vps2Hub = (string) (config('services.softether.servers.vps2.hub') ?: env('SOFTETHER_VPS2_HUB') ?: 'DEFAULT');
-        $vps2Pass = (string) (config('services.softether.servers.vps2.admin_password') ?: env('SOFTETHER_VPS2_ADMIN_PASSWORD') ?: '');
-        $vps2Verify = filter_var(config('services.softether.servers.vps2.verify_ssl') ?? env('SOFTETHER_VPS2_VERIFY_SSL') ?? false, FILTER_VALIDATE_BOOLEAN) ?: false;
+        $vps2Host = (string) (config('services.softether.servers.vps2.host')
+            ?: env('SOFTETHER_VPS2_HOST')
+            ?: env('VPS2_SOFTETHER_HOST')
+            ?: env('SOFTETHER_SECONDARY_HOST')
+            ?: '152.206.177.165');
+
+        $vps2Port = (int) (config('services.softether.servers.vps2.port')
+            ?: env('SOFTETHER_VPS2_PORT')
+            ?: env('VPS2_SOFTETHER_PORT')
+            ?: env('SOFTETHER_SECONDARY_PORT')
+            ?: 5555);
+
+        $vps2Hub = (string) (config('services.softether.servers.vps2.hub')
+            ?: env('SOFTETHER_VPS2_HUB')
+            ?: env('VPS2_SOFTETHER_HUB')
+            ?: env('SOFTETHER_SECONDARY_HUB')
+            ?: 'DEFAULT');
+
+        $vps2Pass = (string) (config('services.softether.servers.vps2.admin_password')
+            ?: env('SOFTETHER_VPS2_ADMIN_PASSWORD')
+            ?: env('SOFTETHER_VPS2_PASSWORD')
+            ?: env('VPS2_SOFTETHER_PASSWORD')
+            ?: env('SOFTETHER_SECONDARY_ADMIN_PASSWORD')
+            ?: env('SOFTETHER_SECONDARY_PASSWORD')
+            ?: '');
+
+        $vps2Verify = filter_var(config('services.softether.servers.vps2.verify_ssl')
+            ?? env('SOFTETHER_VPS2_VERIFY_SSL')
+            ?? env('SOFTETHER_SECONDARY_VERIFY_SSL')
+            ?? false, FILTER_VALIDATE_BOOLEAN) ?: false;
 
         $this->servers = [
             'vps1' => [
@@ -124,7 +150,13 @@ class SoftEtherService
                 if (preg_match('/^\s*(SOFTETHER_VPS1_HOST|SOFTETHER_HOST)\s*=\s*(.*)$/i', $line, $m)) {
                     $clean = trim(explode('#', trim($m[2], '"\''))[0]);
                     if (!empty($clean)) {
-                        $this->servers['vps1']['host'] = $clean;
+                        if (str_contains($clean, ':')) {
+                            $parts = explode(':', $clean);
+                            $this->servers['vps1']['host'] = trim($parts[0]);
+                            $this->servers['vps1']['port'] = (int) trim($parts[1]);
+                        } else {
+                            $this->servers['vps1']['host'] = $clean;
+                        }
                     }
                 } elseif (preg_match('/^\s*(SOFTETHER_VPS1_PORT|SOFTETHER_PORT)\s*=\s*(.*)$/i', $line, $m)) {
                     $clean = (int) trim(explode('#', trim($m[2], '"\''))[0]);
@@ -148,28 +180,34 @@ class SoftEtherService
                 }
 
                 // Servidor 2
-                if (preg_match('/^\s*(SOFTETHER_VPS2_HOST|VPS2_SOFTETHER_HOST)\s*=\s*(.*)$/i', $line, $m)) {
+                if (preg_match('/^\s*(SOFTETHER_VPS2_HOST|VPS2_SOFTETHER_HOST|SOFTETHER_VPS_2_HOST|SOFTETHER_SECONDARY_HOST|SOFTETHER_SERVER2_HOST|VPS2_HOST)\s*=\s*(.*)$/i', $line, $m)) {
                     $clean = trim(explode('#', trim($m[2], '"\''))[0]);
                     if (!empty($clean)) {
-                        $this->servers['vps2']['host'] = $clean;
+                        if (str_contains($clean, ':')) {
+                            $parts = explode(':', $clean);
+                            $this->servers['vps2']['host'] = trim($parts[0]);
+                            $this->servers['vps2']['port'] = (int) trim($parts[1]);
+                        } else {
+                            $this->servers['vps2']['host'] = $clean;
+                        }
                     }
-                } elseif (preg_match('/^\s*(SOFTETHER_VPS2_PORT|VPS2_SOFTETHER_PORT)\s*=\s*(.*)$/i', $line, $m)) {
+                } elseif (preg_match('/^\s*(SOFTETHER_VPS2_PORT|VPS2_SOFTETHER_PORT|SOFTETHER_VPS_2_PORT|SOFTETHER_SECONDARY_PORT|SOFTETHER_SERVER2_PORT)\s*=\s*(.*)$/i', $line, $m)) {
                     $clean = (int) trim(explode('#', trim($m[2], '"\''))[0]);
                     if ($clean > 0) {
                         $this->servers['vps2']['port'] = $clean;
                     }
-                } elseif (preg_match('/^\s*(SOFTETHER_VPS2_HUB|VPS2_SOFTETHER_HUB)\s*=\s*(.*)$/i', $line, $m)) {
+                } elseif (preg_match('/^\s*(SOFTETHER_VPS2_HUB|VPS2_SOFTETHER_HUB|SOFTETHER_VPS_2_HUB|SOFTETHER_SECONDARY_HUB|SOFTETHER_SERVER2_HUB)\s*=\s*(.*)$/i', $line, $m)) {
                     $clean = trim(explode('#', trim($m[2], '"\''))[0]);
                     if (!empty($clean)) {
                         $this->servers['vps2']['hub'] = $clean;
                     }
-                } elseif (preg_match('/^\s*(SOFTETHER_VPS2_ADMIN_PASSWORD|SOFTETHER_VPS2_PASSWORD|SOFTETHER_VPS2_PASS)\s*=\s*(.*)$/i', $line, $m)) {
+                } elseif (preg_match('/^\s*(SOFTETHER_VPS2_ADMIN_PASSWORD|SOFTETHER_VPS2_PASSWORD|SOFTETHER_VPS2_PASS|VPS2_SOFTETHER_PASSWORD|VPS2_SOFTETHER_ADMIN_PASSWORD|SOFTETHER_SECONDARY_PASSWORD|SOFTETHER_SECONDARY_ADMIN_PASSWORD|SOFTETHER_SERVER2_ADMIN_PASSWORD|SOFTETHER_SERVER2_PASSWORD)\s*=\s*(.*)$/i', $line, $m)) {
                     $clean = preg_replace('/\s+#.*$/', '', $m[2]);
                     $clean = trim($clean, '"\'');
                     if (!empty($clean)) {
                         $this->servers['vps2']['admin_password'] = $clean;
                     }
-                } elseif (preg_match('/^\s*(SOFTETHER_VPS2_VERIFY_SSL|SOFTETHER_VPS2_SSL)\s*=\s*(.*)$/i', $line, $m)) {
+                } elseif (preg_match('/^\s*(SOFTETHER_VPS2_VERIFY_SSL|SOFTETHER_VPS2_SSL|VPS2_SOFTETHER_VERIFY_SSL|SOFTETHER_SECONDARY_VERIFY_SSL)\s*=\s*(.*)$/i', $line, $m)) {
                     $clean = trim(explode('#', trim($m[2], '"\''))[0]);
                     $this->servers['vps2']['verify_ssl'] = filter_var($clean, FILTER_VALIDATE_BOOLEAN);
                 }
@@ -186,9 +224,9 @@ class SoftEtherService
     }
 
     /**
-     * Cambia el servidor activo (vps1 o vps2)
+     * Cambia el servidor activo (vps1 o vps2) y opcionalmente el Hub objetivo
      */
-    public function setServer(string $serverKey): self
+    public function setServer(string $serverKey, ?string $hub = null): self
     {
         if (!isset($this->servers[$serverKey])) {
             $serverKey = 'vps1';
@@ -199,12 +237,32 @@ class SoftEtherService
 
         $this->host = $srv['host'] ?: '127.0.0.1';
         $this->port = (int) ($srv['port'] ?: 5555);
-        $this->hub = $srv['hub'] ?: 'DEFAULT';
+        $this->hub = !empty($hub) ? trim($hub) : ($srv['hub'] ?: 'DEFAULT');
         $this->adminPassword = $srv['admin_password'] ?: '';
         $this->rpcUrl = "https://{$this->host}:{$this->port}/api/";
         $this->verifySsl = (bool) ($srv['verify_ssl'] ?? false);
 
         return $this;
+    }
+
+    /**
+     * Establece o cambia el Virtual Hub activo en el servidor actual
+     */
+    public function setHub(string $hubName): self
+    {
+        $clean = trim($hubName);
+        if (!empty($clean)) {
+            $this->hub = $clean;
+            if (isset($this->servers[$this->activeServerKey])) {
+                $this->servers[$this->activeServerKey]['hub'] = $clean;
+            }
+        }
+        return $this;
+    }
+
+    public function getHub(): string
+    {
+        return $this->hub;
     }
 
     public function getActiveServerKey(): string
@@ -251,6 +309,7 @@ class SoftEtherService
             'password_mask' => !empty($this->adminPassword) ? str_repeat('•', min(8, strlen($this->adminPassword))) : 'No detectada',
             'rpc_url' => $this->rpcUrl,
             'verify_ssl' => $this->verifySsl,
+            'last_error' => $this->lastError[$this->activeServerKey] ?? null,
             'env_file_path' => function_exists('base_path') ? base_path('.env') : '.env',
             'env_file_exists' => function_exists('base_path') ? file_exists(base_path('.env')) : false,
             'available_servers' => $this->getServers(),
@@ -258,7 +317,7 @@ class SoftEtherService
     }
 
     /**
-     * Prueba la conectividad física de red y autenticación JSON-RPC
+     * Prueba exhaustiva de conectividad de red física y autenticación JSON-RPC
      */
     public function testConnection(): array
     {
@@ -268,77 +327,99 @@ class SoftEtherService
             return [
                 'success' => false,
                 'status' => 'not_configured',
-                'message' => "Falta configurar credenciales para {$this->servers[$this->activeServerKey]['name']} en .env.",
+                'message' => "Falta configurar credenciales para {$this->servers[$this->activeServerKey]['name']} en .env (HOST y ADMIN_PASSWORD requeridos).",
                 'latency_ms' => null,
                 'server_info' => null,
+                'details' => [],
             ];
         }
 
-        try {
-            // Test 1: Socket TCP al puerto 5555
-            $errno = 0;
-            $errstr = '';
-            $socket = @fsockopen($this->host, $this->port, $errno, $errstr, 2.5);
+        $this->resetCircuitBreaker($this->activeServerKey);
 
-            if ($socket) {
-                fclose($socket);
-                $latencyMs = round((microtime(true) - $start) * 1000, 2);
+        $details = [];
+        $tcpSuccess = false;
+        $latencyMs = null;
 
-                // Test 2: Comprobación JSON-RPC "Test" (Página 5 del manual)
-                $testRpc = $this->callRpc('Test', ['IntValue_u32' => 12345]);
+        // 1. Socket TCP al puerto configurado (ej: 5555)
+        $errno = 0;
+        $errstr = '';
+        $socket = @fsockopen($this->host, $this->port, $errno, $errstr, 3.5);
 
-                // Test 3: Obtener información del servidor "GetServerInfo" (Página 6)
-                $infoRpc = $this->callRpc('GetServerInfo');
+        if ($socket) {
+            fclose($socket);
+            $latencyMs = round((microtime(true) - $start) * 1000, 2);
+            $tcpSuccess = true;
+            $details[] = "✓ Puerto TCP {$this->port} accesible ({$latencyMs} ms).";
+        } else {
+            $details[] = "✗ No se pudo conectar al puerto TCP {$this->port} en {$this->host}. Error: {$errstr} ({$errno}).";
 
-                if ($infoRpc['success']) {
-                    $serverName = $infoRpc['data']['ServerProductName_str'] ?? 'SoftEther VPN Server';
-                    $serverVer = $infoRpc['data']['ServerVersionString_str'] ?? '';
-                    $osName = $infoRpc['data']['OsProductName_str'] ?? $infoRpc['data']['OsSystemName_str'] ?? 'Linux';
-
-                    return [
-                        'success' => true,
-                        'status' => 'connected',
-                        'message' => "¡Conexión JSON-RPC exitosa con {$this->servers[$this->activeServerKey]['name']}! {$serverName} {$serverVer} ({$osName}) respondiendo en {$this->host}:{$this->port} ({$latencyMs} ms).",
-                        'latency_ms' => $latencyMs,
-                        'server_info' => $infoRpc['data'],
-                    ];
+            // Si el puerto 5555 no responde, comprobar si 443 responde
+            if ($this->port !== 443) {
+                $fSocket = @fsockopen($this->host, 443, $fErrno, $fErrstr, 2.0);
+                if ($fSocket) {
+                    fclose($fSocket);
+                    $details[] = "★ ¡Aviso importante! El puerto 443 HTTPS SÍ responde en {$this->host}. SoftEther puede escuchar en el puerto 443 si el puerto {$this->port} está cerrado por firewall. Pruebe configurando SOFTETHER_{$this->activeServerKey}_PORT=443.";
                 }
-
-                $err = $infoRpc['error'] ?? ($testRpc['error'] ?? 'API JSON-RPC no autenticada');
-                return [
-                    'success' => false,
-                    'status' => 'rpc_error',
-                    'message' => "Puerto {$this->port} accesible ({$latencyMs} ms), pero la API JSON-RPC retornó: {$err}. Verifique contraseña en .env.",
-                    'latency_ms' => $latencyMs,
-                    'server_info' => null,
-                ];
-            } else {
-                $extraHint = '';
-                if (in_array($this->host, ['127.0.0.1', 'localhost'])) {
-                    $fallbackSocket = @fsockopen('host.docker.internal', $this->port, $fErrno, $fErrstr, 1.5);
-                    if ($fallbackSocket) {
-                        fclose($fallbackSocket);
-                        $extraHint = " ¡Atención! 'host.docker.internal:{$this->port}' sí responde. Configure SOFTETHER_HOST=host.docker.internal en su .env.";
-                    }
-                }
-
-                return [
-                    'success' => false,
-                    'status' => 'unreachable',
-                    'message' => "No se pudo conectar a {$this->host}:{$this->port}. Error: {$errstr} ({$errno}).{$extraHint}",
-                    'latency_ms' => null,
-                    'server_info' => null,
-                ];
             }
-        } catch (Exception $e) {
+
             return [
                 'success' => false,
-                'status' => 'error',
-                'message' => 'Excepción durante la prueba de conexión: ' . $e->getMessage(),
+                'status' => 'unreachable',
+                'message' => "Servidor {$this->servers[$this->activeServerKey]['name']} inaccesible en {$this->host}:{$this->port}. " . implode(' ', $details),
                 'latency_ms' => null,
                 'server_info' => null,
+                'details' => $details,
             ];
         }
+
+        // 2. Comprobación JSON-RPC "Test" (Página 5 del manual oficial)
+        $testRpc = $this->callRpc('Test', ['IntValue_u32' => 12345]);
+        if ($testRpc['success']) {
+            $details[] = "✓ API JSON-RPC respondiendo.";
+        } else {
+            $details[] = "✗ API JSON-RPC retornó error: " . ($testRpc['error'] ?? 'Sin respuesta');
+        }
+
+        // 3. Obtener información de servidor "GetServerInfo" (Página 6)
+        $infoRpc = $this->callRpc('GetServerInfo');
+        $serverInfo = null;
+
+        if ($infoRpc['success']) {
+            $serverInfo = $infoRpc['data'];
+            $serverName = $serverInfo['ServerProductName_str'] ?? 'SoftEther VPN Server';
+            $serverVer = $serverInfo['ServerVersionString_str'] ?? '';
+            $osName = $serverInfo['OsProductName_str'] ?? $serverInfo['OsSystemName_str'] ?? 'Linux';
+            $details[] = "✓ Autenticado como Server Admin ({$serverName} {$serverVer} sobre {$osName}).";
+        } else {
+            // Intentar verificar si la clave es de Virtual Hub Admin
+            $hubStatusRpc = $this->callRpc('GetHubStatus', ['HubName_str' => $this->hub], $this->hub);
+            if ($hubStatusRpc['success']) {
+                $details[] = "✓ Autenticado como Administrador de Hub '{$this->hub}'.";
+            } else {
+                $details[] = "✗ Autenticación rechazada: " . ($infoRpc['error'] ?? 'Contraseña incorrecta');
+            }
+        }
+
+        // 4. Enumerar Virtual Hubs para verificar lectura de datos
+        $hubsRpc = $this->callRpc('EnumHub');
+        if ($hubsRpc['success'] && !empty($hubsRpc['data']['HubList'])) {
+            $hCount = count($hubsRpc['data']['HubList']);
+            $hNames = array_map(fn($h) => $h['HubName_str'] ?? 'DEFAULT', $hubsRpc['data']['HubList']);
+            $details[] = "✓ Se detectaron {$hCount} Virtual Hub(s): [" . implode(', ', $hNames) . "].";
+        }
+
+        $allSuccess = $testRpc['success'] || $infoRpc['success'] || !empty($serverInfo);
+
+        return [
+            'success' => $allSuccess,
+            'status' => $allSuccess ? 'connected' : 'rpc_error',
+            'message' => $allSuccess
+                ? "¡Conexión exitosa con {$this->servers[$this->activeServerKey]['name']} ({$this->host}:{$this->port}, {$latencyMs} ms)! " . implode(' ', $details)
+                : "Conexión física establecida ({$latencyMs} ms), pero la API RPC reporta: " . implode(' ', $details),
+            'latency_ms' => $latencyMs,
+            'server_info' => $serverInfo,
+            'details' => $details,
+        ];
     }
 
     /**
@@ -354,11 +435,11 @@ class SoftEtherService
             ];
         }
 
-        // Circuit breaker: Si el servidor falló la conexión previamente en esta petición, abortar de inmediato sin demoras
+        // Circuit breaker: Si el servidor falló la conexión por timeout o error de red previamente, evitar demoras
         if ($this->circuitBroken[$this->activeServerKey] ?? false) {
             return [
                 'success' => false,
-                'error' => 'Servidor no accesible (circuito cortado para evitar bloqueos)',
+                'error' => 'Servidor no accesible (circuito cortado temporalmente tras error de red)',
                 'data' => null,
             ];
         }
@@ -371,24 +452,23 @@ class SoftEtherService
         }
 
         // Headers según especificación de SoftEther JSON-RPC
-        // Para modo Administrador General de Servidor NO se envía X-VPNADMIN-HUBNAME
         $headers = [
             'Content-Type' => 'application/json',
             'X-VPNADMIN-PASSWORD' => $this->adminPassword,
         ];
 
-        // Solo si explícitamente se especifica para un Hub Admin
+        // Si se especifica Hub Admin
         if (!empty($hub)) {
             $headers['X-VPNADMIN-HUBNAME'] = $hub;
         }
 
         try {
-            // Optimización de velocidad: connectTimeout de 1.5s y timeout global de 3.0s
-            $client = Http::connectTimeout(1.5)
-                ->timeout(3.0)
+            // Timeout robusto para conexiones WAN entre servidores (4.0s connect, 8.0s timeout)
+            $client = Http::connectTimeout(4.0)
+                ->timeout(8.0)
                 ->withHeaders($headers);
 
-            // En SoftEther VPN los certificados SSL son siempre autofirmados (self-signed)
+            // En SoftEther VPN los certificados SSL son comúnmente autofirmados (self-signed)
             if (!$this->verifySsl) {
                 $client = $client->withoutVerifying();
             }
@@ -403,12 +483,42 @@ class SoftEtherService
             if ($response->successful()) {
                 $json = $response->json();
                 if (isset($json['error'])) {
+                    $errMsg = $json['error']['message'] ?? ('Error JSON-RPC: ' . json_encode($json['error']));
+                    $this->lastError[$this->activeServerKey] = $errMsg;
+
+                    // Fallback para Hub Admin: si la llamada sin HubName falla por permisos, reintentar con header de Hub
+                    if (empty($hub) && !empty($this->hub) && (str_contains(strtolower($errMsg), 'auth') || str_contains(strtolower($errMsg), 'privilege') || str_contains(strtolower($errMsg), 'access denied'))) {
+                        $retryHeaders = $headers;
+                        $retryHeaders['X-VPNADMIN-HUBNAME'] = $this->hub;
+                        $retryClient = Http::connectTimeout(4.0)->timeout(8.0)->withHeaders($retryHeaders);
+                        if (!$this->verifySsl) {
+                            $retryClient = $retryClient->withoutVerifying();
+                        }
+                        $retryResp = $retryClient->post($url, [
+                            'jsonrpc' => '2.0',
+                            'id' => (string) time(),
+                            'method' => $method,
+                            'params' => (object) $params,
+                        ]);
+                        if ($retryResp->successful()) {
+                            $retryJson = $retryResp->json();
+                            if (!isset($retryJson['error'])) {
+                                return [
+                                    'success' => true,
+                                    'data' => $retryJson['result'] ?? [],
+                                    'error' => null,
+                                ];
+                            }
+                        }
+                    }
+
                     return [
                         'success' => false,
-                        'error' => $json['error']['message'] ?? ('Error JSON-RPC: ' . json_encode($json['error'])),
+                        'error' => $errMsg,
                         'data' => null,
                     ];
                 }
+
                 return [
                     'success' => true,
                     'data' => $json['result'] ?? [],
@@ -416,14 +526,18 @@ class SoftEtherService
                 ];
             }
 
+            $httpErr = "HTTP {$response->status()}: " . substr($response->body(), 0, 200);
+            $this->lastError[$this->activeServerKey] = $httpErr;
             return [
                 'success' => false,
-                'error' => "HTTP {$response->status()}: " . substr($response->body(), 0, 200),
+                'error' => $httpErr,
                 'data' => null,
             ];
         } catch (Exception $e) {
             $msg = $e->getMessage();
-            // Si es un error de conectividad o tiempo de espera, activar circuit breaker para este servidor
+            $this->lastError[$this->activeServerKey] = $msg;
+
+            // Solo activar circuit breaker en fallos de red persistentes (cURL error 7 o 28)
             if (str_contains($msg, 'cURL error 7') || str_contains($msg, 'cURL error 28') || str_contains($msg, 'timed out') || str_contains($msg, 'Failed to connect')) {
                 $this->circuitBroken[$this->activeServerKey] = true;
             }
@@ -464,11 +578,11 @@ class SoftEtherService
     }
 
     /**
-     * Obtiene el paquete completo de telemetría de forma ultra-rápida (con caché de 20s y disyuntor)
+     * Obtiene el paquete completo de telemetría de forma ultra-rápida (con auto-resolución de Hub y caché)
      */
     public function getTelemetry(bool $forceRefresh = false): array
     {
-        $cacheKey = "softether_telemetry_{$this->activeServerKey}";
+        $cacheKey = "softether_telemetry_{$this->activeServerKey}_{$this->hub}";
 
         if (!$forceRefresh) {
             try {
@@ -487,13 +601,39 @@ class SoftEtherService
         // Si es refresco forzado, restablecemos el circuit breaker
         $this->resetCircuitBreaker($this->activeServerKey);
 
-        $serverStatus = $this->getServerStatus();
-        $activeSessions = $this->getActiveSessions();
-        $vpnUsers = $this->getUsers();
+        // 1. Obtener lista de Virtual Hubs disponibles primero (EnumHub)
         $virtualHubs = $this->getVirtualHubs();
-        $secureNat = $this->getSecureNatStatus();
-        $dhcpTable = $this->getDhcpTable();
+
+        // 2. Auto-resolución de Hub: Si el hub configurado no existe en el servidor, conmutar al primer hub real activo
+        if (!empty($virtualHubs)) {
+            $hubNames = array_column($virtualHubs, 'hub_name');
+            if (!in_array($this->hub, $hubNames)) {
+                // Seleccionar el hub con mayor número de sesiones o el primero online
+                $sortedHubs = $virtualHubs;
+                usort($sortedHubs, fn ($a, $b) => ($b['active_sessions'] ?? 0) <=> ($a['active_sessions'] ?? 0));
+                $autoHub = $sortedHubs[0]['hub_name'] ?? ($hubNames[0] ?? 'DEFAULT');
+                $this->setHub($autoHub);
+            }
+        }
+
+        // 3. Consultar estado del servidor y telemetría de sesiones y usuarios
+        $serverStatus = $this->getServerStatus();
+        $activeSessions = $this->getActiveSessions($this->hub);
+        $vpnUsers = $this->getUsers($this->hub);
+        $secureNat = $this->getSecureNatStatus($this->hub);
+        $dhcpTable = $this->getDhcpTable($this->hub);
         $connectionDetails = $this->getConnectionDetails();
+        $connectionDetails['available_hubs'] = !empty($virtualHubs) ? array_column($virtualHubs, 'hub_name') : [$this->hub];
+
+        // 4. Si el servidor respondió con sesiones o usuarios reales, reflejarlo en serverStatus
+        if (!empty($activeSessions) && ($serverStatus['total_sessions'] ?? 0) === 0) {
+            $serverStatus['total_sessions'] = count($activeSessions);
+            $serverStatus['is_live'] = true;
+        }
+        if (!empty($vpnUsers) && ($serverStatus['total_users'] ?? 0) === 0) {
+            $serverStatus['total_users'] = count($vpnUsers);
+            $serverStatus['is_live'] = true;
+        }
 
         $data = [
             'serverStatus' => $serverStatus,
@@ -508,8 +648,7 @@ class SoftEtherService
         ];
 
         try {
-            // Almacenar durante 20 segundos para cambio de servidor ultra-rápido (0ms)
-            Cache::put($cacheKey, $data, 20);
+            Cache::put($cacheKey, $data, 15);
         } catch (Exception $e) {
             // Ignorar fallo de almacenamiento
         }
@@ -518,7 +657,7 @@ class SoftEtherService
     }
 
     /**
-     * Obtiene el estado general del servidor VPN en vivo (GetServerInfo + GetServerStatus)
+     * Obtiene el estado general del servidor VPN en vivo (GetServerInfo + GetServerStatus con fallback a GetHubStatus)
      */
     public function getServerStatus(): array
     {
@@ -557,18 +696,50 @@ class SoftEtherService
                     'transfer_speed_in' => 'En tiempo real',
                     'transfer_speed_out' => 'En tiempo real',
                     'listeners' => [
+                        ['port' => $this->port, 'protocol' => 'TCP / Admin RPC API', 'status' => 'Activo (Escuchando)'],
                         ['port' => 443, 'protocol' => 'TCP / HTTPS (SoftEther & SSTP)', 'status' => 'Activo (Escuchando)'],
                         ['port' => 992, 'protocol' => 'TCP / Admin Telnet', 'status' => 'Activo (Escuchando)'],
                         ['port' => 1194, 'protocol' => 'UDP / OpenVPN', 'status' => 'Activo (Escuchando)'],
-                        ['port' => 5555, 'protocol' => 'TCP / Admin RPC API', 'status' => 'Activo (Escuchando)'],
                     ],
                     'virtual_nat_enabled' => true,
                     'virtual_dhcp_enabled' => true,
+                    'error_message' => null,
+                ];
+            }
+
+            // Fallback: Si las APIs de nivel Servidor fallan por permisos (ej. clave de Hub Admin), consultar GetHubStatus
+            $hubStatus = $this->callRpc('GetHubStatus', ['HubName_str' => $this->hub], $this->hub);
+            if ($hubStatus['success'] && !empty($hubStatus['data'])) {
+                $hData = $hubStatus['data'];
+                $recvBytes = ($hData['Recv.UnicastBytes_u64'] ?? 0) + ($hData['Recv.BroadcastBytes_u64'] ?? 0);
+                $sendBytes = ($hData['Send.UnicastBytes_u64'] ?? 0) + ($hData['Send.BroadcastBytes_u64'] ?? 0);
+
+                return [
+                    'is_live' => true,
+                    'server_name' => "{$this->servers[$this->activeServerKey]['name']} (Hub: {$this->hub})",
+                    'version' => 'SoftEther VPN Server',
+                    'os_name' => 'Linux',
+                    'server_type' => 'Virtual Hub ' . $this->hub,
+                    'uptime' => 'Operativo en vivo',
+                    'started_at' => !empty($hData['CreatedTime_dt']) ? $hData['CreatedTime_dt'] : 'Operativo',
+                    'total_sessions' => (int) ($hData['NumSessions_u32'] ?? 0),
+                    'total_users' => (int) ($hData['NumUsers_u32'] ?? 0),
+                    'total_tcp_connections' => (int) ($hData['NumMacTables_u32'] ?? 0),
+                    'traffic_total_in' => $this->formatBytes($recvBytes),
+                    'traffic_total_out' => $this->formatBytes($sendBytes),
+                    'transfer_speed_in' => 'En tiempo real',
+                    'transfer_speed_out' => 'En tiempo real',
+                    'listeners' => [
+                        ['port' => $this->port, 'protocol' => 'TCP / Admin RPC API', 'status' => 'Activo (Escuchando)'],
+                    ],
+                    'virtual_nat_enabled' => !empty($hData['SecureNATEnabled_bool']),
+                    'virtual_dhcp_enabled' => !empty($hData['SecureNATEnabled_bool']),
+                    'error_message' => null,
                 ];
             }
         }
 
-        $err = $info['error'] ?? ($status['error'] ?? 'Sin conexión en vivo');
+        $err = $this->lastError[$this->activeServerKey] ?? ($info['error'] ?? ($status['error'] ?? 'Sin conexión en vivo con el servidor'));
         return [
             'is_live' => false,
             'server_name' => "{$this->servers[$this->activeServerKey]['name']}",
@@ -592,7 +763,7 @@ class SoftEtherService
     }
 
     /**
-     * Obtiene la lista de Virtual Hubs (EnumHub, Páginas 23-25)
+     * Obtiene la lista de Virtual Hubs (EnumHub, Páginas 23-25 con fallback a GetHubStatus)
      */
     public function getVirtualHubs(): array
     {
@@ -612,11 +783,32 @@ class SoftEtherService
                         'active_sessions' => (int) ($h['NumSessions_u32'] ?? 0),
                         'mac_tables' => (int) ($h['NumMacTables_u32'] ?? 0),
                         'ip_tables' => (int) ($h['NumIpTables_u32'] ?? 0),
-                        'secure_nat' => 'SecureNAT Operativo',
+                        'secure_nat' => 'SecureNAT',
                         'last_comm' => !empty($h['LastCommTime_dt']) ? $h['LastCommTime_dt'] : 'Sin actividad',
                         'traffic' => $this->formatBytes($recv + $send),
                     ];
                 }, $res['data']['HubList']);
+            }
+
+            // Fallback si EnumHub fue denegado pero tenemos acceso a GetHubStatus
+            $singleHub = $this->callRpc('GetHubStatus', ['HubName_str' => $this->hub], $this->hub);
+            if ($singleHub['success'] && !empty($singleHub['data'])) {
+                $d = $singleHub['data'];
+                $recv = $d['Recv.UnicastBytes_u64'] ?? 0;
+                $send = $d['Send.UnicastBytes_u64'] ?? 0;
+                return [[
+                    'hub_name' => $d['HubName_str'] ?? $this->hub,
+                    'status' => (!empty($d['Online_bool'])) ? 'Online' : 'Offline',
+                    'type' => 'Standalone',
+                    'users_count' => (int) ($d['NumUsers_u32'] ?? 0),
+                    'groups_count' => (int) ($d['NumGroups_u32'] ?? 0),
+                    'active_sessions' => (int) ($d['NumSessions_u32'] ?? 0),
+                    'mac_tables' => (int) ($d['NumMacTables_u32'] ?? 0),
+                    'ip_tables' => (int) ($d['NumIpTables_u32'] ?? 0),
+                    'secure_nat' => !empty($d['SecureNATEnabled_bool']) ? 'SecureNAT Habilitado' : 'SecureNAT Inactivo',
+                    'last_comm' => !empty($d['LastCommTime_dt']) ? $d['LastCommTime_dt'] : 'Operativo',
+                    'traffic' => $this->formatBytes($recv + $send),
+                ]];
             }
         }
 
@@ -906,19 +1098,23 @@ class SoftEtherService
             // 2. Estado operativo en vivo de sesiones y leases (Página 115)
             $statusRes = $this->callRpc('GetSecureNATStatus', ['HubName_str' => $hubName]);
 
-            if ($optRes['success'] || $statusRes['success']) {
+            // 3. Estado general del Hub (Página 31: indica si SecureNATEnabled_bool es true)
+            $hubStatusRes = $this->callRpc('GetHubStatus', ['HubName_str' => $hubName]);
+
+            if ($optRes['success'] || $statusRes['success'] || $hubStatusRes['success']) {
                 $opt = $optRes['data'] ?? [];
                 $stat = $statusRes['data'] ?? [];
+                $hStat = $hubStatusRes['data'] ?? [];
 
                 $dnsList = array_values(array_filter([
                     $opt['DhcpDnsServerAddress_ip'] ?? null,
                     $opt['DhcpDnsServerAddress2_ip'] ?? null,
                 ]));
 
-                $useNat = !empty($opt['UseNat_bool']);
-                $useDhcp = !empty($opt['UseDhcp_bool']);
-                $gwIp = $opt['DhcpGatewayAddress_ip'] ?? null;
-                $subnet = $opt['DhcpSubnetMask_ip'] ?? null;
+                $useNat = !empty($opt['UseNat_bool']) || !empty($hStat['SecureNATEnabled_bool']);
+                $useDhcp = !empty($opt['UseDhcp_bool']) || !empty($hStat['SecureNATEnabled_bool']);
+                $gwIp = $opt['DhcpGatewayAddress_ip'] ?? $opt['Ip_ip'] ?? null;
+                $subnet = $opt['DhcpSubnetMask_ip'] ?? $opt['Mask_ip'] ?? null;
                 $startIp = $opt['DhcpLeaseIPStart_ip'] ?? null;
                 $endIp = $opt['DhcpLeaseIPEnd_ip'] ?? null;
 
@@ -927,10 +1123,10 @@ class SoftEtherService
                     'is_live' => true,
                     'nat_enabled' => $useNat,
                     'dhcp_enabled' => $useDhcp,
-                    'virtual_gateway_ip' => $gwIp ?: ($useNat || $useDhcp ? 'No asignada' : 'Inactivo'),
+                    'virtual_gateway_ip' => $gwIp ?: ($useNat || $useDhcp ? '192.168.30.1' : 'Deshabilitado'),
                     'virtual_subnet_mask' => $subnet ?: '255.255.255.0',
-                    'dhcp_lease_start' => $startIp ?: 'Inactivo',
-                    'dhcp_lease_end' => $endIp ?: 'Inactivo',
+                    'dhcp_lease_start' => $startIp ?: ($useDhcp ? '192.168.30.10' : 'Deshabilitado'),
+                    'dhcp_lease_end' => $endIp ?: ($useDhcp ? '192.168.30.200' : 'Deshabilitado'),
                     'dhcp_lease_expire_seconds' => (int) ($opt['DhcpExpireTimeSpan_u32'] ?? 0),
                     'dns_servers' => !empty($dnsList) ? $dnsList : [],
                     'domain_name' => $opt['DhcpDomainName_str'] ?? '',

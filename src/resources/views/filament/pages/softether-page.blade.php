@@ -234,17 +234,45 @@
             <div style="display: flex; flex-direction: column; gap: 1rem; justify-content: space-between;">
                 <div>
                     <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; flex-wrap: wrap;">
-                        <span class="se-badge {{ ($connectionDetails['is_configured'] ?? false) ? 'se-badge-emerald' : 'se-badge-amber' }}">
-                            <span style="width: 8px; height: 8px; border-radius: 50%; background: currentColor;"></span>
-                            {{ ($connectionDetails['is_configured'] ?? false) ? "Conectado a {$connectionDetails['server_name']}" : "Modo Diagnóstico (Sin credenciales para {$connectionDetails['server_name']})" }}
-                        </span>
+                        @if($serverStatus['is_live'] ?? false)
+                            <span class="se-badge se-badge-emerald" title="El servidor SoftEther está respondiendo a las consultas JSON-RPC en tiempo real">
+                                <span style="width: 8px; height: 8px; border-radius: 50%; background: currentColor;"></span>
+                                En línea (RPC OK): {{ $connectionDetails['server_name'] }}
+                            </span>
+                        @elseif($connectionDetails['is_configured'] ?? false)
+                            <span class="se-badge se-badge-rose" title="Credenciales presentes en .env, pero el servidor no responde a las llamadas JSON-RPC">
+                                <span style="width: 8px; height: 8px; border-radius: 50%; background: currentColor;"></span>
+                                Sin respuesta RPC: {{ $connectionDetails['server_name'] }}
+                            </span>
+                        @else
+                            <span class="se-badge se-badge-amber">
+                                <span style="width: 8px; height: 8px; border-radius: 50%; background: currentColor;"></span>
+                                Sin configurar (.env): {{ $connectionDetails['server_name'] }}
+                            </span>
+                        @endif
+
                         <span class="se-badge se-badge-sky">
-                            Hub: {{ $connectionDetails['hub'] ?? 'DEFAULT' }}
+                            Hub Activo: {{ $connectionDetails['hub'] ?? 'DEFAULT' }}
                         </span>
                         <span class="se-badge se-badge-sky">
                             Host: {{ $connectionDetails['host'] ?? '127.0.0.1' }}:{{ $connectionDetails['port'] ?? 5555 }}
                         </span>
-                        <span wire:loading wire:target="selectServer, loadData" class="se-badge se-badge-amber">
+
+                        @if(!empty($virtualHubs) && count($virtualHubs) > 1)
+                            <div style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: #94a3b8; background: rgba(15, 23, 42, 0.6); padding: 0.2rem 0.5rem; border-radius: 0.5rem; border: 1px solid #1e293b;">
+                                <span style="font-weight: 600;">Hubs:</span>
+                                @foreach($virtualHubs as $vh)
+                                    <button type="button" 
+                                            wire:click="selectHub('{{ $vh['hub_name'] }}')"
+                                            class="se-badge {{ ($connectionDetails['hub'] ?? '') === $vh['hub_name'] ? 'se-badge-emerald' : 'se-badge-sky' }}"
+                                            style="cursor: pointer; border: 1px solid {{ ($connectionDetails['hub'] ?? '') === $vh['hub_name'] ? '#34d399' : '#0284c7' }};">
+                                        {{ $vh['hub_name'] }} ({{ $vh['active_sessions'] ?? 0 }} ses.)
+                                    </button>
+                                @endforeach
+                            </div>
+                        @endif
+
+                        <span wire:loading wire:target="selectServer, selectHub, loadData" class="se-badge se-badge-amber">
                             <svg style="width: 12px; height: 12px; animation: spin 1s linear infinite;" fill="none" viewBox="0 0 24 24">
                                 <circle style="opacity: 0.25;" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path style="opacity: 0.75;" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -287,9 +315,43 @@
                 </div>
             </div>
 
+            <!-- Panel de Alerta si el servidor no responde RPC -->
+            @if(!($serverStatus['is_live'] ?? false) && ($connectionDetails['is_configured'] ?? false))
+                <div style="margin-top: 1.25rem; padding: 1rem 1.25rem; border-radius: 0.75rem; background: rgba(244, 63, 94, 0.12); border: 1px solid rgba(244, 63, 94, 0.35); color: #fecdd3; font-size: 0.85rem;">
+                    <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+                        <svg style="width: 1.25rem; height: 1.25rem; color: #fb7185; flex-shrink: 0; margin-top: 0.15rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <div style="flex: 1;">
+                            <strong style="color: #ffffff; font-size: 0.95rem;">SoftEther en {{ $connectionDetails['server_name'] }} no responde a la API JSON-RPC</strong>
+                            <div style="margin-top: 0.35rem; color: #fca5a5; font-family: monospace; font-size: 0.8rem; background: rgba(0, 0, 0, 0.25); padding: 0.35rem 0.65rem; border-radius: 0.35rem;">
+                                {{ $serverStatus['error_message'] ?? $connectionDetails['last_error'] ?? 'Tiempo de espera agotado al conectar al puerto ' . ($connectionDetails['port'] ?? 5555) . ' en ' . ($connectionDetails['host'] ?? '') }}
+                            </div>
+                            <div style="margin-top: 0.65rem; color: #cbd5e1; font-size: 0.8rem; line-height: 1.5;">
+                                <strong>Posibles causas y solución rápida:</strong>
+                                <ul style="margin: 0.35rem 0 0.5rem 1.25rem; padding: 0; list-style-type: disc;">
+                                    <li><strong>Firewall bloqueando el puerto {{ $connectionDetails['port'] ?? 5555 }}:</strong> En VPS 2 ejecuta: <code style="color: #38bdf8;">sudo ufw allow {{ $connectionDetails['port'] ?? 5555 }}/tcp</code>. También puedes probar cambiar el puerto a <code style="color: #38bdf8;">443</code> en tu <code style="color: #38bdf8;">.env</code>.</li>
+                                    <li><strong>JSON-RPC deshabilitado:</strong> En <code style="color: #38bdf8;">vpn_server.config</code> en VPS 2 debe estar <code style="color: #38bdf8;">bool DisableJsonRpcWebApi false</code>.</li>
+                                    <li><strong>Contraseña de Administrador incorrecta:</strong> Verifica que <code style="color: #38bdf8;">SOFTETHER_VPS2_ADMIN_PASSWORD</code> coincida con la configurada con <code style="color: #38bdf8;">ServerPasswordSet</code>.</li>
+                                    <li><strong>Nombre del Virtual Hub:</strong> Si el hub en VPS 2 no se llama <code style="color: #38bdf8;">DEFAULT</code>, configúralo en <code style="color: #38bdf8;">SOFTETHER_VPS2_HUB=tu_hub</code>.</li>
+                                </ul>
+                            </div>
+                            <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                <button type="button" wire:click="testConnection" class="se-btn se-btn-sky" style="font-size: 0.75rem; padding: 0.35rem 0.75rem;">
+                                    Ejecutar Diagnóstico Paso a Paso
+                                </button>
+                                <button type="button" wire:click="loadData(true, true)" class="se-btn" style="background: rgba(255, 255, 255, 0.1); color: #ffffff; font-size: 0.75rem; padding: 0.35rem 0.75rem;">
+                                    Reintentar Conexión
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             @if($testResult)
                 <div style="margin-top: 1rem; padding: 0.75rem 1rem; border-radius: 0.5rem; background: {{ $testResult['success'] ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)' }}; border: 1px solid {{ $testResult['success'] ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)' }}; color: {{ $testResult['success'] ? '#6ee7b7' : '#fde68a' }}; font-size: 0.825rem;">
-                    <strong>{{ $testResult['success'] ? 'Resultado:' : 'Aviso de Conexión:' }}</strong>
+                    <strong>{{ $testResult['success'] ? 'Resultado del Diagnóstico:' : 'Aviso de Conexión:' }}</strong>
                     {{ $testResult['message'] }}
                 </div>
             @endif
@@ -580,17 +642,34 @@
         @if($activeTab === 'hubs')
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
                 <div class="se-card">
-                    <h3 style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin: 0 0 1rem 0; border-bottom: 1px solid #1e293b; padding-bottom: 0.5rem;">
-                        Virtual Hubs en {{ $connectionDetails['server_name'] }}
-                    </h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid #1e293b; padding-bottom: 0.5rem;">
+                        <h3 style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin: 0;">
+                            Virtual Hubs en {{ $connectionDetails['server_name'] }}
+                        </h3>
+                        <span style="font-size: 0.75rem; color: #94a3b8;">{{ count($virtualHubs) }} detectado(s)</span>
+                    </div>
                     <div style="display: flex; flex-direction: column; gap: 1rem;">
                         @forelse($virtualHubs as $hub)
-                            <div style="background: #090e1a; border: 1px solid #1e293b; border-radius: 0.5rem; padding: 1rem;">
+                            <div style="background: #090e1a; border: 1px solid {{ ($connectionDetails['hub'] ?? '') === $hub['hub_name'] ? 'rgba(14, 165, 233, 0.5)' : '#1e293b' }}; border-radius: 0.5rem; padding: 1rem;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                                    <div style="font-weight: 700; color: #38bdf8; font-size: 1.05rem;">{{ $hub['hub_name'] }}</div>
-                                    <span class="se-badge {{ ($hub['status'] ?? '') === 'Online' ? 'se-badge-emerald' : 'se-badge-amber' }}">
-                                        {{ $hub['status'] ?? 'Desconocido' }}
-                                    </span>
+                                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                        <div style="font-weight: 700; color: #38bdf8; font-size: 1.05rem;">{{ $hub['hub_name'] }}</div>
+                                        @if(($connectionDetails['hub'] ?? '') === $hub['hub_name'])
+                                            <span class="se-badge se-badge-sky" style="font-size: 0.65rem; padding: 0.15rem 0.45rem;">Hub Activo</span>
+                                        @endif
+                                    </div>
+                                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                        <span class="se-badge {{ ($hub['status'] ?? '') === 'Online' ? 'se-badge-emerald' : 'se-badge-amber' }}">
+                                            {{ $hub['status'] ?? 'Desconocido' }}
+                                        </span>
+                                        @if(($connectionDetails['hub'] ?? '') !== $hub['hub_name'])
+                                            <button type="button" 
+                                                    wire:click="selectHub('{{ $hub['hub_name'] }}')"
+                                                    class="se-btn se-btn-sky" style="padding: 0.2rem 0.55rem; font-size: 0.75rem;">
+                                                Seleccionar
+                                            </button>
+                                        @endif
+                                    </div>
                                 </div>
                                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.8rem; color: #94a3b8;">
                                     <div>Usuarios: <strong style="color: #ffffff;">{{ $hub['users_count'] ?? 0 }}</strong></div>
@@ -605,7 +684,7 @@
                             <div style="text-align: center; color: #94a3b8; padding: 2rem; background: #090e1a; border: 1px dashed #334155; border-radius: 0.5rem;">
                                 <svg style="width: 2rem; height: 2rem; margin: 0 auto 0.5rem auto; color: #64748b;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
                                 <div>No se detectaron Virtual Hubs activos en este servidor.</div>
-                                <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.25rem;">Verifique la conexión RPC con el VPS.</div>
+                                <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.25rem;">Verifique la conexión RPC con el VPS secundario.</div>
                             </div>
                         @endforelse
                     </div>
@@ -671,6 +750,12 @@
                                 <span class="se-badge se-badge-sky">Activo</span>
                             </div>
                         @endif
+
+                        @if(empty($secureNat['nat_enabled']) && empty($secureNat['dhcp_enabled']))
+                            <div style="padding: 0.75rem; border-radius: 0.5rem; background: rgba(148, 163, 184, 0.08); border: 1px dashed #334155; color: #94a3b8; font-size: 0.775rem; margin-top: 0.5rem; line-height: 1.45;">
+                                <strong style="color: #e2e8f0;">Nota técnica sobre SecureNAT:</strong> En este hub, SecureNAT (Virtual NAT y DHCP de SoftEther) está <em>deshabilitado</em>. Esto es lo habitual cuando el servidor utiliza <strong>Local Bridge (TAP)</strong> conectado a la interfaz física de red del VPS, o cuando las IPs las asigna un DHCP externo/dnsmasq del sistema operativo en lugar de la función interna de SoftEther.
+                            </div>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -685,10 +770,10 @@
                     </div>
                     <div>
                         <h2 style="font-size: 1.15rem; font-weight: 700; color: #ffffff; margin: 0;">
-                            Configuración Multi-Servidor (VPS 1 & VPS 2) en tu archivo .env
+                            Configuración Multi-Servidor (VPS 1 & VPS 2) en /opt/dataplus-platform/.env
                         </h2>
                         <p style="color: #94a3b8; font-size: 0.85rem; margin: 0.35rem 0 0 0;">
-                            Estructura para gestionar ambos servidores SoftEther sin exponer contraseñas en Git.
+                            Estructura para gestionar ambos servidores SoftEther sin exponer credenciales en Git.
                         </p>
                     </div>
                 </div>
@@ -708,11 +793,21 @@ SOFTETHER_VPS1_VERIFY_SSL=false
 # SOFTETHER VPN - SERVIDOR 2 (VPS 2 - Secundario)
 # ============================================================
 SOFTETHER_VPS2_NAME="VPS 2 (Secundario)"
-SOFTETHER_VPS2_HOST=IP_DE_TU_VPS2
+SOFTETHER_VPS2_HOST=152.206.177.165
 SOFTETHER_VPS2_PORT=5555
 SOFTETHER_VPS2_HUB=DEFAULT
-SOFTETHER_VPS2_ADMIN_PASSWORD=clave_administrador_vps2
+SOFTETHER_VPS2_ADMIN_PASSWORD=tu_clave_administrador_vps2
 SOFTETHER_VPS2_VERIFY_SSL=false
+                </div>
+
+                <h3 style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin: 1rem 0 0.5rem 0;">
+                    Comando rápido para probar el JSON-RPC del VPS 2 desde la consola del VPS 1:
+                </h3>
+                <div class="se-code-block" style="margin-bottom: 1.5rem;">
+curl -k -X POST -H "Content-Type: application/json" \
+  -H "X-VPNADMIN-PASSWORD: tu_clave_administrador_vps2" \
+  -d '{"jsonrpc":"2.0","id":"1","method":"Test","params":{"IntValue_u32":12345}}' \
+  https://152.206.177.165:5555/api/
                 </div>
 
                 <h3 style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin: 1rem 0 0.5rem 0;">
