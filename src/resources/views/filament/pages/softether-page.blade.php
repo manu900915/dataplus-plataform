@@ -252,25 +252,30 @@
                         @endif
 
                         <span class="se-badge se-badge-sky">
-                            Hub Activo: {{ $connectionDetails['hub'] ?? 'DEFAULT' }}
-                        </span>
-                        <span class="se-badge se-badge-sky">
-                            Host: {{ $connectionDetails['host'] ?? '127.0.0.1' }}:{{ $connectionDetails['port'] ?? 5555 }}
+                            Hubs: {{ !empty($virtualHubs) ? count($virtualHubs) : 1 }}
                         </span>
 
                         @if(!empty($virtualHubs) && count($virtualHubs) > 1)
-                            <div style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: #94a3b8; background: rgba(15, 23, 42, 0.6); padding: 0.2rem 0.5rem; border-radius: 0.5rem; border: 1px solid #1e293b;">
-                                <span style="font-weight: 600;">Hubs:</span>
-                                @foreach($virtualHubs as $vh)
-                                    <button type="button" 
-                                            wire:click="selectHub('{{ $vh['hub_name'] }}')"
-                                            class="se-badge {{ ($connectionDetails['hub'] ?? '') === $vh['hub_name'] ? 'se-badge-emerald' : 'se-badge-sky' }}"
-                                            style="cursor: pointer; border: 1px solid {{ ($connectionDetails['hub'] ?? '') === $vh['hub_name'] ? '#34d399' : '#0284c7' }};">
-                                        {{ $vh['hub_name'] }} ({{ $vh['active_sessions'] ?? 0 }} ses.)
-                                    </button>
-                                @endforeach
+                            <div style="display: inline-flex; align-items: center; gap: 0.35rem;">
+                                <label style="font-size: 0.75rem; color: #94a3b8; font-weight: 600;">Hub Activo:</label>
+                                <select wire:change="selectHub($event.target.value)" 
+                                        style="background: #0f172a; color: #38bdf8; border: 1px solid #0284c7; border-radius: 9999px; padding: 0.2rem 0.65rem; font-size: 0.75rem; font-weight: 600; cursor: pointer; outline: none;">
+                                    @foreach($virtualHubs as $vh)
+                                        <option value="{{ $vh['hub_name'] }}" {{ ($connectionDetails['hub'] ?? '') === $vh['hub_name'] ? 'selected' : '' }}>
+                                            {{ $vh['hub_name'] }} ({{ $vh['active_sessions'] ?? 0 }} ses.)
+                                        </option>
+                                    @endforeach
+                                </select>
                             </div>
+                        @else
+                            <span class="se-badge se-badge-sky">
+                                Hub Activo: {{ $connectionDetails['hub'] ?? 'DEFAULT' }}
+                            </span>
                         @endif
+
+                        <span class="se-badge se-badge-sky">
+                            Host: {{ $connectionDetails['host'] ?? '127.0.0.1' }}:{{ $connectionDetails['port'] ?? 5555 }}
+                        </span>
 
                         <span wire:loading wire:target="selectServer, selectHub, loadData" class="se-badge se-badge-amber">
                             <svg style="width: 12px; height: 12px; animation: spin 1s linear infinite;" fill="none" viewBox="0 0 24 24">
@@ -376,7 +381,7 @@
 
             <button type="button" wire:click="setActiveTab('hubs')" class="se-tab-btn {{ $activeTab === 'hubs' ? 'active' : '' }}">
                 <svg style="width: 1rem; height: 1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
-                <span>Virtual Hubs & SecureNAT</span>
+                <span>Virtual Hubs & SecureNAT ({{ count($virtualHubs) }})</span>
             </button>
 
             <button type="button" wire:click="setActiveTab('config')" class="se-tab-btn {{ $activeTab === 'config' ? 'active' : '' }}">
@@ -775,6 +780,21 @@
                         <p style="color: #94a3b8; font-size: 0.85rem; margin: 0.35rem 0 0 0;">
                             Estructura para gestionar ambos servidores SoftEther sin exponer credenciales en Git.
                         </p>
+                    </div>
+                </div>
+
+                <div style="background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 0.5rem; padding: 1rem; margin-bottom: 1.5rem;">
+                    <h3 style="font-size: 0.95rem; font-weight: 700; color: #38bdf8; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+                        <svg style="width: 1rem; height: 1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        Valores actualmente cargados por Laravel para {{ $connectionDetails['server_name'] }}
+                    </h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; font-size: 0.8rem;">
+                        <div><span style="color: #94a3b8;">Servidor ID:</span> <strong style="color: #ffffff;">{{ $connectionDetails['server_key'] }}</strong></div>
+                        <div><span style="color: #94a3b8;">Host:</span> <strong style="color: #38bdf8; font-family: monospace;">{{ $connectionDetails['host'] ?: 'No definido' }}</strong></div>
+                        <div><span style="color: #94a3b8;">Puerto:</span> <strong style="color: #38bdf8; font-family: monospace;">{{ $connectionDetails['port'] ?: 5555 }}</strong></div>
+                        <div><span style="color: #94a3b8;">Hub Inicial:</span> <strong style="color: #ffffff;">{{ $connectionDetails['hub'] ?: 'DEFAULT' }}</strong></div>
+                        <div><span style="color: #94a3b8;">Contraseña:</span> <strong style="{{ $connectionDetails['has_password'] ? 'color: #34d399;' : 'color: #fb7185;' }}">{{ $connectionDetails['has_password'] ? 'Cargada (' . $connectionDetails['password_mask'] . ')' : 'No configurada (vacía)' }}</strong></div>
+                        <div><span style="color: #94a3b8;">Verificar SSL:</span> <strong style="color: #ffffff;">{{ $connectionDetails['verify_ssl'] ? 'true' : 'false' }}</strong></div>
                     </div>
                 </div>
 
