@@ -857,6 +857,99 @@ class SoftEtherService
     }
 
     /**
+     * Crea un nuevo Virtual Hub en el servidor VPN (CreateHub)
+     */
+    public function createHub(string $hubName, ?string $adminPassword = null): array
+    {
+        $hubName = trim($hubName);
+        if (empty($hubName)) {
+            return [
+                'success' => false,
+                'message' => 'El nombre del Virtual Hub no puede estar vacío.',
+            ];
+        }
+
+        if ($this->isConfigured()) {
+            $params = [
+                'HubName_str' => $hubName,
+                'AdminPassword_str' => $adminPassword ?? '',
+                'Online_bool' => true,
+            ];
+
+            $res = $this->callRpc('CreateHub', $params);
+
+            if ($res['success']) {
+                $this->clearCache($this->activeServerKey);
+                // Asegurar estado Online
+                @$this->callRpc('SetHubOnline', [
+                    'HubName_str' => $hubName,
+                    'Online_bool' => true,
+                ]);
+
+                return [
+                    'success' => true,
+                    'message' => "Virtual Hub '{$hubName}' creado exitosamente en {$this->servers[$this->activeServerKey]['name']}.",
+                ];
+            }
+
+            return [
+                'success' => false,
+                'message' => "Error al crear Virtual Hub en SoftEther: {$res['error']}",
+            ];
+        }
+
+        return [
+            'success' => false,
+            'message' => 'El servidor no está configurado o no responde.',
+        ];
+    }
+
+    /**
+     * Elimina un Virtual Hub del servidor VPN (DeleteHub)
+     */
+    public function deleteHub(string $hubName): array
+    {
+        $hubName = trim($hubName);
+        if (empty($hubName)) {
+            return [
+                'success' => false,
+                'message' => 'Debe especificar el nombre del Virtual Hub a eliminar.',
+            ];
+        }
+
+        if (strtoupper($hubName) === 'DEFAULT') {
+            return [
+                'success' => false,
+                'message' => 'Por seguridad no se permite eliminar el Virtual Hub por defecto (DEFAULT).',
+            ];
+        }
+
+        if ($this->isConfigured()) {
+            $res = $this->callRpc('DeleteHub', [
+                'HubName_str' => $hubName,
+            ]);
+
+            if ($res['success']) {
+                $this->clearCache($this->activeServerKey);
+                return [
+                    'success' => true,
+                    'message' => "Virtual Hub '{$hubName}' eliminado exitosamente de {$this->servers[$this->activeServerKey]['name']}.",
+                ];
+            }
+
+            return [
+                'success' => false,
+                'message' => "No se pudo eliminar el Virtual Hub: {$res['error']}",
+            ];
+        }
+
+        return [
+            'success' => false,
+            'message' => 'El servidor no está configurado o no responde.',
+        ];
+    }
+
+    /**
      * Obtiene las sesiones activas actualmente conectadas al Hub (EnumSession, Páginas 97-99)
      */
     public function getActiveSessions(?string $hub = null): array

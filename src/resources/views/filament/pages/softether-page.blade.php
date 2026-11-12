@@ -647,23 +647,29 @@
         @if($activeTab === 'hubs')
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
                 <div class="se-card">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid #1e293b; padding-bottom: 0.5rem;">
-                        <h3 style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin: 0;">
-                            Virtual Hubs en {{ $connectionDetails['server_name'] }}
-                        </h3>
-                        <span style="font-size: 0.75rem; color: #94a3b8;">{{ count($virtualHubs) }} detectado(s)</span>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid #1e293b; padding-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                        <div>
+                            <h3 style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin: 0;">
+                                Virtual Hubs en {{ $connectionDetails['server_name'] }}
+                            </h3>
+                            <span style="font-size: 0.75rem; color: #94a3b8;">{{ count($virtualHubs) }} detectado(s)</span>
+                        </div>
+                        <button type="button" wire:click="abrirModalCrearHub" class="se-btn se-btn-emerald" style="font-size: 0.75rem; padding: 0.35rem 0.75rem;">
+                            <svg style="width: 0.9rem; height: 0.9rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                            <span>Crear Virtual Hub</span>
+                        </button>
                     </div>
                     <div style="display: flex; flex-direction: column; gap: 1rem;">
                         @forelse($virtualHubs as $hub)
                             <div style="background: #090e1a; border: 1px solid {{ ($connectionDetails['hub'] ?? '') === $hub['hub_name'] ? 'rgba(14, 165, 233, 0.5)' : '#1e293b' }}; border-radius: 0.5rem; padding: 1rem;">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
                                     <div style="display: flex; align-items: center; gap: 0.5rem;">
                                         <div style="font-weight: 700; color: #38bdf8; font-size: 1.05rem;">{{ $hub['hub_name'] }}</div>
                                         @if(($connectionDetails['hub'] ?? '') === $hub['hub_name'])
                                             <span class="se-badge se-badge-sky" style="font-size: 0.65rem; padding: 0.15rem 0.45rem;">Hub Activo</span>
                                         @endif
                                     </div>
-                                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
                                         <span class="se-badge {{ ($hub['status'] ?? '') === 'Online' ? 'se-badge-emerald' : 'se-badge-amber' }}">
                                             {{ $hub['status'] ?? 'Desconocido' }}
                                         </span>
@@ -672,6 +678,16 @@
                                                     wire:click="selectHub('{{ $hub['hub_name'] }}')"
                                                     class="se-btn se-btn-sky" style="padding: 0.2rem 0.55rem; font-size: 0.75rem;">
                                                 Seleccionar
+                                            </button>
+                                        @endif
+                                        @if(strtoupper($hub['hub_name']) !== 'DEFAULT')
+                                            <button type="button" 
+                                                    wire:click="confirmarEliminarHub('{{ $hub['hub_name'] }}')"
+                                                    class="se-btn se-btn-rose" 
+                                                    style="padding: 0.2rem 0.55rem; font-size: 0.75rem;"
+                                                    title="Eliminar Virtual Hub '{{ $hub['hub_name'] }}'">
+                                                <svg style="width: 0.85rem; height: 0.85rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                <span>Eliminar</span>
                                             </button>
                                         @endif
                                     </div>
@@ -915,6 +931,104 @@ docker exec dp-prod-app php artisan cache:clear
                             </button>
                         </div>
                     </form>
+                </div>
+            </div>
+        @endif
+
+        <!-- MODAL CREAR VIRTUAL HUB (CreateHub) -->
+        @if($isCreatingHub)
+            <div class="se-modal-overlay">
+                <div class="se-modal">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 0.75rem; margin-bottom: 1rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <div style="padding: 0.4rem; border-radius: 0.35rem; background: rgba(16, 185, 129, 0.2); color: #34d399;">
+                                <svg style="width: 1.1rem; height: 1.1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                            </div>
+                            <h3 style="font-size: 1.1rem; font-weight: 700; color: #ffffff; margin: 0;">
+                                Nuevo Virtual Hub en {{ $connectionDetails['server_name'] }}
+                            </h3>
+                        </div>
+                        <button type="button" wire:click="cerrarModalCrearHub" style="background: transparent; border: none; color: #94a3b8; font-size: 1.25rem; cursor: pointer;">✕</button>
+                    </div>
+
+                    <form wire:submit.prevent="crearVirtualHub" style="display: flex; flex-direction: column; gap: 1rem; font-size: 0.85rem;">
+                        <div>
+                            <label style="display: block; color: #94a3b8; margin-bottom: 0.25rem;">
+                                Nombre del Virtual Hub <span style="color: #fb7185;">*</span>
+                            </label>
+                            <input type="text" wire:model="newHubName" required placeholder="ej: Cliente_EmpresaX o Sucursal_Playa" style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.5rem; padding: 0.5rem; color: #ffffff; font-family: monospace;" />
+                            <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.25rem;">
+                                Solo caracteres alfanuméricos, guiones y guiones bajos (sin espacios ni acentos).
+                            </div>
+                        </div>
+
+                        <div>
+                            <label style="display: block; color: #94a3b8; margin-bottom: 0.25rem;">
+                                Contraseña de Administración del Hub <span style="color: #64748b; font-size: 0.75rem;">(Opcional)</span>
+                            </label>
+                            <input type="password" wire:model="newHubPassword" placeholder="Dejar vacío o asignar clave específica para este Hub" style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.5rem; padding: 0.5rem; color: #ffffff;" />
+                            <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.25rem;">
+                                Si se define, permite administración remota exclusiva para los administradores de este hub.
+                            </div>
+                        </div>
+
+                        <div style="padding: 0.65rem 0.85rem; border-radius: 0.5rem; background: rgba(14, 165, 233, 0.1); border: 1px solid rgba(14, 165, 233, 0.25); color: #7dd3fc; font-size: 0.75rem; line-height: 1.4;">
+                            ℹ El Virtual Hub se creará en modo <strong>Online</strong> inmediatamente en el servidor SoftEther seleccionado.
+                        </div>
+
+                        <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1rem;">
+                            <button type="button" wire:click="cerrarModalCrearHub" class="se-btn" style="background: #334155; color: #ffffff;">
+                                Cancelar
+                            </button>
+                            <button type="submit" class="se-btn se-btn-emerald">
+                                <svg style="width: 1rem; height: 1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                                <span>Crear Virtual Hub</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        @endif
+
+        <!-- MODAL CONFIRMAR ELIMINACIÓN DE VIRTUAL HUB (DeleteHub) -->
+        @if($hubToDelete)
+            <div class="se-modal-overlay">
+                <div class="se-modal">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 0.75rem; margin-bottom: 1rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <div style="padding: 0.4rem; border-radius: 0.35rem; background: rgba(244, 63, 94, 0.2); color: #fb7185;">
+                                <svg style="width: 1.1rem; height: 1.1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                            </div>
+                            <h3 style="font-size: 1.1rem; font-weight: 700; color: #fb7185; margin: 0;">
+                                ¿Eliminar Virtual Hub '{{ $hubToDelete }}'?
+                            </h3>
+                        </div>
+                        <button type="button" wire:click="cancelarEliminarHub" style="background: transparent; border: none; color: #94a3b8; font-size: 1.25rem; cursor: pointer;">✕</button>
+                    </div>
+
+                    <div style="font-size: 0.85rem; color: #cbd5e1; line-height: 1.5; margin-bottom: 1.25rem;">
+                        <p style="margin: 0 0 0.75rem 0;">
+                            Está a punto de eliminar permanentemente el Virtual Hub <strong style="color: #38bdf8; font-family: monospace;">{{ $hubToDelete }}</strong> en <strong>{{ $connectionDetails['server_name'] }}</strong>.
+                        </p>
+                        <div style="padding: 0.75rem 1rem; border-radius: 0.5rem; background: rgba(244, 63, 94, 0.12); border: 1px solid rgba(244, 63, 94, 0.35); color: #fecdd3; font-size: 0.8rem;">
+                            <strong>Advertencia crítica de SoftEther:</strong>
+                            <ul style="margin: 0.35rem 0 0 1.2rem; padding: 0;">
+                                <li>Se desconectarán todas las sesiones VPN y túneles activos en este Hub.</li>
+                                <li>Se borrarán todos los usuarios, contraseñas, grupos y reglas asociadas al Hub.</li>
+                                <li>Esta acción no se puede deshacer.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                        <button type="button" wire:click="cancelarEliminarHub" class="se-btn" style="background: #334155; color: #ffffff;">
+                            Cancelar
+                        </button>
+                        <button type="button" wire:click="eliminarVirtualHub" class="se-btn se-btn-rose">
+                            <svg style="width: 1rem; height: 1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            <span>Sí, Eliminar Virtual Hub</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         @endif

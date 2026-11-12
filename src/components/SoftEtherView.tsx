@@ -21,7 +21,8 @@ import {
   Plus, 
   X,
   Search,
-  ExternalLink
+  ExternalLink,
+  Trash2
 } from 'lucide-react';
 import { 
   SoftEtherSession, 
@@ -65,6 +66,12 @@ export const SoftEtherView: React.FC<SoftEtherViewProps> = ({ clientes = [] }) =
   const [newClientName, setNewClientName] = useState('Moraima Guanabo');
   const [newMaxConnections, setNewMaxConnections] = useState(1);
   const [newNote, setNewNote] = useState('');
+
+  // Modal para añadir/eliminar Virtual Hub
+  const [isAddHubModalOpen, setIsAddHubModalOpen] = useState(false);
+  const [newHubName, setNewHubName] = useState('');
+  const [newHubPassword, setNewHubPassword] = useState('');
+  const [hubToDelete, setHubToDelete] = useState<string | null>(null);
 
   // Estado del servidor
   const [serverStatus] = useState<SoftEtherServerStatus>({
@@ -296,6 +303,41 @@ export const SoftEtherView: React.FC<SoftEtherViewProps> = ({ clientes = [] }) =
     setNewRealName('');
     setNewPassword('');
     setNewNote('');
+  };
+
+  // Añadir Virtual Hub
+  const handleAddHub = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanName = newHubName.trim();
+    if (!cleanName) return;
+
+    const newHub: SoftEtherVirtualHub = {
+      hub_name: cleanName,
+      status: 'Online',
+      type: 'Standalone',
+      users_count: 0,
+      groups_count: 0,
+      active_sessions: 0,
+      mac_tables: 0,
+      ip_tables: 0,
+      secure_nat: 'Inactivo',
+      last_comm: 'Recién creado',
+      traffic: '0 B'
+    };
+
+    setHubs(prev => [...prev, newHub]);
+    setIsAddHubModalOpen(false);
+    setNewHubName('');
+    setNewHubPassword('');
+  };
+
+  // Eliminar Virtual Hub
+  const handleConfirmDeleteHub = () => {
+    if (!hubToDelete) return;
+    if (hubToDelete.toUpperCase() === 'DEFAULT') return;
+
+    setHubs(prev => prev.filter(h => h.hub_name !== hubToDelete));
+    setHubToDelete(null);
   };
 
   // Probar conexión
@@ -868,10 +910,19 @@ SOFTETHER_VPS2_VERIFY_SSL=false`;
       {activeTab === 'hubs' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6">
-            <h3 className="text-base font-semibold text-white mb-4 flex items-center gap-2 border-b border-slate-800 pb-3">
-              <Layers className="w-4 h-4 text-sky-400" />
-              Virtual Hubs Activos en SoftEther
-            </h3>
+            <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3 flex-wrap gap-2">
+              <h3 className="text-base font-semibold text-white flex items-center gap-2">
+                <Layers className="w-4 h-4 text-sky-400" />
+                Virtual Hubs Activos en SoftEther
+              </h3>
+              <button
+                onClick={() => setIsAddHubModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20 transition-all cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Crear Virtual Hub</span>
+              </button>
+            </div>
             <div className="space-y-4">
               {hubs.map((h, idx) => (
                 <div key={idx} className="bg-slate-950/70 border border-slate-800 rounded-xl p-4">
@@ -882,9 +933,20 @@ SOFTETHER_VPS2_VERIFY_SSL=false`;
                         {h.type}
                       </span>
                     </div>
-                    <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                      {h.status}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                        {h.status}
+                      </span>
+                      {h.hub_name.toUpperCase() !== 'DEFAULT' && (
+                        <button
+                          onClick={() => setHubToDelete(h.hub_name)}
+                          className="p-1.5 rounded-lg text-rose-400 hover:text-white hover:bg-rose-500/20 border border-rose-500/30 transition-all cursor-pointer"
+                          title={`Eliminar Virtual Hub ${h.hub_name}`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-slate-400">
@@ -1124,6 +1186,128 @@ SOFTETHER_VPS2_VERIFY_SSL=false`;
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: NUEVO VIRTUAL HUB */}
+      {isAddHubModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
+            <button
+              onClick={() => setIsAddHubModalOpen(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <h3 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
+              <Plus className="w-5 h-5 text-emerald-400" />
+              Crear Nuevo Virtual Hub
+            </h3>
+            <p className="text-xs text-slate-400 mb-4">
+              Crea un Virtual Hub aislado en el servidor SoftEther para un nuevo cliente o sucursal.
+            </p>
+
+            <form onSubmit={handleAddHub} className="space-y-4 text-sm">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Nombre del Virtual Hub <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="ej: Cliente_EmpresaX"
+                  value={newHubName}
+                  onChange={e => setNewHubName(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 font-mono text-sm focus:outline-none focus:border-sky-500"
+                />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Solo letras, números, guiones y guiones bajos (sin espacios).
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Contraseña de Administración del Hub <span className="text-slate-500">(Opcional)</span>
+                </label>
+                <input
+                  type="password"
+                  placeholder="Dejar vacío o definir contraseña específica"
+                  value={newHubPassword}
+                  onChange={e => setNewHubPassword(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-sky-500"
+                />
+              </div>
+
+              <div className="p-3 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-300 text-xs leading-relaxed">
+                ℹ El Virtual Hub se creará en estado <strong>Online</strong> inmediatamente en el servidor VPN.
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsAddHubModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20 cursor-pointer"
+                >
+                  Crear Virtual Hub
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: CONFIRMAR ELIMINAR VIRTUAL HUB */}
+      {hubToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
+            <button
+              onClick={() => setHubToDelete(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <h3 className="text-lg font-bold text-rose-400 mb-1 flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-rose-400" />
+              ¿Eliminar Virtual Hub '{hubToDelete}'?
+            </h3>
+            <p className="text-xs text-slate-300 mb-3">
+              Está a punto de eliminar permanentemente este Virtual Hub del servidor VPN.
+            </p>
+
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-200 text-xs space-y-1 mb-5">
+              <div className="font-semibold text-rose-300">Consecuencias críticas:</div>
+              <ul className="list-disc list-inside space-y-0.5 text-slate-300">
+                <li>Se desconectarán todos los túneles y clientes activos en este Hub.</li>
+                <li>Se eliminarán todas las cuentas de usuario VPN y SecureNAT del Hub.</li>
+                <li>Esta acción es irreversible en SoftEther.</li>
+              </ul>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setHubToDelete(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteHub}
+                className="px-5 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/20 cursor-pointer"
+              >
+                Sí, Eliminar Virtual Hub
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -42,6 +42,14 @@ class SoftEtherPage extends Page
     public string $newPassword = '';
     public string $newNote = '';
 
+    // Campos modal nuevo Virtual Hub
+    public bool $isCreatingHub = false;
+    public string $newHubName = '';
+    public string $newHubPassword = '';
+
+    // Hub a eliminar (confirmación)
+    public ?string $hubToDelete = null;
+
     public function mount(): void
     {
         $this->loadData();
@@ -322,6 +330,122 @@ class SoftEtherPage extends Page
         } else {
             Notification::make()
                 ->title('Error al reiniciar')
+                ->body($res['message'])
+                ->danger()
+                ->send();
+        }
+    }
+
+    public function abrirModalCrearHub(): void
+    {
+        $this->newHubName = '';
+        $this->newHubPassword = '';
+        $this->isCreatingHub = true;
+    }
+
+    public function cerrarModalCrearHub(): void
+    {
+        $this->isCreatingHub = false;
+        $this->newHubName = '';
+        $this->newHubPassword = '';
+    }
+
+    public function crearVirtualHub(): void
+    {
+        $name = trim($this->newHubName);
+        if (empty($name)) {
+            Notification::make()
+                ->title('Nombre requerido')
+                ->body('Debe indicar un nombre para el Virtual Hub.')
+                ->warning()
+                ->send();
+            return;
+        }
+
+        if (!preg_match('/^[a-zA-Z0-9_-]+$/', $name)) {
+            Notification::make()
+                ->title('Nombre inválido')
+                ->body('El nombre del Hub solo debe contener letras, números, guiones y guiones bajos (sin espacios).')
+                ->warning()
+                ->send();
+            return;
+        }
+
+        /** @var SoftEtherService $service */
+        $service = app(SoftEtherService::class);
+        $service->setServer($this->selectedServer);
+
+        $res = $service->createHub($name, $this->newHubPassword ?: null);
+
+        if ($res['success']) {
+            Notification::make()
+                ->title('Virtual Hub Creado')
+                ->body($res['message'])
+                ->success()
+                ->send();
+
+            $this->isCreatingHub = false;
+            $this->newHubName = '';
+            $this->newHubPassword = '';
+            $this->selectedHub = $name;
+            $this->loadData(false, true);
+        } else {
+            Notification::make()
+                ->title('Error al crear Virtual Hub')
+                ->body($res['message'])
+                ->danger()
+                ->send();
+        }
+    }
+
+    public function confirmarEliminarHub(string $hubName): void
+    {
+        if (strtoupper($hubName) === 'DEFAULT') {
+            Notification::make()
+                ->title('Operación no permitida')
+                ->body('El Virtual Hub "DEFAULT" es el hub principal del sistema y no puede eliminarse.')
+                ->warning()
+                ->send();
+            return;
+        }
+
+        $this->hubToDelete = $hubName;
+    }
+
+    public function cancelarEliminarHub(): void
+    {
+        $this->hubToDelete = null;
+    }
+
+    public function eliminarVirtualHub(): void
+    {
+        if (empty($this->hubToDelete)) {
+            return;
+        }
+
+        $hubName = $this->hubToDelete;
+
+        /** @var SoftEtherService $service */
+        $service = app(SoftEtherService::class);
+        $service->setServer($this->selectedServer);
+
+        $res = $service->deleteHub($hubName);
+
+        if ($res['success']) {
+            Notification::make()
+                ->title('Virtual Hub Eliminado')
+                ->body($res['message'])
+                ->success()
+                ->send();
+
+            $this->hubToDelete = null;
+            if ($this->selectedHub === $hubName) {
+                $this->selectedHub = 'DEFAULT';
+            }
+            $this->loadData(false, true);
+        } else {
+            Notification::make()
+                ->title('Error al eliminar Virtual Hub')
                 ->body($res['message'])
                 ->danger()
                 ->send();
