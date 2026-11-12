@@ -652,15 +652,62 @@
                             <h3 style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin: 0;">
                                 Virtual Hubs en {{ $connectionDetails['server_name'] }}
                             </h3>
-                            <span style="font-size: 0.75rem; color: #94a3b8;">{{ count($virtualHubs) }} detectado(s)</span>
+                            <span style="font-size: 0.75rem; color: #94a3b8;">{{ count($virtualHubs) }} detectado(s) en SoftEther</span>
                         </div>
                         <button type="button" wire:click="abrirModalCrearHub" class="se-btn se-btn-emerald" style="font-size: 0.75rem; padding: 0.35rem 0.75rem;">
                             <svg style="width: 0.9rem; height: 0.9rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                             <span>Crear Virtual Hub</span>
                         </button>
                     </div>
+
+                    <!-- Buscador de Virtual Hubs -->
+                    <div style="margin-bottom: 0.75rem; display: flex; gap: 0.5rem; align-items: center;">
+                        <div style="position: relative; flex: 1;">
+                            <span style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: #64748b; pointer-events: none;">
+                                <svg style="width: 1rem; height: 1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                            </span>
+                            <input type="text" 
+                                   wire:model.live.debounce.250ms="hubSearch" 
+                                   placeholder="Buscar Virtual Hub por nombre o estado..." 
+                                   style="width: 100%; background: #090e1a; border: 1px solid #1e293b; border-radius: 0.5rem; padding: 0.45rem 2rem 0.45rem 2.25rem; color: #ffffff; font-size: 0.8rem; outline: none;" />
+                            @if(!empty($hubSearch))
+                                <button type="button" 
+                                        wire:click="limpiarBusquedaHub" 
+                                        style="position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); background: transparent; border: none; color: #94a3b8; font-size: 0.9rem; cursor: pointer;">
+                                    ✕
+                                </button>
+                            @endif
+                        </div>
+                        @if(!empty($hubSearch))
+                            <button type="button" wire:click="limpiarBusquedaHub" class="se-btn" style="background: rgba(255,255,255,0.06); color: #94a3b8; font-size: 0.75rem; padding: 0.45rem 0.75rem;">
+                                Limpiar
+                            </button>
+                        @endif
+                    </div>
+
+                    @php
+                        $allFilteredHubs = $this->getFilteredVirtualHubs();
+                        $totalFiltered = count($allFilteredHubs);
+                        $paginatedHubs = $this->getPaginatedVirtualHubs();
+                        $totalPages = $this->getTotalHubPages();
+                    @endphp
+
+                    <!-- Resumen de resultados y página -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; font-size: 0.75rem; color: #94a3b8;">
+                        <span>
+                            @if(!empty($hubSearch))
+                                Filtrados: <strong style="color: #38bdf8;">{{ $totalFiltered }}</strong> de {{ count($virtualHubs) }} hubs
+                            @else
+                                Mostrando <strong style="color: #ffffff;">{{ count($paginatedHubs) }}</strong> de {{ count($virtualHubs) }} hubs
+                            @endif
+                        </span>
+                        @if($totalPages > 1)
+                            <span>Página <strong style="color: #38bdf8;">{{ $hubPage }}</strong> de {{ $totalPages }}</span>
+                        @endif
+                    </div>
+
                     <div style="display: flex; flex-direction: column; gap: 1rem;">
-                        @forelse($virtualHubs as $hub)
+                        @forelse($paginatedHubs as $hub)
                             <div style="background: #090e1a; border: 1px solid {{ ($connectionDetails['hub'] ?? '') === $hub['hub_name'] ? 'rgba(14, 165, 233, 0.5)' : '#1e293b' }}; border-radius: 0.5rem; padding: 1rem;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
                                     <div style="display: flex; align-items: center; gap: 0.5rem;">
@@ -703,12 +750,53 @@
                             </div>
                         @empty
                             <div style="text-align: center; color: #94a3b8; padding: 2rem; background: #090e1a; border: 1px dashed #334155; border-radius: 0.5rem;">
-                                <svg style="width: 2rem; height: 2rem; margin: 0 auto 0.5rem auto; color: #64748b;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
-                                <div>No se detectaron Virtual Hubs activos en este servidor.</div>
-                                <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.25rem;">Verifique la conexión RPC con el VPS secundario.</div>
+                                <svg style="width: 2rem; height: 2rem; margin: 0 auto 0.5rem auto; color: #64748b;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                                @if(!empty($hubSearch))
+                                    <div>No se encontraron Virtual Hubs que coincidan con "{{ $hubSearch }}".</div>
+                                    <button type="button" wire:click="limpiarBusquedaHub" class="se-btn se-btn-sky" style="margin-top: 0.75rem; font-size: 0.75rem; padding: 0.3rem 0.75rem;">
+                                        Limpiar búsqueda
+                                    </button>
+                                @else
+                                    <div>No se detectaron Virtual Hubs activos en este servidor.</div>
+                                    <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.25rem;">Verifique la conexión RPC con el VPS secundario.</div>
+                                @endif
                             </div>
                         @endforelse
                     </div>
+
+                    <!-- Controles de Paginación -->
+                    @if($totalPages > 1)
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid #1e293b; flex-wrap: wrap; gap: 0.5rem;">
+                            <div style="font-size: 0.75rem; color: #94a3b8;">
+                                Página {{ $hubPage }} de {{ $totalPages }} ({{ $totalFiltered }} hubs)
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.35rem;">
+                                <button type="button" 
+                                        wire:click="setHubPage({{ $hubPage - 1 }})" 
+                                        {{ $hubPage <= 1 ? 'disabled' : '' }}
+                                        class="se-btn" 
+                                        style="padding: 0.3rem 0.65rem; font-size: 0.75rem; background: {{ $hubPage <= 1 ? '#090e1a' : '#1e293b' }}; color: {{ $hubPage <= 1 ? '#475569' : '#e2e8f0' }}; cursor: {{ $hubPage <= 1 ? 'not-allowed' : 'pointer' }};">
+                                    ◀ Anterior
+                                </button>
+
+                                @for($p = max(1, $hubPage - 2); $p <= min($totalPages, $hubPage + 2); $p++)
+                                    <button type="button" 
+                                            wire:click="setHubPage({{ $p }})" 
+                                            style="padding: 0.3rem 0.6rem; font-size: 0.75rem; border-radius: 0.375rem; font-weight: 600; cursor: pointer; border: 1px solid {{ $p === $hubPage ? '#0284c7' : '#334155' }}; background: {{ $p === $hubPage ? 'rgba(14, 165, 233, 0.25)' : '#0f172a' }}; color: {{ $p === $hubPage ? '#38bdf8' : '#94a3b8' }};">
+                                        {{ $p }}
+                                    </button>
+                                @endfor
+
+                                <button type="button" 
+                                        wire:click="setHubPage({{ $hubPage + 1 }})" 
+                                        {{ $hubPage >= $totalPages ? 'disabled' : '' }}
+                                        class="se-btn" 
+                                        style="padding: 0.3rem 0.65rem; font-size: 0.75rem; background: {{ $hubPage >= $totalPages ? '#090e1a' : '#1e293b' }}; color: {{ $hubPage >= $totalPages ? '#475569' : '#e2e8f0' }}; cursor: {{ $hubPage >= $totalPages ? 'not-allowed' : 'pointer' }};">
+                                    Siguiente ▶
+                                </button>
+                            </div>
+                        </div>
+                    @endif
                 </div>
 
                 <div class="se-card">

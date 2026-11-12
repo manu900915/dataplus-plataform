@@ -73,6 +73,11 @@ export const SoftEtherView: React.FC<SoftEtherViewProps> = ({ clientes = [] }) =
   const [newHubPassword, setNewHubPassword] = useState('');
   const [hubToDelete, setHubToDelete] = useState<string | null>(null);
 
+  // Búsqueda y paginación de Virtual Hubs
+  const [hubSearch, setHubSearch] = useState('');
+  const [hubPage, setHubPage] = useState(1);
+  const hubsPerPage = 6;
+
   // Estado del servidor
   const [serverStatus] = useState<SoftEtherServerStatus>({
     is_live: false,
@@ -911,10 +916,13 @@ SOFTETHER_VPS2_VERIFY_SSL=false`;
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6">
             <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3 flex-wrap gap-2">
-              <h3 className="text-base font-semibold text-white flex items-center gap-2">
-                <Layers className="w-4 h-4 text-sky-400" />
-                Virtual Hubs Activos en SoftEther
-              </h3>
+              <div>
+                <h3 className="text-base font-semibold text-white flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-sky-400" />
+                  Virtual Hubs Activos en SoftEther
+                </h3>
+                <span className="text-xs text-slate-400">{hubs.length} detectado(s)</span>
+              </div>
               <button
                 onClick={() => setIsAddHubModalOpen(true)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20 transition-all cursor-pointer"
@@ -923,53 +931,164 @@ SOFTETHER_VPS2_VERIFY_SSL=false`;
                 <span>Crear Virtual Hub</span>
               </button>
             </div>
-            <div className="space-y-4">
-              {hubs.map((h, idx) => (
-                <div key={idx} className="bg-slate-950/70 border border-slate-800 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base font-bold text-sky-400 font-mono">{h.hub_name}</span>
-                      <span className="px-2 py-0.5 rounded text-xs bg-slate-800 text-slate-300">
-                        {h.type}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                        {h.status}
-                      </span>
-                      {h.hub_name.toUpperCase() !== 'DEFAULT' && (
-                        <button
-                          onClick={() => setHubToDelete(h.hub_name)}
-                          className="p-1.5 rounded-lg text-rose-400 hover:text-white hover:bg-rose-500/20 border border-rose-500/30 transition-all cursor-pointer"
-                          title={`Eliminar Virtual Hub ${h.hub_name}`}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+
+            {/* Buscador de Virtual Hubs */}
+            <div className="mb-3 flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Buscar Virtual Hub por nombre o estado..."
+                  value={hubSearch}
+                  onChange={e => {
+                    setHubSearch(e.target.value);
+                    setHubPage(1);
+                  }}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-8 py-2 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-sky-500 transition-colors"
+                />
+                {hubSearch && (
+                  <button
+                    onClick={() => {
+                      setHubSearch('');
+                      setHubPage(1);
+                    }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 text-xs"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {(() => {
+              const filteredHubs = hubs.filter(h => {
+                if (!hubSearch.trim()) return true;
+                const q = hubSearch.toLowerCase();
+                return h.hub_name.toLowerCase().includes(q) || h.status.toLowerCase().includes(q);
+              });
+              const totalPages = Math.max(1, Math.ceil(filteredHubs.length / hubsPerPage));
+              const currentPage = Math.min(hubPage, totalPages);
+              const paginatedHubs = filteredHubs.slice((currentPage - 1) * hubsPerPage, currentPage * hubsPerPage);
+
+              return (
+                <>
+                  <div className="flex items-center justify-between text-xs text-slate-400 mb-3">
+                    <span>
+                      {hubSearch ? (
+                        <>Filtrados: <strong className="text-sky-400">{filteredHubs.length}</strong> de {hubs.length} hubs</>
+                      ) : (
+                        <>Mostrando <strong className="text-white">{paginatedHubs.length}</strong> de {hubs.length} hubs</>
                       )}
-                    </div>
+                    </span>
+                    {totalPages > 1 && (
+                      <span>Página <strong className="text-sky-400">{currentPage}</strong> de {totalPages}</span>
+                    )}
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-slate-400">
-                    <div className="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/80">
-                      <div>Usuarios</div>
-                      <div className="text-sm font-bold text-white mt-0.5">{h.users_count}</div>
-                    </div>
-                    <div className="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/80">
-                      <div>Sesiones</div>
-                      <div className="text-sm font-bold text-sky-400 mt-0.5">{h.active_sessions}</div>
-                    </div>
-                    <div className="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/80">
-                      <div>MAC Tables</div>
-                      <div className="text-sm font-bold text-slate-200 mt-0.5">{h.mac_tables}</div>
-                    </div>
-                    <div className="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/80">
-                      <div>Tráfico</div>
-                      <div className="text-sm font-bold text-emerald-400 mt-0.5">{h.traffic}</div>
-                    </div>
+                  <div className="space-y-4">
+                    {paginatedHubs.map((h, idx) => (
+                      <div key={idx} className="bg-slate-950/70 border border-slate-800 rounded-xl p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-base font-bold text-sky-400 font-mono">{h.hub_name}</span>
+                            <span className="px-2 py-0.5 rounded text-xs bg-slate-800 text-slate-300">
+                              {h.type}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                              {h.status}
+                            </span>
+                            {h.hub_name.toUpperCase() !== 'DEFAULT' && (
+                              <button
+                                onClick={() => setHubToDelete(h.hub_name)}
+                                className="p-1.5 rounded-lg text-rose-400 hover:text-white hover:bg-rose-500/20 border border-rose-500/30 transition-all cursor-pointer"
+                                title={`Eliminar Virtual Hub ${h.hub_name}`}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-slate-400">
+                          <div className="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/80">
+                            <div>Usuarios</div>
+                            <div className="text-sm font-bold text-white mt-0.5">{h.users_count}</div>
+                          </div>
+                          <div className="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/80">
+                            <div>Sesiones</div>
+                            <div className="text-sm font-bold text-sky-400 mt-0.5">{h.active_sessions}</div>
+                          </div>
+                          <div className="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/80">
+                            <div>MAC Tables</div>
+                            <div className="text-sm font-bold text-slate-200 mt-0.5">{h.mac_tables}</div>
+                          </div>
+                          <div className="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/80">
+                            <div>Tráfico</div>
+                            <div className="text-sm font-bold text-emerald-400 mt-0.5">{h.traffic}</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    {paginatedHubs.length === 0 && (
+                      <div className="text-center py-8 bg-slate-950/40 rounded-xl border border-dashed border-slate-800 text-slate-400 text-xs">
+                        <Search className="w-6 h-6 mx-auto mb-2 text-slate-600" />
+                        <div>No se encontraron Virtual Hubs que coincidan con "{hubSearch}".</div>
+                        <button
+                          onClick={() => {
+                            setHubSearch('');
+                            setHubPage(1);
+                          }}
+                          className="mt-3 px-3 py-1 rounded-lg bg-sky-600/20 text-sky-400 border border-sky-500/30 hover:bg-sky-600/30 transition-colors"
+                        >
+                          Limpiar búsqueda
+                        </button>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
-            </div>
+
+                  {/* Paginación */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between pt-4 mt-4 border-t border-slate-800 flex-wrap gap-2 text-xs">
+                      <span className="text-slate-400">
+                        Página {currentPage} de {totalPages} ({filteredHubs.length} hubs)
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => setHubPage(p => Math.max(1, p - 1))}
+                          disabled={currentPage <= 1}
+                          className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 cursor-pointer"
+                        >
+                          ◀ Anterior
+                        </button>
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                          <button
+                            key={p}
+                            onClick={() => setHubPage(p)}
+                            className={`w-7 h-7 rounded-lg text-xs font-semibold cursor-pointer ${
+                              p === currentPage
+                                ? 'bg-sky-500/20 text-sky-400 border border-sky-500/40'
+                                : 'bg-slate-800 text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => setHubPage(p => Math.min(totalPages, p + 1))}
+                          disabled={currentPage >= totalPages}
+                          className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 cursor-pointer"
+                        >
+                          Siguiente ▶
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
 
           <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6">

@@ -50,6 +50,11 @@ class SoftEtherPage extends Page
     // Hub a eliminar (confirmación)
     public ?string $hubToDelete = null;
 
+    // Búsqueda y paginación de Virtual Hubs
+    public string $hubSearch = '';
+    public int $hubPage = 1;
+    public int $hubsPerPage = 6;
+
     public function mount(): void
     {
         $this->loadData();
@@ -450,5 +455,63 @@ class SoftEtherPage extends Page
                 ->danger()
                 ->send();
         }
+    }
+
+    public function updatedHubSearch(): void
+    {
+        $this->hubPage = 1;
+    }
+
+    public function limpiarBusquedaHub(): void
+    {
+        $this->hubSearch = '';
+        $this->hubPage = 1;
+    }
+
+    public function setHubPage(int $page): void
+    {
+        $totalPages = $this->getTotalHubPages();
+        if ($page < 1) {
+            $page = 1;
+        }
+        if ($page > $totalPages && $totalPages > 0) {
+            $page = $totalPages;
+        }
+        $this->hubPage = $page;
+    }
+
+    public function getFilteredVirtualHubs(): array
+    {
+        $search = trim(mb_strtolower($this->hubSearch));
+        if (empty($search)) {
+            return $this->virtualHubs;
+        }
+
+        return array_values(array_filter($this->virtualHubs, function ($h) use ($search) {
+            $name = mb_strtolower($h['hub_name'] ?? '');
+            $status = mb_strtolower($h['status'] ?? '');
+            $type = mb_strtolower($h['type'] ?? '');
+            return str_contains($name, $search) || str_contains($status, $search) || str_contains($type, $search);
+        }));
+    }
+
+    public function getPaginatedVirtualHubs(): array
+    {
+        $filtered = $this->getFilteredVirtualHubs();
+        $total = count($filtered);
+        $offset = ($this->hubPage - 1) * $this->hubsPerPage;
+
+        if ($offset >= $total && $total > 0) {
+            $this->hubPage = max(1, (int) ceil($total / $this->hubsPerPage));
+            $offset = ($this->hubPage - 1) * $this->hubsPerPage;
+        }
+
+        return array_slice($filtered, $offset, $this->hubsPerPage);
+    }
+
+    public function getTotalHubPages(): int
+    {
+        $total = count($this->getFilteredVirtualHubs());
+        return $total > 0 ? (int) ceil($total / $this->hubsPerPage) : 1;
     }
 }
