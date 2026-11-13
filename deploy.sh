@@ -44,9 +44,20 @@ fi
 log "Limpiando caches obsoletas..."
 rm -f src/bootstrap/cache/*.php 2>/dev/null || true
 
-# 4) Construir imagen (Dockerfile cachea capas, rápido si no cambió)
-log "Construyendo imagen..."
-docker compose -f "$COMPOSE_FILE" build app
+# 4) Construir imagen (solo si se pasa --build o la imagen no existe)
+BUILD_REQUESTED=false
+for arg in "$@"; do
+  [ "$arg" = "--build" ] && BUILD_REQUESTED=true
+done
+
+if [ "$BUILD_REQUESTED" = true ] || ! docker images --format '{{.Repository}}' | grep -q 'dp-prod.*app'; then
+  log "Construyendo imagen Docker..."
+  if ! docker compose -f "$COMPOSE_FILE" build app; then
+    log "⚠️ Aviso: Falló build de imagen con registro externo. Continuando con la imagen local existente..."
+  fi
+else
+  log "Omitiendo build de imagen (el código de ./src se monta como volumen en vivo). Usa ./deploy.sh --build si modificaste Dockerfile."
+fi
 
 # 5) Levantar infraestructura y aplicar migraciones antes del relanzamiento
 docker network inspect proxy_net >/dev/null 2>&1 || docker network create proxy_net

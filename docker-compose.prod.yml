@@ -38,7 +38,7 @@ services:
         condition: service_healthy
 
   db:
-    image: registry.docker.ir/postgres:16-alpine
+    image: postgres:16-alpine
     container_name: dp-prod-db
     restart: unless-stopped
     environment:
@@ -58,7 +58,7 @@ services:
       start_period: 10s
 
   redis:
-    image: registry.docker.ir/redis:7-alpine
+    image: redis:7-alpine
     container_name: dp-prod-redis
     restart: unless-stopped
     command: redis-server --appendonly yes
@@ -73,7 +73,7 @@ services:
       retries: 5
 
   nginx:
-    image: registry.docker.ir/nginx:alpine
+    image: nginx:alpine
     container_name: dp-prod-nginx
     restart: unless-stopped
     volumes:
@@ -86,7 +86,7 @@ services:
       - app
 
   mailpit:
-    image: registry.docker.ir/axllent/mailpit:latest
+    image: axllent/mailpit:latest
     container_name: dp-prod-mailpit
     restart: unless-stopped
     networks:

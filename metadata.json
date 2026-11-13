@@ -1,0 +1,8 @@
+{
+  "name": "DataPlus - Plataforma de Gestión Operativa",
+  "description": "Sistema integral de gestión de operaciones técnicas, proyectos con presupuestos y tablero Kanban, control de inventario multialmacén, incidencias y gestión de clientes.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
