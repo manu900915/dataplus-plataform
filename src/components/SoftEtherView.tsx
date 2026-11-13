@@ -22,7 +22,10 @@ import {
   X,
   Search,
   ExternalLink,
-  Trash2
+  Trash2,
+  Settings,
+  Clock,
+  FileText
 } from 'lucide-react';
 import { 
   SoftEtherSession, 
@@ -56,10 +59,12 @@ export const SoftEtherView: React.FC<SoftEtherViewProps> = ({ clientes = [] }) =
   // Filtros
   const [sessionSearch, setSessionSearch] = useState('');
   const [userSearch, setUserSearch] = useState('');
-  const [userFilter, setUserFilter] = useState<'todos' | 'habilitados' | 'deshabilitados'>('todos');
+  const [userHubFilter, setUserHubFilter] = useState('');
+  const [userFilter, setUserFilter] = useState<'todos' | 'habilitados' | 'deshabilitados' | 'temporal'>('todos');
 
   // Modal para añadir usuario
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
+  const [newUserHub, setNewUserHub] = useState('DEFAULT');
   const [newUsername, setNewUsername] = useState('');
   const [newRealName, setNewRealName] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -67,11 +72,24 @@ export const SoftEtherView: React.FC<SoftEtherViewProps> = ({ clientes = [] }) =
   const [newMaxConnections, setNewMaxConnections] = useState(1);
   const [newNote, setNewNote] = useState('');
 
+  // Modal para deshabilitar usuario por tiempo definido
+  const [userToTimedDisable, setUserToTimedDisable] = useState<{ username: string; hub_name: string } | null>(null);
+  const [disablePreset, setDisablePreset] = useState('60');
+  const [disableCustomUntil, setDisableCustomUntil] = useState('');
+
   // Modal para añadir/eliminar Virtual Hub
   const [isAddHubModalOpen, setIsAddHubModalOpen] = useState(false);
   const [newHubName, setNewHubName] = useState('');
   const [newHubPassword, setNewHubPassword] = useState('');
   const [hubToDelete, setHubToDelete] = useState<string | null>(null);
+
+  // Modal de gestión por Virtual Hub (DHCP, SecureNAT, Usuarios, Logs)
+  const [managingHub, setManagingHub] = useState<string | null>(null);
+  const [hubManageTab, setHubManageTab] = useState<'nat_dhcp' | 'users' | 'logs'>('nat_dhcp');
+  const [hubNewUsername, setHubNewUsername] = useState('');
+  const [hubNewRealName, setHubNewRealName] = useState('');
+  const [hubNewPassword, setHubNewPassword] = useState('');
+  const [hubNatConfigs, setHubNatConfigs] = useState<Record<string, SoftEtherSecureNat>>({});
 
   // Búsqueda y paginación de Virtual Hubs
   const [hubSearch, setHubSearch] = useState('');
@@ -163,6 +181,7 @@ export const SoftEtherView: React.FC<SoftEtherViewProps> = ({ clientes = [] }) =
   const [users, setUsers] = useState<SoftEtherUser[]>([
     {
       username: 'moraima_4g',
+      hub_name: 'DEFAULT',
       real_name: 'Moraima Guanabo - Router B310',
       cliente_asociado: 'Moraima Guanabo',
       auth_type: 'Contraseña Estándar',
@@ -176,6 +195,7 @@ export const SoftEtherView: React.FC<SoftEtherViewProps> = ({ clientes = [] }) =
     },
     {
       username: 'dainet_playa',
+      hub_name: 'DEFAULT',
       real_name: 'Dainet Playa - Enlace MikroTik',
       cliente_asociado: 'Dainet Playa',
       auth_type: 'Contraseña Estándar',
@@ -189,6 +209,7 @@ export const SoftEtherView: React.FC<SoftEtherViewProps> = ({ clientes = [] }) =
     },
     {
       username: 'ecaraballo',
+      hub_name: 'DATAPLUS_REMOTE',
       real_name: 'Enmanuel Caraballo (DataPlus)',
       cliente_asociado: 'Operaciones Internas',
       auth_type: 'Contraseña & Certificado',
@@ -202,6 +223,7 @@ export const SoftEtherView: React.FC<SoftEtherViewProps> = ({ clientes = [] }) =
     },
     {
       username: 'backup_link_cctv',
+      hub_name: 'DATAPLUS_REMOTE',
       real_name: 'Respaldo Enlace Secundario CCTV',
       cliente_asociado: 'Reserva Técnica',
       auth_type: 'Contraseña Estándar',
@@ -216,19 +238,23 @@ export const SoftEtherView: React.FC<SoftEtherViewProps> = ({ clientes = [] }) =
   ]);
 
   // Virtual Hubs
-  const [hubs] = useState<SoftEtherHub[]>([
+  const [hubs, setHubs] = useState<SoftEtherHub[]>([
     {
       hub_name: 'DEFAULT',
       status: 'Online',
       type: 'Standalone',
-      users_count: 4,
+      users_count: 2,
       groups_count: 1,
-      active_sessions: 3,
+      active_sessions: 2,
       mac_tables: 12,
       ip_tables: 9,
       secure_nat: 'Habilitado (Virtual NAT & DHCP)',
       last_comm: '2026-10-21 21:03:10',
-      traffic: '184.2 GB'
+      traffic: '184.2 GB',
+      save_security_log: true,
+      security_log_switch_type: 4,
+      save_packet_log: false,
+      packet_log_switch_type: 4
     },
     {
       hub_name: 'DATAPLUS_REMOTE',
@@ -241,13 +267,18 @@ export const SoftEtherView: React.FC<SoftEtherViewProps> = ({ clientes = [] }) =
       ip_tables: 3,
       secure_nat: 'Habilitado',
       last_comm: '2026-10-21 20:55:00',
-      traffic: '56.7 GB'
+      traffic: '56.7 GB',
+      save_security_log: true,
+      security_log_switch_type: 4,
+      save_packet_log: true,
+      packet_log_switch_type: 3
     }
   ]);
 
   // SecureNAT
-  const [secureNat] = useState<SoftEtherSecureNat>({
+  const [secureNat, setSecureNat] = useState<SoftEtherSecureNat>({
     hub_name: 'DEFAULT',
+    securenat_enabled: true,
     nat_enabled: true,
     dhcp_enabled: true,
     virtual_gateway_ip: '192.168.30.1',
@@ -256,6 +287,8 @@ export const SoftEtherView: React.FC<SoftEtherViewProps> = ({ clientes = [] }) =
     dhcp_lease_end: '192.168.30.200',
     dhcp_lease_expire_seconds: 7200,
     dns_servers: ['1.1.1.1', '8.8.8.8'],
+    domain_name: 'dataplus.local',
+    mtu: 1500,
     active_dhcp_leases: 3,
     total_nat_sessions: 48
   });
@@ -268,19 +301,53 @@ export const SoftEtherView: React.FC<SoftEtherViewProps> = ({ clientes = [] }) =
   };
 
   // Toggle estado de usuario
-  const handleToggleUser = (username: string) => {
+  const handleEnableUser = (username: string, hubName: string) => {
     setUsers(prev => prev.map(u => {
-      if (u.username === username) {
-        const nextState = !u.is_active;
+      if (u.username === username && u.hub_name === hubName) {
         return {
           ...u,
-          is_active: nextState,
-          estado: nextState ? 'Habilitado' : 'Deshabilitado',
-          currently_connected: nextState ? u.currently_connected : false
+          is_active: true,
+          is_timed_disabled: false,
+          disabled_until: null,
+          estado: 'Habilitado',
         };
       }
       return u;
     }));
+  };
+
+  const handleConfirmTimedDisable = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userToTimedDisable) return;
+
+    let untilStr: string | null = null;
+    if (disablePreset === 'custom' && disableCustomUntil) {
+      untilStr = disableCustomUntil.replace('T', ' ') + ':00';
+    } else if (disablePreset !== 'indefinite') {
+      const mins = parseInt(disablePreset, 10) || 60;
+      const d = new Date(Date.now() + mins * 60000);
+      untilStr = d.toISOString().slice(0, 19).replace('T', ' ');
+    }
+
+    setUsers(prev => prev.map(u => {
+      if (u.username === userToTimedDisable.username && u.hub_name === userToTimedDisable.hub_name) {
+        return {
+          ...u,
+          is_active: false,
+          is_timed_disabled: Boolean(untilStr),
+          disabled_until: untilStr,
+          estado: untilStr ? 'Deshabilitado (Temporal)' : 'Deshabilitado',
+          currently_connected: false,
+        };
+      }
+      return u;
+    }));
+    setUserToTimedDisable(null);
+  };
+
+  const handleDeleteUser = (username: string, hubName: string) => {
+    if (!confirm(`¿Seguro que desea eliminar permanentemente al usuario ${username} del Hub ${hubName}?`)) return;
+    setUsers(prev => prev.filter(u => !(u.username === username && u.hub_name === hubName)));
   };
 
   // Añadir usuario
@@ -290,6 +357,7 @@ export const SoftEtherView: React.FC<SoftEtherViewProps> = ({ clientes = [] }) =
 
     const newUser: SoftEtherUser = {
       username: newUsername.trim().toLowerCase(),
+      hub_name: newUserHub || 'DEFAULT',
       real_name: newRealName.trim() || `${newClientName} - VPN Client`,
       cliente_asociado: newClientName,
       auth_type: 'Contraseña Estándar',
@@ -316,7 +384,7 @@ export const SoftEtherView: React.FC<SoftEtherViewProps> = ({ clientes = [] }) =
     const cleanName = newHubName.trim();
     if (!cleanName) return;
 
-    const newHub: SoftEtherVirtualHub = {
+    const newHub: SoftEtherHub = {
       hub_name: cleanName,
       status: 'Online',
       type: 'Standalone',
@@ -327,7 +395,11 @@ export const SoftEtherView: React.FC<SoftEtherViewProps> = ({ clientes = [] }) =
       ip_tables: 0,
       secure_nat: 'Inactivo',
       last_comm: 'Recién creado',
-      traffic: '0 B'
+      traffic: '0 B',
+      save_security_log: true,
+      security_log_switch_type: 4,
+      save_packet_log: false,
+      packet_log_switch_type: 4
     };
 
     setHubs(prev => [...prev, newHub]);
@@ -343,6 +415,20 @@ export const SoftEtherView: React.FC<SoftEtherViewProps> = ({ clientes = [] }) =
 
     setHubs(prev => prev.filter(h => h.hub_name !== hubToDelete));
     setHubToDelete(null);
+  };
+
+  const openHubManagement = (hubName: string, tab: 'nat_dhcp' | 'users' | 'logs') => {
+    setManagingHub(hubName);
+    setHubManageTab(tab);
+    if (!hubNatConfigs[hubName]) {
+      setHubNatConfigs(prev => ({
+        ...prev,
+        [hubName]: {
+          ...secureNat,
+          hub_name: hubName,
+        }
+      }));
+    }
   };
 
   // Probar conexión
@@ -417,15 +503,19 @@ SOFTETHER_VPS2_VERIFY_SSL=false`;
            s.ip_virtual_dhcp.includes(q);
   });
 
-  // Filtrado de usuarios
+  // Filtrado de usuarios (por usuario o por Virtual Hub)
   const filteredUsers = users.filter(u => {
+    if (userHubFilter && u.hub_name !== userHubFilter) return false;
     const q = userSearch.toLowerCase();
-    const matchText = u.username.toLowerCase().includes(q) ||
-                      u.real_name.toLowerCase().includes(q) ||
-                      u.cliente_asociado.toLowerCase().includes(q);
+    const matchText =
+      u.username.toLowerCase().includes(q) ||
+      u.real_name.toLowerCase().includes(q) ||
+      u.cliente_asociado.toLowerCase().includes(q) ||
+      u.hub_name.toLowerCase().includes(q);
     if (!matchText) return false;
     if (userFilter === 'habilitados') return u.is_active;
     if (userFilter === 'deshabilitados') return !u.is_active;
+    if (userFilter === 'temporal') return Boolean(u.is_timed_disabled);
     return true;
   });
 
@@ -802,17 +892,28 @@ SOFTETHER_VPS2_VERIFY_SSL=false`;
       {activeTab === 'usuarios' && (
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
-            <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
               <div className="relative w-full sm:w-72">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Buscar usuario..."
+                  placeholder="Buscar por usuario o Virtual Hub..."
                   value={userSearch}
                   onChange={e => setUserSearch(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500"
                 />
               </div>
+
+              <select
+                value={userHubFilter}
+                onChange={e => setUserHubFilter(e.target.value)}
+                className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-sky-400 font-semibold focus:outline-none focus:border-sky-500 cursor-pointer"
+              >
+                <option value="">Todos los Virtual Hubs ({hubs.length})</option>
+                {hubs.map(h => (
+                  <option key={h.hub_name} value={h.hub_name}>{h.hub_name}</option>
+                ))}
+              </select>
 
               <select
                 value={userFilter}
@@ -822,11 +923,15 @@ SOFTETHER_VPS2_VERIFY_SSL=false`;
                 <option value="todos">Todos los estados</option>
                 <option value="habilitados">Habilitados</option>
                 <option value="deshabilitados">Deshabilitados</option>
+                <option value="temporal">Deshab. Temporal</option>
               </select>
             </div>
 
             <button
-              onClick={() => setIsAddUserModalOpen(true)}
+              onClick={() => {
+                setNewUserHub(userHubFilter || hubs[0]?.hub_name || 'DEFAULT');
+                setIsAddUserModalOpen(true);
+              }}
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20 transition-all cursor-pointer"
             >
               <Plus className="w-4 h-4" />
@@ -840,12 +945,13 @@ SOFTETHER_VPS2_VERIFY_SSL=false`;
                 <thead className="bg-slate-950/80 text-xs uppercase font-semibold text-slate-400 border-b border-slate-800">
                   <tr>
                     <th className="px-5 py-4">Usuario</th>
+                    <th className="px-4 py-4">Virtual Hub</th>
                     <th className="px-4 py-4">Nombre Descriptivo / Cliente</th>
                     <th className="px-4 py-4">Autenticación</th>
                     <th className="px-4 py-4">Estado</th>
                     <th className="px-4 py-4">En Línea</th>
                     <th className="px-4 py-4">Último Inicio</th>
-                    <th className="px-5 py-4 text-right">Modificar</th>
+                    <th className="px-5 py-4 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
@@ -855,6 +961,14 @@ SOFTETHER_VPS2_VERIFY_SSL=false`;
                         {u.username}
                       </td>
                       <td className="px-4 py-4">
+                        <button
+                          onClick={() => openHubManagement(u.hub_name, 'users')}
+                          className="px-2.5 py-1 rounded-full text-xs font-mono font-semibold bg-sky-500/15 text-sky-300 border border-sky-500/30 hover:bg-sky-500/25 cursor-pointer"
+                        >
+                          {u.hub_name}
+                        </button>
+                      </td>
+                      <td className="px-4 py-4">
                         <div className="font-semibold text-white">{u.real_name}</div>
                         <div className="text-xs text-slate-400">{u.note}</div>
                       </td>
@@ -862,13 +976,22 @@ SOFTETHER_VPS2_VERIFY_SSL=false`;
                         {u.auth_type}
                       </td>
                       <td className="px-4 py-4">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                          u.is_active
-                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                            : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
-                        }`}>
-                          {u.estado}
-                        </span>
+                        {u.is_active ? (
+                          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                            Habilitado
+                          </span>
+                        ) : u.is_timed_disabled ? (
+                          <div className="flex flex-col gap-1">
+                            <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30 w-fit">
+                              Deshab. Temporal
+                            </span>
+                            <span className="text-[11px] font-mono text-amber-400">Hasta: {u.disabled_until}</span>
+                          </div>
+                        ) : (
+                          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-400 border border-rose-500/30">
+                            Deshabilitado
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-4">
                         {u.currently_connected ? (
@@ -884,22 +1007,38 @@ SOFTETHER_VPS2_VERIFY_SSL=false`;
                         {u.last_login || '-'}
                       </td>
                       <td className="px-5 py-4 text-right">
-                        <button
-                          onClick={() => handleToggleUser(u.username)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                            u.is_active
-                              ? 'bg-rose-500/15 text-rose-300 hover:bg-rose-500/25 border border-rose-500/30'
-                              : 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 border border-emerald-500/30'
-                          }`}
-                        >
-                          {u.is_active ? 'Pausar Acceso' : 'Habilitar'}
-                        </button>
+                        <div className="flex items-center justify-end gap-2">
+                          {u.is_active ? (
+                            <button
+                              onClick={() => {
+                                setUserToTimedDisable({ username: u.username, hub_name: u.hub_name });
+                                setDisablePreset('60');
+                              }}
+                              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 border border-amber-500/30 cursor-pointer"
+                            >
+                              Deshabilitar
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleEnableUser(u.username, u.hub_name)}
+                              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 border border-emerald-500/30 cursor-pointer"
+                            >
+                              Habilitar
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDeleteUser(u.username, u.hub_name)}
+                            className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/15 text-rose-300 hover:bg-rose-500/25 border border-rose-500/30 cursor-pointer"
+                          >
+                            Eliminar
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
                   {filteredUsers.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="text-center py-10 text-slate-500">
+                      <td colSpan={8} className="text-center py-10 text-slate-500">
                         No se encontraron usuarios VPN.
                       </td>
                     </tr>
@@ -1028,6 +1167,30 @@ SOFTETHER_VPS2_VERIFY_SSL=false`;
                             <div>Tráfico</div>
                             <div className="text-sm font-bold text-emerald-400 mt-0.5">{h.traffic}</div>
                           </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-slate-800/80">
+                          <button
+                            onClick={() => openHubManagement(h.hub_name, 'nat_dhcp')}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/25 cursor-pointer"
+                          >
+                            <Settings className="w-3.5 h-3.5" />
+                            <span>DHCP & SecureNAT</span>
+                          </button>
+                          <button
+                            onClick={() => openHubManagement(h.hub_name, 'users')}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-sky-500/15 text-sky-300 border border-sky-500/30 hover:bg-sky-500/25 cursor-pointer"
+                          >
+                            <Users className="w-3.5 h-3.5" />
+                            <span>Usuarios ({users.filter(u => u.hub_name === h.hub_name).length})</span>
+                          </button>
+                          <button
+                            onClick={() => openHubManagement(h.hub_name, 'logs')}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-500/25 cursor-pointer"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            <span>Logs</span>
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -1232,6 +1395,21 @@ SOFTETHER_VPS2_VERIFY_SSL=false`;
             <form onSubmit={handleAddUser} className="space-y-4 text-sm">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Virtual Hub de Destino <span className="text-rose-400">*</span>
+                </label>
+                <select
+                  value={newUserHub}
+                  onChange={e => setNewUserHub(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sky-400 font-mono text-sm focus:outline-none focus:border-sky-500 cursor-pointer"
+                >
+                  {hubs.map(h => (
+                    <option key={h.hub_name} value={h.hub_name}>{h.hub_name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
                   Nombre de Usuario VPN (Username)
                 </label>
                 <input
@@ -1430,6 +1608,361 @@ SOFTETHER_VPS2_VERIFY_SSL=false`;
           </div>
         </div>
       )}
+
+      {/* MODAL: DESHABILITAR USUARIO POR TIEMPO DEFINIDO */}
+      {userToTimedDisable && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
+            <button
+              onClick={() => setUserToTimedDisable(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-lg font-bold text-amber-400 mb-1 flex items-center gap-2">
+              <Clock className="w-5 h-5" />
+              Deshabilitar Cuenta: {userToTimedDisable.username}
+            </h3>
+            <p className="text-xs text-slate-400 mb-4">
+              Virtual Hub: <span className="font-mono text-sky-400">{userToTimedDisable.hub_name}</span>
+            </p>
+            <form onSubmit={handleConfirmTimedDisable} className="space-y-4 text-sm">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Duración de suspensión
+                </label>
+                <select
+                  value={disablePreset}
+                  onChange={e => setDisablePreset(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-amber-500 cursor-pointer"
+                >
+                  <option value="60">1 hora</option>
+                  <option value="360">6 horas</option>
+                  <option value="720">12 horas</option>
+                  <option value="1440">24 horas (1 día)</option>
+                  <option value="4320">3 días</option>
+                  <option value="10080">7 días</option>
+                  <option value="custom">Fecha y hora personalizada</option>
+                  <option value="indefinite">Indefinido</option>
+                </select>
+              </div>
+              {disablePreset === 'custom' && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Reactivar automáticamente el:
+                  </label>
+                  <input
+                    type="datetime-local"
+                    required
+                    value={disableCustomUntil}
+                    onChange={e => setDisableCustomUntil(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              )}
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setUserToTimedDisable(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl text-xs font-semibold bg-amber-600 hover:bg-amber-500 text-white cursor-pointer"
+                >
+                  Confirmar Deshabilitación
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: GESTIÓN COMPLETA DE VIRTUAL HUB */}
+      {managingHub && (() => {
+        const currentHubObj = hubs.find(h => h.hub_name === managingHub);
+        const natCfg = hubNatConfigs[managingHub] || secureNat;
+        const hubUsersList = users.filter(u => u.hub_name === managingHub);
+
+        const updateCurrentNat = (patch: Partial<SoftEtherSecureNat>) => {
+          setHubNatConfigs(prev => ({
+            ...prev,
+            [managingHub]: { ...natCfg, ...patch }
+          }));
+          if (managingHub === 'DEFAULT') {
+            setSecureNat(prev => ({ ...prev, ...patch }));
+          }
+        };
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 shadow-2xl relative">
+              <button
+                onClick={() => setManagingHub(null)}
+                className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <h3 className="text-lg font-bold text-white mb-1">
+                Gestión de Virtual Hub: <span className="font-mono text-sky-400">{managingHub}</span>
+              </h3>
+              <p className="text-xs text-slate-400 mb-4">Configuración individual de DHCP, SecureNAT, Usuarios y Logs</p>
+
+              <div className="flex items-center gap-2 border-b border-slate-800 pb-2 mb-5">
+                <button
+                  onClick={() => setHubManageTab('nat_dhcp')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer ${
+                    hubManageTab === 'nat_dhcp' ? 'bg-sky-500/20 text-sky-400 border border-sky-500/40' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  DHCP & SecureNAT
+                </button>
+                <button
+                  onClick={() => setHubManageTab('users')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer ${
+                    hubManageTab === 'users' ? 'bg-sky-500/20 text-sky-400 border border-sky-500/40' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Usuarios del Hub ({hubUsersList.length})
+                </button>
+                <button
+                  onClick={() => setHubManageTab('logs')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer ${
+                    hubManageTab === 'logs' ? 'bg-sky-500/20 text-sky-400 border border-sky-500/40' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Logs del Hub
+                </button>
+              </div>
+
+              {hubManageTab === 'nat_dhcp' && (
+                <div className="space-y-4 text-xs">
+                  <div className="flex flex-wrap gap-4 p-3 rounded-xl bg-slate-950 border border-slate-800">
+                    <label className="flex items-center gap-2 text-slate-200 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(natCfg.securenat_enabled ?? natCfg.nat_enabled)}
+                        onChange={e => updateCurrentNat({ securenat_enabled: e.target.checked })}
+                      />
+                      <span>Activar SecureNAT</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-slate-200 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={natCfg.nat_enabled}
+                        onChange={e => updateCurrentNat({ nat_enabled: e.target.checked })}
+                      />
+                      <span>Virtual NAT</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-slate-200 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={natCfg.dhcp_enabled}
+                        onChange={e => updateCurrentNat({ dhcp_enabled: e.target.checked })}
+                      />
+                      <span>Servidor DHCP</span>
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-400 mb-1">Gateway Virtual</label>
+                      <input
+                        type="text"
+                        value={natCfg.virtual_gateway_ip}
+                        onChange={e => updateCurrentNat({ virtual_gateway_ip: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 mb-1">Máscara de Subred</label>
+                      <input
+                        type="text"
+                        value={natCfg.virtual_subnet_mask}
+                        onChange={e => updateCurrentNat({ virtual_subnet_mask: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 mb-1">Rango DHCP Inicio</label>
+                      <input
+                        type="text"
+                        value={natCfg.dhcp_lease_start}
+                        onChange={e => updateCurrentNat({ dhcp_lease_start: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-emerald-400 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 mb-1">Rango DHCP Fin</label>
+                      <input
+                        type="text"
+                        value={natCfg.dhcp_lease_end}
+                        onChange={e => updateCurrentNat({ dhcp_lease_end: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-emerald-400 font-mono"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end pt-2">
+                    <button
+                      onClick={() => {
+                        setActionNotice(`Configuración DHCP & SecureNAT guardada para ${managingHub}.`);
+                        setManagingHub(null);
+                      }}
+                      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold cursor-pointer"
+                    >
+                      Guardar DHCP & SecureNAT
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {hubManageTab === 'users' && (
+                <div className="space-y-4 text-xs">
+                  <form
+                    onSubmit={e => {
+                      e.preventDefault();
+                      if (!hubNewUsername.trim()) return;
+                      setUsers(prev => [
+                        {
+                          username: hubNewUsername.trim().toLowerCase(),
+                          hub_name: managingHub,
+                          real_name: hubNewRealName.trim() || hubNewUsername.trim(),
+                          cliente_asociado: managingHub,
+                          auth_type: 'Contraseña Estándar',
+                          estado: 'Habilitado',
+                          is_active: true,
+                          max_connections: 1,
+                          expires_at: 'Indefinido',
+                          note: 'Creado desde gestión del Hub',
+                          last_login: 'Nunca',
+                          currently_connected: false,
+                        },
+                        ...prev,
+                      ]);
+                      setHubNewUsername('');
+                      setHubNewRealName('');
+                      setHubNewPassword('');
+                    }}
+                    className="grid grid-cols-1 sm:grid-cols-4 gap-2 p-3 rounded-xl bg-slate-950 border border-slate-800"
+                  >
+                    <input
+                      type="text"
+                      required
+                      placeholder="Usuario"
+                      value={hubNewUsername}
+                      onChange={e => setHubNewUsername(e.target.value)}
+                      className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white font-mono"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Nombre / Equipo"
+                      value={hubNewRealName}
+                      onChange={e => setHubNewRealName(e.target.value)}
+                      className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white"
+                    />
+                    <input
+                      type="password"
+                      required
+                      placeholder="Contraseña"
+                      value={hubNewPassword}
+                      onChange={e => setHubNewPassword(e.target.value)}
+                      className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white"
+                    />
+                    <button
+                      type="submit"
+                      className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-semibold cursor-pointer"
+                    >
+                      + Agregar Usuario
+                    </button>
+                  </form>
+
+                  <div className="space-y-2">
+                    {hubUsersList.map(hu => (
+                      <div key={hu.username} className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800">
+                        <div>
+                          <div className="font-mono font-bold text-sky-400">{hu.username}</div>
+                          <div className="text-slate-400">{hu.real_name}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-0.5 rounded-full font-semibold ${
+                            hu.is_active ? 'bg-emerald-500/15 text-emerald-400' : 'bg-amber-500/15 text-amber-300'
+                          }`}>
+                            {hu.estado}
+                          </span>
+                          {hu.is_active ? (
+                            <button
+                              onClick={() => setUserToTimedDisable({ username: hu.username, hub_name: managingHub })}
+                              className="px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30 cursor-pointer"
+                            >
+                              Deshabilitar
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleEnableUser(hu.username, managingHub)}
+                              className="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 cursor-pointer"
+                            >
+                              Habilitar
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDeleteUser(hu.username, managingHub)}
+                            className="px-2.5 py-1 rounded-lg bg-rose-500/15 text-rose-300 border border-rose-500/30 cursor-pointer"
+                          >
+                            Eliminar
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {hubManageTab === 'logs' && currentHubObj && (
+                <div className="space-y-4 text-xs">
+                  <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                    <div>
+                      <div className="font-semibold text-white">Security Log (Eventos de conexión y autenticación)</div>
+                      <div className="text-slate-400">Rotación diaria</div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setHubs(prev => prev.map(h => h.hub_name === managingHub ? { ...h, save_security_log: !h.save_security_log } : h));
+                      }}
+                      className={`px-3 py-1.5 rounded-lg font-semibold cursor-pointer ${
+                        currentHubObj.save_security_log
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                          : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                      }`}
+                    >
+                      {currentHubObj.save_security_log ? 'Activo (Clic para desactivar)' : 'Desactivado (Clic para activar)'}
+                    </button>
+                  </div>
+                  <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                    <div>
+                      <div className="font-semibold text-white">Packet Log (Auditoría de paquetes DHCP/TCP)</div>
+                      <div className="text-slate-400">Rotación diaria</div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setHubs(prev => prev.map(h => h.hub_name === managingHub ? { ...h, save_packet_log: !h.save_packet_log } : h));
+                      }}
+                      className={`px-3 py-1.5 rounded-lg font-semibold cursor-pointer ${
+                        currentHubObj.save_packet_log
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                          : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                      }`}
+                    >
+                      {currentHubObj.save_packet_log ? 'Activo (Clic para desactivar)' : 'Desactivado (Clic para activar)'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

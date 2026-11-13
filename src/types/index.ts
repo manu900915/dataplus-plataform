@@ -357,11 +357,15 @@ export interface SoftEtherSession {
 
 export interface SoftEtherUser {
   username: string;
+  hub_name: string;
   real_name: string;
   cliente_asociado: string;
   auth_type: string;
-  estado: 'Habilitado' | 'Deshabilitado';
+  estado: 'Habilitado' | 'Deshabilitado' | 'Deshabilitado (Temporal)';
   is_active: boolean;
+  is_timed_disabled?: boolean;
+  disabled_until?: string | null;
+  disabled_reason?: string | null;
   max_connections: number;
   expires_at: string;
   note: string;
@@ -381,6 +385,10 @@ export interface SoftEtherHub {
   secure_nat: string;
   last_comm: string;
   traffic: string;
+  save_security_log?: boolean;
+  security_log_switch_type?: number;
+  save_packet_log?: boolean;
+  packet_log_switch_type?: number;
 }
 
 export interface SoftEtherServerStatus {
@@ -405,6 +413,7 @@ export interface SoftEtherServerStatus {
 
 export interface SoftEtherSecureNat {
   hub_name: string;
+  securenat_enabled?: boolean;
   nat_enabled: boolean;
   dhcp_enabled: boolean;
   virtual_gateway_ip: string;
@@ -413,7 +422,10 @@ export interface SoftEtherSecureNat {
   dhcp_lease_end: string;
   dhcp_lease_expire_seconds: number;
   dns_servers: string[];
+  domain_name?: string;
+  mtu?: number;
   active_dhcp_leases: number;
   total_nat_sessions: number;
 }
+
 

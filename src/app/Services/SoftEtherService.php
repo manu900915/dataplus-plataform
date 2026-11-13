@@ -605,13 +605,28 @@ class SoftEtherService
     }
 
     /**
+     * Obtiene la versión actual de caché para un servidor (permite invalidación instantánea multi-hub)
+     */
+    protected function getCacheVersion(string $serverKey): int
+    {
+        try {
+            return (int) Cache::get("softether_cache_ver_{$serverKey}", 1);
+        } catch (Exception $e) {
+            return 1;
+        }
+    }
+
+    /**
      * Limpia la caché temporal de telemetría
      */
     public function clearCache(?string $serverKey = null): void
     {
         $key = $serverKey ?: $this->activeServerKey;
         try {
+            $ver = $this->getCacheVersion($key);
+            Cache::put("softether_cache_ver_{$key}", $ver + 1, 86400);
             Cache::forget("softether_telemetry_{$key}");
+            Cache::forget("softether_telemetry_{$key}_{$this->hub}");
         } catch (Exception $e) {
             // Continuar si la caché de Laravel no está configurada
         }
@@ -623,7 +638,13 @@ class SoftEtherService
      */
     public function getTelemetry(bool $forceRefresh = false): array
     {
-        $cacheKey = "softether_telemetry_{$this->activeServerKey}_{$this->hub}";
+        // Procesar deshabilitaciones temporales vencidas antes de devolver telemetría
+        if ($this->isConfigured()) {
+            $this->processExpiredTimedDisables($this->activeServerKey);
+        }
+
+        $ver = $this->getCacheVersion($this->activeServerKey);
+        $cacheKey = "softether_telemetry_{$this->activeServerKey}_{$this->hub}_v{$ver}";
 
         if (!$forceRefresh) {
             try {
@@ -661,6 +682,7 @@ class SoftEtherService
         $serverStatus = $this->getServerStatus();
         $activeSessions = $this->getActiveSessions($this->hub);
         $vpnUsers = $this->getUsers($this->hub);
+        $allVpnUsers = $this->getAllUsers($virtualHubs, $activeSessions);
         $secureNat = $this->getSecureNatStatus($this->hub);
         $dhcpTable = $this->getDhcpTable($this->hub);
         $connectionDetails = $this->getConnectionDetails();
@@ -671,8 +693,9 @@ class SoftEtherService
             $serverStatus['total_sessions'] = count($activeSessions);
             $serverStatus['is_live'] = true;
         }
-        if (!empty($vpnUsers) && ($serverStatus['total_users'] ?? 0) === 0) {
-            $serverStatus['total_users'] = count($vpnUsers);
+        $totalUsersCount = count($allVpnUsers) > 0 ? count($allVpnUsers) : count($vpnUsers);
+        if ($totalUsersCount > 0 && ($serverStatus['total_users'] ?? 0) === 0) {
+            $serverStatus['total_users'] = $totalUsersCount;
             $serverStatus['is_live'] = true;
         }
 
@@ -680,6 +703,7 @@ class SoftEtherService
             'serverStatus' => $serverStatus,
             'activeSessions' => $activeSessions,
             'vpnUsers' => $vpnUsers,
+            'allVpnUsers' => $allVpnUsers,
             'virtualHubs' => $virtualHubs,
             'secureNat' => $secureNat,
             'dhcpTable' => $dhcpTable,
@@ -959,7 +983,7 @@ class SoftEtherService
         if ($this->isConfigured()) {
             $res = $this->callRpc('EnumSession', ['HubName_str' => $hubName]);
             if ($res['success'] && !empty($res['data']['SessionList'])) {
-                return array_map(function ($s) {
+                return array_map(function ($s) use ($hubName) {
                     $name = $s['Name_str'] ?? 'SID-UNKNOWN';
                     $user = $s['Username_str'] ?? 'vpn_user';
                     $ip = $s['ClientIP_ip'] ?? $s['RemoteHostname_str'] ?? '127.0.0.1';
@@ -967,6 +991,7 @@ class SoftEtherService
 
                     return [
                         'session_name' => $name,
+                        'hub_name' => $hubName,
                         'username' => $user,
                         'cliente_nombre' => $this->findClientNameForUser($user),
                         'tipo_equipo' => !empty($s['RemoteHostname_str']) ? $s['RemoteHostname_str'] : 'Cliente VPN',
@@ -1046,7 +1071,157 @@ class SoftEtherService
     }
 
     /**
-     * Obtiene la lista de usuarios VPN (EnumUser, Páginas 82-83)
+     * Ruta persistente en almacenamiento local para horarios de deshabilitación temporal
+     */
+    protected function getTimedDisablesFilePath(): string
+    {
+        if (function_exists('storage_path')) {
+            return storage_path('app/softether_timed_disables.json');
+        }
+        return sys_get_temp_dir() . '/softether_timed_disables.json';
+    }
+
+    /**
+     * Carga la lista de usuarios deshabilitados temporalmente desde disco
+     */
+    public function loadTimedDisables(): array
+    {
+        $path = $this->getTimedDisablesFilePath();
+        if (!file_exists($path) || !is_readable($path)) {
+            return [];
+        }
+        $raw = @file_get_contents($path);
+        if (!$raw) {
+            return [];
+        }
+        $decoded = json_decode($raw, true);
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * Guarda la lista de usuarios deshabilitados temporalmente en disco
+     */
+    protected function saveTimedDisables(array $items): void
+    {
+        $path = $this->getTimedDisablesFilePath();
+        $dir = dirname($path);
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0755, true);
+        }
+        @file_put_contents($path, json_encode($items, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    }
+
+    protected function makeTimedDisableKey(string $serverKey, string $hubName, string $username): string
+    {
+        return strtolower(trim($serverKey)) . '::' . trim($hubName) . '::' . strtolower(trim($username));
+    }
+
+    protected function removeTimedDisableRecord(string $serverKey, string $hubName, string $username): void
+    {
+        $all = $this->loadTimedDisables();
+        $k = $this->makeTimedDisableKey($serverKey, $hubName, $username);
+        if (isset($all[$k])) {
+            unset($all[$k]);
+            $this->saveTimedDisables($all);
+        }
+    }
+
+    /**
+     * Verifica y re-habilita automáticamente cuentas cuyo tiempo de suspensión temporal haya expirado
+     */
+    public function processExpiredTimedDisables(?string $serverKey = null): int
+    {
+        $targetServer = $serverKey ?: $this->activeServerKey;
+        $all = $this->loadTimedDisables();
+        if (empty($all)) {
+            return 0;
+        }
+
+        $now = time();
+        $changed = false;
+        $reenabledCount = 0;
+
+        foreach ($all as $k => $entry) {
+            if (($entry['server_key'] ?? '') !== $targetServer) {
+                continue;
+            }
+            $untilTs = (int) ($entry['disabled_until_ts'] ?? 0);
+            if ($untilTs > 0 && $now >= $untilTs) {
+                $hubName = $entry['hub_name'] ?? 'DEFAULT';
+                $username = $entry['username'] ?? '';
+                if (!empty($username)) {
+                    $res = $this->toggleUser($username, true, $hubName);
+                    if ($res['success'] || str_contains(strtolower($res['message'] ?? ''), 'not exist') || str_contains(strtolower($res['message'] ?? ''), 'object does not exist')) {
+                        unset($all[$k]);
+                        $changed = true;
+                        if ($res['success']) {
+                            $reenabledCount++;
+                        }
+                    }
+                } else {
+                    unset($all[$k]);
+                    $changed = true;
+                }
+            }
+        }
+
+        if ($changed) {
+            $this->saveTimedDisables($all);
+            if ($reenabledCount > 0) {
+                $this->clearCache($targetServer);
+            }
+        }
+
+        return $reenabledCount;
+    }
+
+    /**
+     * Formatea un registro de usuario SoftEther añadiendo su Hub y estado temporal
+     */
+    protected function mapSoftEtherUser(array $u, string $hubName, array $timedMap = [], array $connectedKeys = []): array
+    {
+        $username = $u['Name_str'] ?? '';
+        $realName = $u['Realname_utf'] ?? $username;
+        $isDenied = (bool) ($u['DenyAccess_bool'] ?? false);
+
+        $authTypeMap = [
+            0 => 'Anónimo',
+            1 => 'Contraseña Estándar',
+            2 => 'Certificado de Usuario',
+            3 => 'Root Certificate CA',
+            4 => 'RADIUS Authentication',
+            5 => 'Windows NT Domain',
+        ];
+        $authType = $authTypeMap[$u['AuthType_u32'] ?? 1] ?? 'Contraseña';
+
+        $timedKey = $this->makeTimedDisableKey($this->activeServerKey, $hubName, $username);
+        $timedEntry = $timedMap[$timedKey] ?? null;
+        $isTimedDisabled = $isDenied && !empty($timedEntry) && ((int) ($timedEntry['disabled_until_ts'] ?? 0) > time());
+
+        $sessionKey = strtolower($hubName . '::' . $username);
+        $isConnected = isset($connectedKeys[$sessionKey]);
+
+        return [
+            'username' => $username,
+            'hub_name' => $hubName,
+            'real_name' => $realName,
+            'cliente_asociado' => $realName,
+            'auth_type' => $authType,
+            'estado' => $isDenied ? ($isTimedDisabled ? 'Deshabilitado (Temporal)' : 'Deshabilitado') : 'Habilitado',
+            'is_active' => !$isDenied,
+            'is_timed_disabled' => $isTimedDisabled,
+            'disabled_until' => $isTimedDisabled ? ($timedEntry['disabled_until'] ?? null) : null,
+            'disabled_reason' => $isTimedDisabled ? ($timedEntry['reason'] ?? null) : null,
+            'max_connections' => (int) ($u['NumLogin_u32'] ?? 1),
+            'expires_at' => !empty($u['Expires_dt']) ? $u['Expires_dt'] : 'Indefinido',
+            'note' => $u['Note_utf'] ?? 'Cliente VPN DataPlus',
+            'last_login' => !empty($u['LastLoginTime_dt']) ? $u['LastLoginTime_dt'] : 'Nunca',
+            'currently_connected' => $isConnected,
+        ];
+    }
+
+    /**
+     * Obtiene la lista de usuarios VPN de un Hub específico (EnumUser, Páginas 82-83)
      */
     public function getUsers(?string $hub = null): array
     {
@@ -1055,35 +1230,8 @@ class SoftEtherService
         if ($this->isConfigured()) {
             $res = $this->callRpc('EnumUser', ['HubName_str' => $hubName]);
             if ($res['success'] && !empty($res['data']['UserList'])) {
-                return array_map(function ($u) {
-                    $username = $u['Name_str'] ?? '';
-                    $realName = $u['Realname_utf'] ?? $username;
-                    $isDenied = (bool) ($u['DenyAccess_bool'] ?? false);
-
-                    $authTypeMap = [
-                        0 => 'Anónimo',
-                        1 => 'Contraseña Estándar',
-                        2 => 'Certificado de Usuario',
-                        3 => 'Root Certificate CA',
-                        4 => 'RADIUS Authentication',
-                        5 => 'Windows NT Domain',
-                    ];
-                    $authType = $authTypeMap[$u['AuthType_u32'] ?? 1] ?? 'Contraseña';
-
-                    return [
-                        'username' => $username,
-                        'real_name' => $realName,
-                        'cliente_asociado' => $realName,
-                        'auth_type' => $authType,
-                        'estado' => $isDenied ? 'Deshabilitado' : 'Habilitado',
-                        'is_active' => !$isDenied,
-                        'max_connections' => (int) ($u['NumLogin_u32'] ?? 1),
-                        'expires_at' => !empty($u['Expires_dt']) ? $u['Expires_dt'] : 'Indefinido',
-                        'note' => $u['Note_utf'] ?? 'Cliente VPN DataPlus',
-                        'last_login' => !empty($u['LastLoginTime_dt']) ? $u['LastLoginTime_dt'] : 'Nunca',
-                        'currently_connected' => false,
-                    ];
-                }, $res['data']['UserList']);
+                $timedMap = $this->loadTimedDisables();
+                return array_map(fn ($u) => $this->mapSoftEtherUser($u, $hubName, $timedMap), $res['data']['UserList']);
             }
         }
 
@@ -1091,11 +1239,110 @@ class SoftEtherService
     }
 
     /**
+     * Obtiene todos los usuarios VPN de TODOS los Virtual Hubs del servidor usando peticiones HTTP concurrentes (Http::pool)
+     */
+    public function getAllUsers(array $virtualHubs = [], array $activeSessions = []): array
+    {
+        if (!$this->isConfigured()) {
+            return [];
+        }
+
+        if (empty($virtualHubs)) {
+            return $this->getUsers($this->hub);
+        }
+
+        $hubNames = array_values(array_unique(array_filter(array_column($virtualHubs, 'hub_name'))));
+        if (empty($hubNames)) {
+            return $this->getUsers($this->hub);
+        }
+
+        if ($this->circuitBroken[$this->activeServerKey] ?? false) {
+            return [];
+        }
+
+        $url = rtrim($this->rpcUrl, '/');
+        if (!str_ends_with($url, '/api')) {
+            $url .= '/api/';
+        } else {
+            $url .= '/';
+        }
+
+        $headers = [
+            'Content-Type' => 'application/json',
+            'X-VPNADMIN-PASSWORD' => $this->adminPassword,
+        ];
+
+        $timedMap = $this->loadTimedDisables();
+        $connectedKeys = [];
+        foreach ($activeSessions as $s) {
+            $u = strtolower($s['username'] ?? '');
+            $h = $s['hub_name'] ?? $this->hub;
+            if (!empty($u)) {
+                $connectedKeys[strtolower($h . '::' . $u)] = true;
+            }
+        }
+
+        $allUsers = [];
+
+        try {
+            // Procesar en lotes de hasta 20 hubs por pool para no saturar sockets
+            foreach (array_chunk($hubNames, 20) as $chunk) {
+                $responses = Http::pool(function ($pool) use ($chunk, $url, $headers) {
+                    $calls = [];
+                    foreach ($chunk as $idx => $hubName) {
+                        $client = $pool->as($hubName)
+                            ->connectTimeout(4.0)
+                            ->timeout(8.0)
+                            ->withHeaders($headers);
+
+                        if (!$this->verifySsl) {
+                            $client = $client->withoutVerifying();
+                        }
+
+                        $calls[] = $client->post($url, [
+                            'jsonrpc' => '2.0',
+                            'id' => (string) (time() + $idx),
+                            'method' => 'EnumUser',
+                            'params' => (object) ['HubName_str' => $hubName],
+                        ]);
+                    }
+                    return $calls;
+                });
+
+                foreach ($chunk as $hubName) {
+                    $resp = $responses[$hubName] ?? null;
+                    if ($resp && method_exists($resp, 'successful') && $resp->successful()) {
+                        $json = $resp->json();
+                        if (!isset($json['error']) && !empty($json['result']['UserList'])) {
+                            foreach ($json['result']['UserList'] as $u) {
+                                $allUsers[] = $this->mapSoftEtherUser($u, $hubName, $timedMap, $connectedKeys);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception $e) {
+            Log::warning("SoftEther getAllUsers pool error ({$this->activeServerKey}): " . $e->getMessage());
+            return $this->getUsers($this->hub);
+        }
+
+        usort($allUsers, function ($a, $b) {
+            $cmp = strcasecmp($a['hub_name'] ?? '', $b['hub_name'] ?? '');
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+            return strcasecmp($a['username'] ?? '', $b['username'] ?? '');
+        });
+
+        return $allUsers;
+    }
+
+    /**
      * Crea un nuevo usuario VPN (CreateUser, Páginas 67-71)
      */
     public function createUser(array $userData, ?string $hub = null): array
     {
-        $hubName = $hub ?: $this->hub;
+        $hubName = !empty($userData['hub_name']) ? trim($userData['hub_name']) : ($hub ?: $this->hub);
         $username = strtolower(trim($userData['username'] ?? ''));
         $password = (string) ($userData['password'] ?? '');
 
@@ -1117,13 +1364,20 @@ class SoftEtherService
                 'UsePolicy_bool' => false,
             ];
 
+            if (!empty($userData['expire_at'])) {
+                $ts = strtotime($userData['expire_at']);
+                if ($ts && $ts > time()) {
+                    $params['ExpireTime_dt'] = gmdate('Y-m-d\TH:i:s.000\Z', $ts);
+                }
+            }
+
             $res = $this->callRpc('CreateUser', $params);
 
             if ($res['success']) {
                 $this->clearCache($this->activeServerKey);
                 return [
                     'success' => true,
-                    'message' => "Usuario VPN '{$username}' creado exitosamente en {$this->servers[$this->activeServerKey]['name']}.",
+                    'message' => "Usuario VPN '{$username}' creado exitosamente en el Hub '{$hubName}' ({$this->servers[$this->activeServerKey]['name']}).",
                 ];
             }
 
@@ -1153,10 +1407,11 @@ class SoftEtherService
             ]);
 
             if ($res['success']) {
+                $this->removeTimedDisableRecord($this->activeServerKey, $hubName, $username);
                 $this->clearCache($this->activeServerKey);
                 return [
                     'success' => true,
-                    'message' => "Usuario VPN '{$username}' eliminado exitosamente en SoftEther.",
+                    'message' => "Usuario VPN '{$username}' eliminado exitosamente del Hub '{$hubName}'.",
                 ];
             }
 
@@ -1196,10 +1451,13 @@ class SoftEtherService
             $res = $this->callRpc('SetUser', $userData);
 
             if ($res['success']) {
+                if ($enable) {
+                    $this->removeTimedDisableRecord($this->activeServerKey, $hubName, $username);
+                }
                 $this->clearCache($this->activeServerKey);
                 return [
                     'success' => true,
-                    'message' => "Usuario VPN {$username} {$accion} correctamente en SoftEther.",
+                    'message' => "Usuario VPN '{$username}' ({$hubName}) {$accion} correctamente en SoftEther.",
                 ];
             }
 
@@ -1216,23 +1474,112 @@ class SoftEtherService
     }
 
     /**
-     * Obtiene el estado real de SecureNAT (GetSecureNATOption + GetSecureNATStatus, Páginas 111-116)
+     * Deshabilita un usuario VPN de forma indefinida o por un tiempo definido (re-habilitación automática)
+     */
+    public function disableUserForDuration(
+        string $username,
+        ?string $hub = null,
+        ?int $minutes = null,
+        ?string $untilDatetime = null,
+        ?string $reason = null
+    ): array {
+        $hubName = $hub ?: $this->hub;
+        $res = $this->toggleUser($username, false, $hubName);
+
+        if (!$res['success']) {
+            return $res;
+        }
+
+        $untilTs = null;
+        if ($minutes !== null && $minutes > 0) {
+            $untilTs = time() + ($minutes * 60);
+        } elseif (!empty($untilDatetime)) {
+            $parsed = strtotime($untilDatetime);
+            if ($parsed && $parsed > time()) {
+                $untilTs = $parsed;
+            }
+        }
+
+        if ($untilTs !== null) {
+            $untilStr = date('Y-m-d H:i:s', $untilTs);
+            $all = $this->loadTimedDisables();
+            $k = $this->makeTimedDisableKey($this->activeServerKey, $hubName, $username);
+            $all[$k] = [
+                'server_key' => $this->activeServerKey,
+                'hub_name' => $hubName,
+                'username' => $username,
+                'disabled_at' => date('Y-m-d H:i:s'),
+                'disabled_until' => $untilStr,
+                'disabled_until_ts' => $untilTs,
+                'reason' => $reason ?: 'Suspensión temporal programada',
+            ];
+            $this->saveTimedDisables($all);
+            $this->clearCache($this->activeServerKey);
+
+            return [
+                'success' => true,
+                'disabled_until' => $untilStr,
+                'message' => "Usuario '{$username}' ({$hubName}) deshabilitado temporalmente hasta {$untilStr}.",
+            ];
+        }
+
+        // Si es indefinido, limpiar cualquier programación previa
+        $this->removeTimedDisableRecord($this->activeServerKey, $hubName, $username);
+        $this->clearCache($this->activeServerKey);
+
+        return [
+            'success' => true,
+            'disabled_until' => null,
+            'message' => "Usuario '{$username}' ({$hubName}) deshabilitado de forma indefinida.",
+        ];
+    }
+
+    /**
+     * Activa o desactiva SecureNAT en un Virtual Hub (EnableSecureNAT / DisableSecureNAT)
+     */
+    public function toggleSecureNat(bool $enable, ?string $hub = null): array
+    {
+        $hubName = $hub ?: $this->hub;
+
+        if ($this->isConfigured()) {
+            $method = $enable ? 'EnableSecureNAT' : 'DisableSecureNAT';
+            $res = $this->callRpc($method, ['HubName_str' => $hubName]);
+
+            if ($res['success']) {
+                $this->clearCache($this->activeServerKey);
+                $estado = $enable ? 'activado' : 'desactivado';
+                return [
+                    'success' => true,
+                    'message' => "SecureNAT {$estado} correctamente en el Virtual Hub '{$hubName}'.",
+                ];
+            }
+
+            return [
+                'success' => false,
+                'message' => "No se pudo cambiar el estado de SecureNAT: {$res['error']}",
+            ];
+        }
+
+        return [
+            'success' => false,
+            'message' => 'El servidor no está configurado o no responde.',
+        ];
+    }
+
+    /**
+     * Obtiene el estado real de SecureNAT y opciones DHCP (GetSecureNATOption + GetSecureNATStatus + GetHubStatus)
      */
     public function getSecureNatStatus(?string $hub = null): array
     {
         $hubName = $hub ?: $this->hub;
 
         if ($this->isConfigured()) {
-            // 1. Opciones y configuración real de red IP (Página 111 del manual oficial)
             $optRes = $this->callRpc('GetSecureNATOption', ['RpcHubName_str' => $hubName]);
             if (!$optRes['success']) {
                 $optRes = $this->callRpc('GetSecureNATOption', ['HubName_str' => $hubName]);
             }
 
-            // 2. Estado operativo en vivo de sesiones y leases (Página 115)
             $statusRes = $this->callRpc('GetSecureNATStatus', ['HubName_str' => $hubName]);
-
-            // 3. Estado general del Hub (Página 31: indica si SecureNATEnabled_bool es true)
             $hubStatusRes = $this->callRpc('GetHubStatus', ['HubName_str' => $hubName]);
 
             if ($optRes['success'] || $statusRes['success'] || $hubStatusRes['success']) {
@@ -1240,30 +1587,45 @@ class SoftEtherService
                 $stat = $statusRes['data'] ?? [];
                 $hStat = $hubStatusRes['data'] ?? [];
 
-                $dnsList = array_values(array_filter([
-                    $opt['DhcpDnsServerAddress_ip'] ?? null,
-                    $opt['DhcpDnsServerAddress2_ip'] ?? null,
-                ]));
+                $dns1 = (string) ($opt['DhcpDnsServerAddress_ip'] ?? '');
+                $dns2 = (string) ($opt['DhcpDnsServerAddress2_ip'] ?? '');
+                $dnsList = array_values(array_filter([$dns1, $dns2], fn ($ip) => !empty($ip) && $ip !== '0.0.0.0'));
 
-                $useNat = !empty($opt['UseNat_bool']) || !empty($hStat['SecureNATEnabled_bool']);
-                $useDhcp = !empty($opt['UseDhcp_bool']) || !empty($hStat['SecureNATEnabled_bool']);
-                $gwIp = $opt['DhcpGatewayAddress_ip'] ?? $opt['Ip_ip'] ?? null;
-                $subnet = $opt['DhcpSubnetMask_ip'] ?? $opt['Mask_ip'] ?? null;
+                $secureNatEngineOn = !empty($hStat['SecureNATEnabled_bool']);
+                $useNatOpt = !empty($opt['UseNat_bool']);
+                $useDhcpOpt = !empty($opt['UseDhcp_bool']);
+
+                $useNat = $secureNatEngineOn ? $useNatOpt : false;
+                $useDhcp = $secureNatEngineOn ? $useDhcpOpt : false;
+
+                $gwIp = $opt['Ip_ip'] ?? $opt['DhcpGatewayAddress_ip'] ?? null;
+                $dhcpGwIp = $opt['DhcpGatewayAddress_ip'] ?? $gwIp ?? null;
+                $subnet = $opt['DhcpSubnetMask_ip'] ?? $opt['Mask_ip'] ?? '255.255.255.0';
                 $startIp = $opt['DhcpLeaseIPStart_ip'] ?? null;
                 $endIp = $opt['DhcpLeaseIPEnd_ip'] ?? null;
 
                 return [
                     'hub_name' => $hubName,
                     'is_live' => true,
+                    'securenat_enabled' => $secureNatEngineOn,
+                    'use_nat' => $useNatOpt,
+                    'use_dhcp' => $useDhcpOpt,
                     'nat_enabled' => $useNat,
                     'dhcp_enabled' => $useDhcp,
-                    'virtual_gateway_ip' => $gwIp ?: ($useNat || $useDhcp ? '192.168.30.1' : 'Deshabilitado'),
+                    'virtual_gateway_ip' => $gwIp ?: '192.168.30.1',
                     'virtual_subnet_mask' => $subnet ?: '255.255.255.0',
-                    'dhcp_lease_start' => $startIp ?: ($useDhcp ? '192.168.30.10' : 'Deshabilitado'),
-                    'dhcp_lease_end' => $endIp ?: ($useDhcp ? '192.168.30.200' : 'Deshabilitado'),
-                    'dhcp_lease_expire_seconds' => (int) ($opt['DhcpExpireTimeSpan_u32'] ?? 0),
-                    'dns_servers' => !empty($dnsList) ? $dnsList : [],
-                    'domain_name' => $opt['DhcpDomainName_str'] ?? '',
+                    'dhcp_gateway_ip' => ($dhcpGwIp && $dhcpGwIp !== '0.0.0.0') ? $dhcpGwIp : ($gwIp ?: '192.168.30.1'),
+                    'dhcp_lease_start' => $startIp ?: '192.168.30.10',
+                    'dhcp_lease_end' => $endIp ?: '192.168.30.200',
+                    'dhcp_lease_expire_seconds' => (int) ($opt['DhcpExpireTimeSpan_u32'] ?? 7200),
+                    'dns_server_1' => ($dns1 && $dns1 !== '0.0.0.0') ? $dns1 : '',
+                    'dns_server_2' => ($dns2 && $dns2 !== '0.0.0.0') ? $dns2 : '',
+                    'dns_servers' => $dnsList,
+                    'domain_name' => (string) ($opt['DhcpDomainName_str'] ?? ''),
+                    'mtu' => (int) ($opt['Mtu_u32'] ?? 1500),
+                    'nat_tcp_timeout' => (int) ($opt['NatTcpTimeout_u32'] ?? 1800),
+                    'nat_udp_timeout' => (int) ($opt['NatUdpTimeout_u32'] ?? 60),
+                    'save_log' => (bool) ($opt['SaveLog_bool'] ?? true),
                     'active_dhcp_leases' => (int) ($stat['NumDhcpClients_u32'] ?? 0),
                     'total_nat_sessions' => (int) (($stat['NumTcpSessions_u32'] ?? 0) + ($stat['NumUdpSessions_u32'] ?? 0)),
                     'tcp_sessions' => (int) ($stat['NumTcpSessions_u32'] ?? 0),
@@ -1276,19 +1638,28 @@ class SoftEtherService
             }
         }
 
-        // Estado cuando no está activo o el servidor no responde (datos reales en 0, sin invenciones)
         return [
             'hub_name' => $hubName,
             'is_live' => false,
+            'securenat_enabled' => false,
+            'use_nat' => false,
+            'use_dhcp' => false,
             'nat_enabled' => false,
             'dhcp_enabled' => false,
-            'virtual_gateway_ip' => 'No disponible',
-            'virtual_subnet_mask' => 'No disponible',
-            'dhcp_lease_start' => 'No disponible',
-            'dhcp_lease_end' => 'No disponible',
-            'dhcp_lease_expire_seconds' => 0,
+            'virtual_gateway_ip' => '192.168.30.1',
+            'virtual_subnet_mask' => '255.255.255.0',
+            'dhcp_gateway_ip' => '192.168.30.1',
+            'dhcp_lease_start' => '192.168.30.10',
+            'dhcp_lease_end' => '192.168.30.200',
+            'dhcp_lease_expire_seconds' => 7200,
+            'dns_server_1' => '8.8.8.8',
+            'dns_server_2' => '1.1.1.1',
             'dns_servers' => [],
             'domain_name' => '',
+            'mtu' => 1500,
+            'nat_tcp_timeout' => 1800,
+            'nat_udp_timeout' => 60,
+            'save_log' => true,
             'active_dhcp_leases' => 0,
             'total_nat_sessions' => 0,
             'tcp_sessions' => 0,
@@ -1297,6 +1668,160 @@ class SoftEtherService
             'dns_sessions' => 0,
             'is_kernel_mode' => false,
             'is_raw_ip_mode' => false,
+        ];
+    }
+
+    /**
+     * Guarda la configuración completa de SecureNAT y DHCP Virtual (SetSecureNATOption + Enable/DisableSecureNAT)
+     */
+    public function saveSecureNatConfig(array $config, ?string $hub = null): array
+    {
+        $hubName = $hub ?: $this->hub;
+
+        if (!$this->isConfigured()) {
+            return [
+                'success' => false,
+                'message' => 'El servidor no está configurado o no responde.',
+            ];
+        }
+
+        // Obtener opciones actuales para preservar campos binarios (MacAddress_bin)
+        $optRes = $this->callRpc('GetSecureNATOption', ['RpcHubName_str' => $hubName]);
+        if (!$optRes['success']) {
+            $optRes = $this->callRpc('GetSecureNATOption', ['HubName_str' => $hubName]);
+        }
+        $opt = $optRes['data'] ?? [];
+
+        $gwIp = trim($config['virtual_gateway_ip'] ?? $opt['Ip_ip'] ?? '192.168.30.1') ?: '192.168.30.1';
+        $mask = trim($config['virtual_subnet_mask'] ?? $opt['Mask_ip'] ?? '255.255.255.0') ?: '255.255.255.0';
+        $dhcpStart = trim($config['dhcp_lease_start'] ?? $opt['DhcpLeaseIPStart_ip'] ?? '192.168.30.10') ?: '192.168.30.10';
+        $dhcpEnd = trim($config['dhcp_lease_end'] ?? $opt['DhcpLeaseIPEnd_ip'] ?? '192.168.30.200') ?: '192.168.30.200';
+        $dhcpGw = trim($config['dhcp_gateway_ip'] ?? $gwIp) ?: $gwIp;
+        $dns1 = trim($config['dns_server_1'] ?? '');
+        $dns2 = trim($config['dns_server_2'] ?? '');
+
+        $payload = $opt;
+        $payload['RpcHubName_str'] = $hubName;
+        $payload['Ip_ip'] = $gwIp;
+        $payload['Mask_ip'] = $mask;
+        $payload['UseNat_bool'] = (bool) ($config['use_nat'] ?? true);
+        $payload['Mtu_u32'] = max(576, (int) ($config['mtu'] ?? $opt['Mtu_u32'] ?? 1500));
+        $payload['NatTcpTimeout_u32'] = max(60, (int) ($config['nat_tcp_timeout'] ?? $opt['NatTcpTimeout_u32'] ?? 1800));
+        $payload['NatUdpTimeout_u32'] = max(10, (int) ($config['nat_udp_timeout'] ?? $opt['NatUdpTimeout_u32'] ?? 60));
+        $payload['UseDhcp_bool'] = (bool) ($config['use_dhcp'] ?? true);
+        $payload['DhcpLeaseIPStart_ip'] = $dhcpStart;
+        $payload['DhcpLeaseIPEnd_ip'] = $dhcpEnd;
+        $payload['DhcpSubnetMask_ip'] = $mask;
+        $payload['DhcpExpireTimeSpan_u32'] = max(60, (int) ($config['dhcp_lease_expire_seconds'] ?? $opt['DhcpExpireTimeSpan_u32'] ?? 7200));
+        $payload['DhcpGatewayAddress_ip'] = $dhcpGw;
+        $payload['DhcpDnsServerAddress_ip'] = !empty($dns1) ? $dns1 : '0.0.0.0';
+        $payload['DhcpDnsServerAddress2_ip'] = !empty($dns2) ? $dns2 : '0.0.0.0';
+        $payload['DhcpDomainName_str'] = trim((string) ($config['domain_name'] ?? ''));
+        $payload['SaveLog_bool'] = (bool) ($config['save_log'] ?? $opt['SaveLog_bool'] ?? true);
+
+        $saveRes = $this->callRpc('SetSecureNATOption', $payload);
+        if (!$saveRes['success']) {
+            return [
+                'success' => false,
+                'message' => "Error al guardar opciones SecureNAT/DHCP: {$saveRes['error']}",
+            ];
+        }
+
+        if (array_key_exists('securenat_enabled', $config)) {
+            $engineRes = $this->toggleSecureNat((bool) $config['securenat_enabled'], $hubName);
+            if (!$engineRes['success']) {
+                return $engineRes;
+            }
+        }
+
+        $this->clearCache($this->activeServerKey);
+
+        return [
+            'success' => true,
+            'message' => "Configuración de SecureNAT y DHCP guardada correctamente en el Virtual Hub '{$hubName}'.",
+        ];
+    }
+
+    /**
+     * Obtiene la configuración de Logs de un Virtual Hub (GetHubLog)
+     */
+    public function getHubLog(?string $hub = null): array
+    {
+        $hubName = $hub ?: $this->hub;
+
+        if ($this->isConfigured()) {
+            $res = $this->callRpc('GetHubLog', ['HubName_str' => $hubName]);
+            if ($res['success']) {
+                $d = $res['data'] ?? [];
+                return [
+                    'hub_name' => $hubName,
+                    'is_live' => true,
+                    'save_security_log' => (bool) ($d['SaveSecurityLog_bool'] ?? false),
+                    'security_log_switch_type' => (int) ($d['SecurityLogSwitchType_u32'] ?? 4),
+                    'save_packet_log' => (bool) ($d['SavePacketLog_bool'] ?? false),
+                    'packet_log_switch_type' => (int) ($d['PacketLogSwitchType_u32'] ?? 4),
+                    'packet_log_config' => is_array($d['PacketLogConfig_u32'] ?? null) && count($d['PacketLogConfig_u32']) === 8
+                        ? $d['PacketLogConfig_u32']
+                        : [1, 0, 1, 0, 0, 0, 0, 0],
+                ];
+            }
+        }
+
+        return [
+            'hub_name' => $hubName,
+            'is_live' => false,
+            'save_security_log' => false,
+            'security_log_switch_type' => 4,
+            'save_packet_log' => false,
+            'packet_log_switch_type' => 4,
+            'packet_log_config' => [1, 0, 1, 0, 0, 0, 0, 0],
+        ];
+    }
+
+    /**
+     * Activa, desactiva o actualiza la configuración de Logs de un Virtual Hub (SetHubLog)
+     */
+    public function setHubLog(array $logConfig, ?string $hub = null): array
+    {
+        $hubName = $hub ?: $this->hub;
+
+        if (!$this->isConfigured()) {
+            return [
+                'success' => false,
+                'message' => 'El servidor no está configurado o no responde.',
+            ];
+        }
+
+        $current = $this->callRpc('GetHubLog', ['HubName_str' => $hubName]);
+        $existingPacketCfg = $current['data']['PacketLogConfig_u32'] ?? [1, 0, 1, 0, 0, 0, 0, 0];
+        if (!is_array($existingPacketCfg) || count($existingPacketCfg) !== 8) {
+            $existingPacketCfg = [1, 0, 1, 0, 0, 0, 0, 0];
+        }
+
+        $packetCfg = $logConfig['packet_log_config'] ?? $existingPacketCfg;
+        $packetCfg = array_values(array_slice(array_pad(array_map('intval', $packetCfg), 8, 0), 0, 8));
+
+        $payload = [
+            'HubName_str' => $hubName,
+            'SaveSecurityLog_bool' => (bool) ($logConfig['save_security_log'] ?? false),
+            'SecurityLogSwitchType_u32' => (int) ($logConfig['security_log_switch_type'] ?? 4),
+            'SavePacketLog_bool' => (bool) ($logConfig['save_packet_log'] ?? false),
+            'PacketLogSwitchType_u32' => (int) ($logConfig['packet_log_switch_type'] ?? 4),
+            'PacketLogConfig_u32' => $packetCfg,
+        ];
+
+        $res = $this->callRpc('SetHubLog', $payload);
+        if ($res['success']) {
+            $this->clearCache($this->activeServerKey);
+            return [
+                'success' => true,
+                'message' => "Configuración de Logs actualizada en el Virtual Hub '{$hubName}'.",
+            ];
+        }
+
+        return [
+            'success' => false,
+            'message' => "Error al configurar Logs del Hub: {$res['error']}",
         ];
     }
 

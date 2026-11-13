@@ -165,6 +165,22 @@
             color: #fbbf24;
             border: 1px solid rgba(245, 158, 11, 0.3);
         }
+        .se-btn-emerald {
+            background: rgba(16, 185, 129, 0.18);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.35);
+        }
+        .se-btn-emerald:hover {
+            background: rgba(16, 185, 129, 0.28);
+        }
+        .se-btn-indigo {
+            background: rgba(99, 102, 241, 0.18);
+            color: #a5b4fc;
+            border: 1px solid rgba(99, 102, 241, 0.35);
+        }
+        .se-btn-indigo:hover {
+            background: rgba(99, 102, 241, 0.28);
+        }
         .se-code-block {
             background: #090d16;
             border: 1px solid #1e293b;
@@ -376,7 +392,7 @@
 
             <button type="button" wire:click="setActiveTab('usuarios')" class="se-tab-btn {{ $activeTab === 'usuarios' ? 'active' : '' }}">
                 <svg style="width: 1rem; height: 1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-                <span>Cuentas VPN ({{ count($vpnUsers) }})</span>
+                <span>Cuentas VPN ({{ count(!empty($allVpnUsers) ? $allVpnUsers : $vpnUsers) }})</span>
             </button>
 
             <button type="button" wire:click="setActiveTab('hubs')" class="se-tab-btn {{ $activeTab === 'hubs' ? 'active' : '' }}">
@@ -566,22 +582,77 @@
             </div>
         @endif
 
-        <!-- TAB 3: CUENTAS DE CLIENTES VPN -->
+        <!-- TAB 3: CUENTAS DE CLIENTES VPN (RELACIONADAS CON VIRTUAL HUB) -->
         @if($activeTab === 'usuarios')
+            @php
+                $totalAllUsers = count(!empty($allVpnUsers) ? $allVpnUsers : $vpnUsers);
+                $filteredUsers = $this->getFilteredVpnUsers();
+                $totalFilteredUsers = count($filteredUsers);
+                $paginatedUsers = $this->getPaginatedVpnUsers();
+                $totalUserPages = $this->getTotalUserPages();
+            @endphp
             <div class="se-card">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
                     <div>
                         <h3 style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin: 0;">
                             Cuentas de Usuarios VPN ({{ $connectionDetails['server_name'] }})
                         </h3>
                         <p style="color: #94a3b8; font-size: 0.8rem; margin: 0.25rem 0 0 0;">
-                            Usuarios autorizados para conectar routers 4G y puestos remotos al Virtual Hub <strong>{{ $connectionDetails['hub'] }}</strong>.
+                            Cuentas VPN vinculadas por Virtual Hub en todo el servidor ({{ $totalAllUsers }} cuentas totales).
                         </p>
                     </div>
-                    <button type="button" wire:click="$set('isCreatingUser', true)" class="se-btn se-btn-sky">
+                    <button type="button" wire:click="abrirModalCrearUsuario" class="se-btn se-btn-sky">
                         <svg style="width: 1rem; height: 1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                         <span>Crear Usuario VPN</span>
                     </button>
+                </div>
+
+                <!-- Barra de Búsqueda por Usuario / Virtual Hub y Filtros -->
+                <div style="display: flex; flex-wrap: wrap; gap: 0.65rem; align-items: center; margin-bottom: 0.85rem; padding: 0.75rem; background: #090e1a; border: 1px solid #1e293b; border-radius: 0.5rem;">
+                    <div style="position: relative; flex: 1; min-width: 240px;">
+                        <span style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: #64748b; pointer-events: none;">
+                            <svg style="width: 1rem; height: 1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                        </span>
+                        <input type="text"
+                               wire:model.live.debounce.250ms="userSearch"
+                               placeholder="Buscar por usuario, nombre o Virtual Hub..."
+                               style="width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 0.5rem; padding: 0.45rem 2rem 0.45rem 2.25rem; color: #ffffff; font-size: 0.8rem; outline: none;" />
+                        @if(!empty($userSearch))
+                            <button type="button" wire:click="$set('userSearch', '')" style="position: absolute; right: 0.65rem; top: 50%; transform: translateY(-50%); background: transparent; border: none; color: #94a3b8; cursor: pointer;">✕</button>
+                        @endif
+                    </div>
+
+                    <select wire:model.live="userHubFilter"
+                            style="background: #0f172a; border: 1px solid #334155; border-radius: 0.5rem; padding: 0.45rem 0.75rem; color: #38bdf8; font-size: 0.8rem; font-weight: 600; outline: none; cursor: pointer;">
+                        <option value="">Todos los Virtual Hubs ({{ count($virtualHubs) }})</option>
+                        @foreach($virtualHubs as $vh)
+                            <option value="{{ $vh['hub_name'] }}">{{ $vh['hub_name'] }} ({{ $vh['users_count'] ?? 0 }})</option>
+                        @endforeach
+                    </select>
+
+                    <select wire:model.live="userStatusFilter"
+                            style="background: #0f172a; border: 1px solid #334155; border-radius: 0.5rem; padding: 0.45rem 0.75rem; color: #e2e8f0; font-size: 0.8rem; outline: none; cursor: pointer;">
+                        <option value="todos">Todos los estados</option>
+                        <option value="habilitados">Solo Habilitados</option>
+                        <option value="deshabilitados">Solo Deshabilitados</option>
+                        <option value="temporal">Deshabilitados Temporalmente</option>
+                    </select>
+
+                    @if(!empty($userSearch) || !empty($userHubFilter) || $userStatusFilter !== 'todos')
+                        <button type="button" wire:click="limpiarFiltrosUsuarios" class="se-btn" style="background: rgba(255,255,255,0.08); color: #cbd5e1; font-size: 0.75rem;">
+                            Limpiar filtros
+                        </button>
+                    @endif
+                </div>
+
+                <!-- Resumen de conteo -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; font-size: 0.75rem; color: #94a3b8;">
+                    <span>
+                        Mostrando <strong style="color: #ffffff;">{{ count($paginatedUsers) }}</strong> de <strong style="color: #38bdf8;">{{ $totalFilteredUsers }}</strong> cuentas coincidentes
+                    </span>
+                    @if($totalUserPages > 1)
+                        <span>Página <strong style="color: #38bdf8;">{{ $userPage }}</strong> de {{ $totalUserPages }}</span>
+                    @endif
                 </div>
 
                 <div style="overflow-x: auto;">
@@ -589,6 +660,7 @@
                         <thead>
                             <tr>
                                 <th>Usuario</th>
+                                <th>Virtual Hub</th>
                                 <th>Nombre / Descripción</th>
                                 <th>Autenticación</th>
                                 <th>Estado</th>
@@ -597,10 +669,27 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @forelse($vpnUsers as $user)
+                            @forelse($paginatedUsers as $user)
+                                @php
+                                    $uHub = $user['hub_name'] ?? ($connectionDetails['hub'] ?? 'DEFAULT');
+                                    $isActive = (bool) ($user['is_active'] ?? true);
+                                    $isTimed = (bool) ($user['is_timed_disabled'] ?? false);
+                                @endphp
                                 <tr>
                                     <td style="font-family: monospace; font-weight: 600; color: #38bdf8;">
-                                        {{ $user['username'] }}
+                                        <div>{{ $user['username'] }}</div>
+                                        @if(!empty($user['currently_connected']))
+                                            <span style="font-size: 0.65rem; color: #34d399; font-family: sans-serif;">● Conectado ahora</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <button type="button"
+                                                wire:click="abrirGestionHub('{{ $uHub }}', 'users')"
+                                                class="se-badge se-badge-sky"
+                                                style="cursor: pointer; font-family: monospace;"
+                                                title="Gestionar Virtual Hub {{ $uHub }}">
+                                            {{ $uHub }}
+                                        </button>
                                     </td>
                                     <td>
                                         <div style="font-weight: 600; color: #ffffff;">{{ $user['real_name'] }}</div>
@@ -608,38 +697,100 @@
                                     </td>
                                     <td>{{ $user['auth_type'] ?? 'Contraseña' }}</td>
                                     <td>
-                                        <span class="se-badge {{ ($user['is_active'] ?? true) ? 'se-badge-emerald' : 'se-badge-rose' }}">
-                                            {{ ($user['is_active'] ?? true) ? 'Habilitado' : 'Deshabilitado' }}
-                                        </span>
+                                        @if($isActive)
+                                            <span class="se-badge se-badge-emerald">Habilitado</span>
+                                        @elseif($isTimed)
+                                            <div style="display: flex; flex-direction: column; gap: 0.2rem;">
+                                                <span class="se-badge se-badge-amber">Deshab. Temporal</span>
+                                                <span style="font-size: 0.7rem; color: #fbbf24; font-family: monospace;">
+                                                    Hasta: {{ $user['disabled_until'] }}
+                                                </span>
+                                            </div>
+                                        @else
+                                            <span class="se-badge se-badge-rose">Deshabilitado</span>
+                                        @endif
                                     </td>
-                                    <td>{{ $user['last_login'] ?? 'Nunca' }}</td>
+                                    <td style="font-size: 0.75rem;">{{ $user['last_login'] ?? 'Nunca' }}</td>
                                     <td>
-                                        <div style="display: flex; gap: 0.5rem;">
-                                            <button type="button" 
-                                                    wire:click="toggleUsuario('{{ $user['username'] }}', {{ ($user['is_active'] ?? true) ? 'false' : 'true' }})" 
-                                                    class="se-btn {{ ($user['is_active'] ?? true) ? 'se-btn-rose' : 'se-btn-sky' }}">
-                                                <span>{{ ($user['is_active'] ?? true) ? 'Deshabilitar' : 'Habilitar' }}</span>
-                                            </button>
-                                            <button type="button" 
-                                                    wire:click="eliminarUsuario('{{ $user['username'] }}')" 
-                                                    wire:confirm="¿Seguro que desea eliminar permanentemente al usuario {{ $user['username'] }}?"
+                                        <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+                                            @if($isActive)
+                                                <button type="button"
+                                                        wire:click="abrirModalDeshabilitarUsuario('{{ $user['username'] }}', '{{ $uHub }}')"
+                                                        class="se-btn se-btn-amber"
+                                                        style="padding: 0.35rem 0.65rem; font-size: 0.75rem;"
+                                                        title="Deshabilitar por tiempo definido o indefinido">
+                                                    Deshabilitar
+                                                </button>
+                                            @else
+                                                <button type="button"
+                                                        wire:click="toggleUsuario('{{ $user['username'] }}', true, '{{ $uHub }}')"
+                                                        class="se-btn se-btn-emerald"
+                                                        style="padding: 0.35rem 0.65rem; font-size: 0.75rem;">
+                                                    Habilitar
+                                                </button>
+                                            @endif
+                                            <button type="button"
+                                                    wire:click="eliminarUsuario('{{ $user['username'] }}', '{{ $uHub }}')"
+                                                    wire:confirm="¿Seguro que desea eliminar permanentemente al usuario {{ $user['username'] }} del Hub {{ $uHub }}?"
                                                     class="se-btn se-btn-rose"
+                                                    style="padding: 0.35rem 0.65rem; font-size: 0.75rem;"
                                                     title="Eliminar usuario de SoftEther">
-                                                <span>Eliminar</span>
+                                                Eliminar
                                             </button>
                                         </div>
                                     </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" style="text-align: center; color: #94a3b8; padding: 2rem;">
-                                        No se encontraron usuarios VPN registrados en este hub.
+                                    <td colspan="7" style="text-align: center; color: #94a3b8; padding: 2rem;">
+                                        @if(!empty($userSearch) || !empty($userHubFilter) || $userStatusFilter !== 'todos')
+                                            No se encontraron cuentas VPN con los filtros aplicados.
+                                            <div style="margin-top: 0.75rem;">
+                                                <button type="button" wire:click="limpiarFiltrosUsuarios" class="se-btn se-btn-sky" style="font-size: 0.75rem;">
+                                                    Limpiar filtros
+                                                </button>
+                                            </div>
+                                        @else
+                                            No se encontraron usuarios VPN registrados en este servidor.
+                                        @endif
                                     </td>
                                 </tr>
                             @endforelse
                         </tbody>
                     </table>
                 </div>
+
+                <!-- Paginación de Cuentas VPN -->
+                @if($totalUserPages > 1)
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding-top: 0.85rem; border-top: 1px solid #1e293b; flex-wrap: wrap; gap: 0.5rem;">
+                        <div style="font-size: 0.75rem; color: #94a3b8;">
+                            Página {{ $userPage }} de {{ $totalUserPages }} ({{ $totalFilteredUsers }} cuentas)
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.35rem;">
+                            <button type="button"
+                                    wire:click="setUserPage({{ $userPage - 1 }})"
+                                    {{ $userPage <= 1 ? 'disabled' : '' }}
+                                    class="se-btn"
+                                    style="padding: 0.3rem 0.65rem; font-size: 0.75rem; background: {{ $userPage <= 1 ? '#090e1a' : '#1e293b' }}; color: {{ $userPage <= 1 ? '#475569' : '#e2e8f0' }}; cursor: {{ $userPage <= 1 ? 'not-allowed' : 'pointer' }};">
+                                ◀ Anterior
+                            </button>
+                            @for($up = max(1, $userPage - 2); $up <= min($totalUserPages, $userPage + 2); $up++)
+                                <button type="button"
+                                        wire:click="setUserPage({{ $up }})"
+                                        style="padding: 0.3rem 0.6rem; font-size: 0.75rem; border-radius: 0.375rem; font-weight: 600; cursor: pointer; border: 1px solid {{ $up === $userPage ? '#0284c7' : '#334155' }}; background: {{ $up === $userPage ? 'rgba(14, 165, 233, 0.25)' : '#0f172a' }}; color: {{ $up === $userPage ? '#38bdf8' : '#94a3b8' }};">
+                                    {{ $up }}
+                                </button>
+                            @endfor
+                            <button type="button"
+                                    wire:click="setUserPage({{ $userPage + 1 }})"
+                                    {{ $userPage >= $totalUserPages ? 'disabled' : '' }}
+                                    class="se-btn"
+                                    style="padding: 0.3rem 0.65rem; font-size: 0.75rem; background: {{ $userPage >= $totalUserPages ? '#090e1a' : '#1e293b' }}; color: {{ $userPage >= $totalUserPages ? '#475569' : '#e2e8f0' }}; cursor: {{ $userPage >= $totalUserPages ? 'not-allowed' : 'pointer' }};">
+                                Siguiente ▶
+                            </button>
+                        </div>
+                    </div>
+                @endif
             </div>
         @endif
 
@@ -747,6 +898,27 @@
                                     <div>Tráfico: <strong style="color: #38bdf8;">{{ $hub['traffic'] ?? '0 B' }}</strong></div>
                                     <div>Última com.: <span style="font-size: 0.75rem;">{{ $hub['last_comm'] ?? 'N/D' }}</span></div>
                                 </div>
+                                <!-- Acciones de gestión directa del Virtual Hub -->
+                                <div style="display: flex; gap: 0.45rem; flex-wrap: wrap; margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px solid #1e293b;">
+                                    <button type="button"
+                                            wire:click="abrirGestionHub('{{ $hub['hub_name'] }}', 'nat_dhcp')"
+                                            class="se-btn se-btn-emerald"
+                                            style="padding: 0.3rem 0.65rem; font-size: 0.73rem;">
+                                        ⚙ DHCP & SecureNAT
+                                    </button>
+                                    <button type="button"
+                                            wire:click="abrirGestionHub('{{ $hub['hub_name'] }}', 'users')"
+                                            class="se-btn se-btn-sky"
+                                            style="padding: 0.3rem 0.65rem; font-size: 0.73rem;">
+                                        👥 Usuarios ({{ $hub['users_count'] ?? 0 }})
+                                    </button>
+                                    <button type="button"
+                                            wire:click="abrirGestionHub('{{ $hub['hub_name'] }}', 'logs')"
+                                            class="se-btn se-btn-indigo"
+                                            style="padding: 0.3rem 0.65rem; font-size: 0.73rem;">
+                                        📋 Logs
+                                    </button>
+                                </div>
                             </div>
                         @empty
                             <div style="text-align: center; color: #94a3b8; padding: 2rem; background: #090e1a; border: 1px dashed #334155; border-radius: 0.5rem;">
@@ -800,9 +972,25 @@
                 </div>
 
                 <div class="se-card">
-                    <h3 style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin: 0 0 1rem 0; border-bottom: 1px solid #1e293b; padding-bottom: 0.5rem;">
-                        Estado SecureNAT & DHCP Virtual (Hub: {{ $connectionDetails['hub'] }})
-                    </h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid #1e293b; padding-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                        <h3 style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin: 0;">
+                            Estado SecureNAT & DHCP Virtual (Hub: {{ $connectionDetails['hub'] }})
+                        </h3>
+                        <div style="display: flex; gap: 0.45rem; flex-wrap: wrap;">
+                            <button type="button"
+                                    wire:click="toggleHubSecureNat({{ !empty($secureNat['securenat_enabled']) ? 'false' : 'true' }}, '{{ $connectionDetails['hub'] }}')"
+                                    class="se-btn {{ !empty($secureNat['securenat_enabled']) ? 'se-btn-amber' : 'se-btn-emerald' }}"
+                                    style="padding: 0.3rem 0.65rem; font-size: 0.73rem;">
+                                {{ !empty($secureNat['securenat_enabled']) ? 'Desactivar SecureNAT' : 'Activar SecureNAT' }}
+                            </button>
+                            <button type="button"
+                                    wire:click="abrirGestionHub('{{ $connectionDetails['hub'] }}', 'nat_dhcp')"
+                                    class="se-btn se-btn-sky"
+                                    style="padding: 0.3rem 0.65rem; font-size: 0.73rem;">
+                                Configurar DHCP / NAT
+                            </button>
+                        </div>
+                    </div>
                     <div style="display: flex; flex-direction: column; gap: 0.85rem; font-size: 0.825rem;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <span style="color: #94a3b8;">Virtual NAT:</span>
@@ -994,6 +1182,16 @@ docker exec dp-prod-app php artisan cache:clear
 
                     <form wire:submit.prevent="crearUsuario" style="display: flex; flex-direction: column; gap: 1rem; font-size: 0.85rem;">
                         <div>
+                            <label style="display: block; color: #94a3b8; margin-bottom: 0.25rem;">Virtual Hub de Destino <span style="color: #fb7185;">*</span></label>
+                            <select wire:model="newUserHub" required style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.5rem; padding: 0.5rem; color: #38bdf8; font-weight: 600;">
+                                @forelse($virtualHubs as $vh)
+                                    <option value="{{ $vh['hub_name'] }}">{{ $vh['hub_name'] }} ({{ $vh['users_count'] ?? 0 }} usuarios)</option>
+                                @empty
+                                    <option value="{{ $connectionDetails['hub'] ?? 'DEFAULT' }}">{{ $connectionDetails['hub'] ?? 'DEFAULT' }}</option>
+                                @endforelse
+                            </select>
+                        </div>
+                        <div>
                             <label style="display: block; color: #94a3b8; margin-bottom: 0.25rem;">Nombre de Usuario (VPN)</label>
                             <input type="text" wire:model="newUsername" required placeholder="ej: cliente_playa" style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.5rem; padding: 0.5rem; color: #ffffff;" />
                         </div>
@@ -1019,6 +1217,365 @@ docker exec dp-prod-app php artisan cache:clear
                             </button>
                         </div>
                     </form>
+                </div>
+            </div>
+        @endif
+
+        <!-- MODAL DESHABILITAR USUARIO POR TIEMPO DEFINIDO -->
+        @if($userToTimedDisable)
+            <div class="se-modal-overlay" style="z-index: 60;">
+                <div class="se-modal">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 0.75rem; margin-bottom: 1rem;">
+                        <h3 style="font-size: 1.05rem; font-weight: 700; color: #fbbf24; margin: 0;">
+                            Deshabilitar Cuenta VPN: {{ $userToTimedDisable['username'] }}
+                        </h3>
+                        <button type="button" wire:click="cerrarModalDeshabilitarUsuario" style="background: transparent; border: none; color: #94a3b8; font-size: 1.25rem; cursor: pointer;">✕</button>
+                    </div>
+
+                    <div style="font-size: 0.825rem; color: #cbd5e1; margin-bottom: 1rem;">
+                        Virtual Hub: <span class="se-badge se-badge-sky" style="font-family: monospace;">{{ $userToTimedDisable['hub_name'] }}</span>
+                    </div>
+
+                    <form wire:submit.prevent="confirmarDeshabilitarUsuario" style="display: flex; flex-direction: column; gap: 1rem; font-size: 0.85rem;">
+                        <div>
+                            <label style="display: block; color: #94a3b8; margin-bottom: 0.35rem;">Duración de la deshabilitación</label>
+                            <select wire:model.live="disableDurationPreset" style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.5rem; padding: 0.55rem; color: #ffffff;">
+                                <option value="60">1 hora (reactivación automática)</option>
+                                <option value="360">6 horas (reactivación automática)</option>
+                                <option value="720">12 horas (reactivación automática)</option>
+                                <option value="1440">24 horas / 1 día (reactivación automática)</option>
+                                <option value="4320">3 días (reactivación automática)</option>
+                                <option value="10080">7 días (reactivación automática)</option>
+                                <option value="custom">Fecha y hora personalizada</option>
+                                <option value="indefinite">Indefinido (hasta reactivación manual)</option>
+                            </select>
+                        </div>
+
+                        @if($disableDurationPreset === 'custom')
+                            <div>
+                                <label style="display: block; color: #94a3b8; margin-bottom: 0.25rem;">Reactivar automáticamente el:</label>
+                                <input type="datetime-local" wire:model="disableUntilCustom" required style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.5rem; padding: 0.5rem; color: #ffffff;" />
+                            </div>
+                        @endif
+
+                        <div>
+                            <label style="display: block; color: #94a3b8; margin-bottom: 0.25rem;">Motivo / Nota interna (opcional)</label>
+                            <input type="text" wire:model="disableReason" placeholder="ej: Suspensión por mantenimiento o pago pendiente" style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.5rem; padding: 0.5rem; color: #ffffff;" />
+                        </div>
+
+                        <div style="padding: 0.65rem 0.85rem; border-radius: 0.5rem; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); color: #fde68a; font-size: 0.75rem; line-height: 1.4;">
+                            ℹ La cuenta será bloqueada de inmediato en SoftEther. Si elige un tiempo definido, se reactivará automáticamente al cumplirse el plazo.
+                        </div>
+
+                        <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 0.5rem;">
+                            <button type="button" wire:click="cerrarModalDeshabilitarUsuario" class="se-btn" style="background: #334155; color: #ffffff;">
+                                Cancelar
+                            </button>
+                            <button type="submit" class="se-btn se-btn-amber">
+                                Confirmar Deshabilitación
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        @endif
+
+        <!-- MODAL GESTIÓN COMPLETA DE VIRTUAL HUB (DHCP, SECURENAT, USUARIOS, LOGS) -->
+        @if($managingHub)
+            <div class="se-modal-overlay">
+                <div class="se-modal" style="max-width: 840px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 0.75rem; margin-bottom: 1rem;">
+                        <div>
+                            <h3 style="font-size: 1.15rem; font-weight: 700; color: #38bdf8; margin: 0;">
+                                Gestión de Virtual Hub: <span style="font-family: monospace; color: #ffffff;">{{ $managingHub }}</span>
+                            </h3>
+                            <span style="font-size: 0.75rem; color: #94a3b8;">Servidor: {{ $connectionDetails['server_name'] }}</span>
+                        </div>
+                        <button type="button" wire:click="cerrarGestionHub" style="background: transparent; border: none; color: #94a3b8; font-size: 1.25rem; cursor: pointer;">✕</button>
+                    </div>
+
+                    <!-- Sub-pestañas del Hub -->
+                    <div class="se-tabs" style="margin-bottom: 1.25rem;">
+                        <button type="button" wire:click="setHubManageTab('nat_dhcp')" class="se-tab-btn {{ $hubManageTab === 'nat_dhcp' ? 'active' : '' }}">
+                            <span>⚙ DHCP & SecureNAT</span>
+                        </button>
+                        <button type="button" wire:click="setHubManageTab('users')" class="se-tab-btn {{ $hubManageTab === 'users' ? 'active' : '' }}">
+                            <span>👥 Usuarios del Hub ({{ count($hubManageUsers) }})</span>
+                        </button>
+                        <button type="button" wire:click="setHubManageTab('logs')" class="se-tab-btn {{ $hubManageTab === 'logs' ? 'active' : '' }}">
+                            <span>📋 Logs del Hub</span>
+                        </button>
+                    </div>
+
+                    <!-- SUB-TAB 1: DHCP & SECURENAT -->
+                    @if($hubManageTab === 'nat_dhcp')
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; border-radius: 0.5rem; background: #090e1a; border: 1px solid #1e293b; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <span style="font-size: 0.85rem; color: #cbd5e1; font-weight: 600;">Estado Motor SecureNAT:</span>
+                                <span class="se-badge {{ !empty($hubManageSecureNat['securenat_enabled']) ? 'se-badge-emerald' : 'se-badge-amber' }}">
+                                    {{ !empty($hubManageSecureNat['securenat_enabled']) ? 'Activo en SoftEther' : 'Desactivado' }}
+                                </span>
+                            </div>
+                            <button type="button"
+                                    wire:click="toggleHubSecureNat({{ !empty($hubManageSecureNat['securenat_enabled']) ? 'false' : 'true' }}, '{{ $managingHub }}')"
+                                    class="se-btn {{ !empty($hubManageSecureNat['securenat_enabled']) ? 'se-btn-rose' : 'se-btn-emerald' }}"
+                                    style="font-size: 0.75rem;">
+                                {{ !empty($hubManageSecureNat['securenat_enabled']) ? 'Desactivar SecureNAT Ahora' : 'Activar SecureNAT Ahora' }}
+                            </button>
+                        </div>
+
+                        <form wire:submit.prevent="guardarConfigSecureNatDhcp" style="display: flex; flex-direction: column; gap: 1rem; font-size: 0.825rem;">
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0.65rem; padding: 0.75rem; background: #090e1a; border: 1px solid #1e293b; border-radius: 0.5rem;">
+                                <label style="display: flex; align-items: center; gap: 0.5rem; color: #e2e8f0; cursor: pointer;">
+                                    <input type="checkbox" wire:model="natForm.securenat_enabled" />
+                                    <span>Activar Motor SecureNAT</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 0.5rem; color: #e2e8f0; cursor: pointer;">
+                                    <input type="checkbox" wire:model="natForm.use_nat" />
+                                    <span>Habilitar Virtual NAT</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 0.5rem; color: #e2e8f0; cursor: pointer;">
+                                    <input type="checkbox" wire:model="natForm.use_dhcp" />
+                                    <span>Habilitar Servidor DHCP</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 0.5rem; color: #e2e8f0; cursor: pointer;">
+                                    <input type="checkbox" wire:model="natForm.save_log" />
+                                    <span>Guardar Log NAT/DHCP</span>
+                                </label>
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.85rem;">
+                                <div>
+                                    <label style="display: block; color: #94a3b8; margin-bottom: 0.25rem;">IP Interfaz Virtual (Host NAT)</label>
+                                    <input type="text" wire:model="natForm.virtual_gateway_ip" required style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.45rem; padding: 0.45rem; color: #ffffff; font-family: monospace;" />
+                                </div>
+                                <div>
+                                    <label style="display: block; color: #94a3b8; margin-bottom: 0.25rem;">Máscara de Subred</label>
+                                    <input type="text" wire:model="natForm.virtual_subnet_mask" required style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.45rem; padding: 0.45rem; color: #ffffff; font-family: monospace;" />
+                                </div>
+                                <div>
+                                    <label style="display: block; color: #94a3b8; margin-bottom: 0.25rem;">Rango DHCP Inicio</label>
+                                    <input type="text" wire:model="natForm.dhcp_lease_start" required style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.45rem; padding: 0.45rem; color: #34d399; font-family: monospace;" />
+                                </div>
+                                <div>
+                                    <label style="display: block; color: #94a3b8; margin-bottom: 0.25rem;">Rango DHCP Fin</label>
+                                    <input type="text" wire:model="natForm.dhcp_lease_end" required style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.45rem; padding: 0.45rem; color: #34d399; font-family: monospace;" />
+                                </div>
+                                <div>
+                                    <label style="display: block; color: #94a3b8; margin-bottom: 0.25rem;">Gateway Asignado (DHCP)</label>
+                                    <input type="text" wire:model="natForm.dhcp_gateway_ip" style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.45rem; padding: 0.45rem; color: #ffffff; font-family: monospace;" />
+                                </div>
+                                <div>
+                                    <label style="display: block; color: #94a3b8; margin-bottom: 0.25rem;">Tiempo Concesión Lease (seg)</label>
+                                    <input type="number" min="60" wire:model="natForm.dhcp_lease_expire_seconds" required style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.45rem; padding: 0.45rem; color: #ffffff; font-family: monospace;" />
+                                </div>
+                                <div>
+                                    <label style="display: block; color: #94a3b8; margin-bottom: 0.25rem;">Servidor DNS 1</label>
+                                    <input type="text" wire:model="natForm.dns_server_1" placeholder="8.8.8.8" style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.45rem; padding: 0.45rem; color: #a78bfa; font-family: monospace;" />
+                                </div>
+                                <div>
+                                    <label style="display: block; color: #94a3b8; margin-bottom: 0.25rem;">Servidor DNS 2</label>
+                                    <input type="text" wire:model="natForm.dns_server_2" placeholder="1.1.1.1" style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.45rem; padding: 0.45rem; color: #a78bfa; font-family: monospace;" />
+                                </div>
+                                <div>
+                                    <label style="display: block; color: #94a3b8; margin-bottom: 0.25rem;">Nombre de Dominio (Opcional)</label>
+                                    <input type="text" wire:model="natForm.domain_name" placeholder="ej: dataplus.local" style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.45rem; padding: 0.45rem; color: #ffffff;" />
+                                </div>
+                                <div>
+                                    <label style="display: block; color: #94a3b8; margin-bottom: 0.25rem;">MTU (Default 1500)</label>
+                                    <input type="number" min="576" max="1500" wire:model="natForm.mtu" style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.45rem; padding: 0.45rem; color: #ffffff; font-family: monospace;" />
+                                </div>
+                                <div>
+                                    <label style="display: block; color: #94a3b8; margin-bottom: 0.25rem;">NAT TCP Timeout (seg)</label>
+                                    <input type="number" min="60" wire:model="natForm.nat_tcp_timeout" style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.45rem; padding: 0.45rem; color: #ffffff; font-family: monospace;" />
+                                </div>
+                                <div>
+                                    <label style="display: block; color: #94a3b8; margin-bottom: 0.25rem;">NAT UDP Timeout (seg)</label>
+                                    <input type="number" min="10" wire:model="natForm.nat_udp_timeout" style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.45rem; padding: 0.45rem; color: #ffffff; font-family: monospace;" />
+                                </div>
+                            </div>
+
+                            <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 0.5rem;">
+                                <button type="button" wire:click="cerrarGestionHub" class="se-btn" style="background: #334155; color: #ffffff;">Cerrar</button>
+                                <button type="submit" class="se-btn se-btn-emerald">Guardar DHCP & SecureNAT</button>
+                            </div>
+                        </form>
+
+                        @if(!empty($hubManageDhcpTable))
+                            <div style="margin-top: 1.25rem; border-top: 1px solid #1e293b; padding-top: 1rem;">
+                                <h4 style="font-size: 0.85rem; font-weight: 600; color: #38bdf8; margin: 0 0 0.5rem 0;">
+                                    Concesiones DHCP Activas ({{ count($hubManageDhcpTable) }})
+                                </h4>
+                                <div style="overflow-x: auto;">
+                                    <table class="se-table" style="font-size: 0.75rem;">
+                                        <thead>
+                                            <tr>
+                                                <th>IP Asignada</th>
+                                                <th>MAC</th>
+                                                <th>Hostname</th>
+                                                <th>Expira</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($hubManageDhcpTable as $lease)
+                                                <tr>
+                                                    <td style="font-family: monospace; color: #34d399;">{{ $lease['IpAddress_ip'] ?? '-' }}</td>
+                                                    <td style="font-family: monospace;">{{ $lease['MacAddress_bin'] ?? '-' }}</td>
+                                                    <td>{{ $lease['Hostname_str'] ?? '-' }}</td>
+                                                    <td>{{ $lease['ExpireTime_dt'] ?? '-' }}</td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        @endif
+                    @endif
+
+                    <!-- SUB-TAB 2: USUARIOS DEL HUB -->
+                    @if($hubManageTab === 'users')
+                        <form wire:submit.prevent="crearUsuarioEnHub" style="padding: 0.9rem; background: #090e1a; border: 1px solid #1e293b; border-radius: 0.5rem; margin-bottom: 1rem;">
+                            <div style="font-size: 0.825rem; font-weight: 600; color: #38bdf8; margin-bottom: 0.65rem;">
+                                + Agregar Nuevo Usuario en {{ $managingHub }}
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.65rem;">
+                                <input type="text" wire:model="hubNewUsername" required placeholder="Usuario (ej: router_sucursal)" style="background: #1e293b; border: 1px solid #475569; border-radius: 0.45rem; padding: 0.45rem; color: #ffffff; font-size: 0.8rem;" />
+                                <input type="text" wire:model="hubNewRealname" placeholder="Nombre / Equipo" style="background: #1e293b; border: 1px solid #475569; border-radius: 0.45rem; padding: 0.45rem; color: #ffffff; font-size: 0.8rem;" />
+                                <input type="password" wire:model="hubNewPassword" required placeholder="Contraseña VPN" style="background: #1e293b; border: 1px solid #475569; border-radius: 0.45rem; padding: 0.45rem; color: #ffffff; font-size: 0.8rem;" />
+                                <input type="text" wire:model="hubNewNote" placeholder="Nota (opcional)" style="background: #1e293b; border: 1px solid #475569; border-radius: 0.45rem; padding: 0.45rem; color: #ffffff; font-size: 0.8rem;" />
+                            </div>
+                            <div style="display: flex; justify-content: flex-end; margin-top: 0.65rem;">
+                                <button type="submit" class="se-btn se-btn-sky" style="font-size: 0.78rem;">Agregar Usuario</button>
+                            </div>
+                        </form>
+
+                        <div style="overflow-x: auto;">
+                            <table class="se-table" style="font-size: 0.78rem;">
+                                <thead>
+                                    <tr>
+                                        <th>Usuario</th>
+                                        <th>Nombre</th>
+                                        <th>Estado</th>
+                                        <th>Último Acceso</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse($hubManageUsers as $hu)
+                                        @php
+                                            $hActive = (bool) ($hu['is_active'] ?? true);
+                                            $hTimed = (bool) ($hu['is_timed_disabled'] ?? false);
+                                        @endphp
+                                        <tr>
+                                            <td style="font-family: monospace; font-weight: 600; color: #38bdf8;">{{ $hu['username'] }}</td>
+                                            <td>{{ $hu['real_name'] }}</td>
+                                            <td>
+                                                @if($hActive)
+                                                    <span class="se-badge se-badge-emerald">Habilitado</span>
+                                                @elseif($hTimed)
+                                                    <span class="se-badge se-badge-amber" title="Hasta {{ $hu['disabled_until'] }}">Temporal ({{ $hu['disabled_until'] }})</span>
+                                                @else
+                                                    <span class="se-badge se-badge-rose">Deshabilitado</span>
+                                                @endif
+                                            </td>
+                                            <td>{{ $hu['last_login'] ?? 'Nunca' }}</td>
+                                            <td>
+                                                <div style="display: flex; gap: 0.4rem;">
+                                                    @if($hActive)
+                                                        <button type="button"
+                                                                wire:click="abrirModalDeshabilitarUsuario('{{ $hu['username'] }}', '{{ $managingHub }}')"
+                                                                class="se-btn se-btn-amber"
+                                                                style="padding: 0.25rem 0.55rem; font-size: 0.72rem;">
+                                                            Deshabilitar
+                                                        </button>
+                                                    @else
+                                                        <button type="button"
+                                                                wire:click="toggleUsuario('{{ $hu['username'] }}', true, '{{ $managingHub }}')"
+                                                                class="se-btn se-btn-emerald"
+                                                                style="padding: 0.25rem 0.55rem; font-size: 0.72rem;">
+                                                            Habilitar
+                                                        </button>
+                                                    @endif
+                                                    <button type="button"
+                                                            wire:click="eliminarUsuario('{{ $hu['username'] }}', '{{ $managingHub }}')"
+                                                            wire:confirm="¿Eliminar permanentemente al usuario {{ $hu['username'] }} del Hub {{ $managingHub }}?"
+                                                            class="se-btn se-btn-rose"
+                                                            style="padding: 0.25rem 0.55rem; font-size: 0.72rem;">
+                                                        Eliminar
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="5" style="text-align: center; color: #94a3b8; padding: 1.5rem;">
+                                                No hay usuarios registrados en el Virtual Hub {{ $managingHub }}.
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
+
+                    <!-- SUB-TAB 3: LOGS DEL HUB -->
+                    @if($hubManageTab === 'logs')
+                        <form wire:submit.prevent="guardarConfigLogsHub" style="display: flex; flex-direction: column; gap: 1rem; font-size: 0.85rem;">
+                            <div style="padding: 1rem; background: #090e1a; border: 1px solid #1e293b; border-radius: 0.5rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                                    <label style="display: flex; align-items: center; gap: 0.6rem; font-weight: 600; color: #ffffff; cursor: pointer;">
+                                        <input type="checkbox" wire:model="logForm.save_security_log" />
+                                        <span>Activar Log de Seguridad (Security Log)</span>
+                                    </label>
+                                    <span class="se-badge {{ !empty($logForm['save_security_log']) ? 'se-badge-emerald' : 'se-badge-rose' }}">
+                                        {{ !empty($logForm['save_security_log']) ? 'Activo' : 'Desactivado' }}
+                                    </span>
+                                </div>
+                                <div>
+                                    <label style="display: block; color: #94a3b8; font-size: 0.78rem; margin-bottom: 0.25rem;">Ciclo de rotación del archivo de Security Log</label>
+                                    <select wire:model="logForm.security_log_switch_type" style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.45rem; padding: 0.45rem; color: #ffffff;">
+                                        <option value="0">Sin rotación (archivo único)</option>
+                                        <option value="1">Por segundo</option>
+                                        <option value="2">Por minuto</option>
+                                        <option value="3">Cada hora</option>
+                                        <option value="4">Diario (Recomendado)</option>
+                                        <option value="5">Mensual</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div style="padding: 1rem; background: #090e1a; border: 1px solid #1e293b; border-radius: 0.5rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                                    <label style="display: flex; align-items: center; gap: 0.6rem; font-weight: 600; color: #ffffff; cursor: pointer;">
+                                        <input type="checkbox" wire:model="logForm.save_packet_log" />
+                                        <span>Activar Log de Paquetes (Packet Log)</span>
+                                    </label>
+                                    <span class="se-badge {{ !empty($logForm['save_packet_log']) ? 'se-badge-emerald' : 'se-badge-rose' }}">
+                                        {{ !empty($logForm['save_packet_log']) ? 'Activo' : 'Desactivado' }}
+                                    </span>
+                                </div>
+                                <div>
+                                    <label style="display: block; color: #94a3b8; font-size: 0.78rem; margin-bottom: 0.25rem;">Ciclo de rotación del archivo de Packet Log</label>
+                                    <select wire:model="logForm.packet_log_switch_type" style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.45rem; padding: 0.45rem; color: #ffffff;">
+                                        <option value="0">Sin rotación (archivo único)</option>
+                                        <option value="1">Por segundo</option>
+                                        <option value="2">Por minuto</option>
+                                        <option value="3">Cada hora</option>
+                                        <option value="4">Diario (Recomendado)</option>
+                                        <option value="5">Mensual</option>
+                                    </select>
+                                </div>
+                                <div style="margin-top: 0.6rem; font-size: 0.75rem; color: #94a3b8;">
+                                    Nota: El Packet Log registra cabeceras de tráfico (TCP/DHCP). Actívelo solo si necesita auditoría o diagnóstico de tráfico, ya que consume espacio en disco.
+                                </div>
+                            </div>
+
+                            <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                                <button type="button" wire:click="cerrarGestionHub" class="se-btn" style="background: #334155; color: #ffffff;">Cerrar</button>
+                                <button type="submit" class="se-btn se-btn-emerald">Guardar Configuración de Logs</button>
+                            </div>
+                        </form>
+                    @endif
                 </div>
             </div>
         @endif
