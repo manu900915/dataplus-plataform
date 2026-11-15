@@ -685,8 +685,26 @@ class SoftEtherService
         $allVpnUsers = $this->getAllUsers($virtualHubs, $activeSessions);
         $secureNat = $this->getSecureNatStatus($this->hub);
         $dhcpTable = $this->getDhcpTable($this->hub);
+        $allHubRoutes = $this->getAllHubSecureNatRoutes($virtualHubs);
+        $l3Data = $this->getL3Switches();
         $connectionDetails = $this->getConnectionDetails();
         $connectionDetails['available_hubs'] = !empty($virtualHubs) ? array_column($virtualHubs, 'hub_name') : [$this->hub];
+
+        if (!empty($virtualHubs) && !empty($allHubRoutes)) {
+            $virtualHubs = array_map(function ($vh) use ($allHubRoutes) {
+                $hName = $vh['hub_name'] ?? '';
+                if ($hName !== '' && isset($allHubRoutes[$hName])) {
+                    $vh['push_routes_count'] = count($allHubRoutes[$hName]['routes'] ?? []);
+                    $vh['apply_dhcp_push_routes'] = (bool) ($allHubRoutes[$hName]['apply_dhcp_push_routes'] ?? false);
+                    $vh['dhcp_push_routes'] = $allHubRoutes[$hName]['dhcp_push_routes'] ?? '';
+                } else {
+                    $vh['push_routes_count'] = 0;
+                    $vh['apply_dhcp_push_routes'] = false;
+                    $vh['dhcp_push_routes'] = '';
+                }
+                return $vh;
+            }, $virtualHubs);
+        }
 
         // 4. Si el servidor respondió con sesiones o usuarios reales, reflejarlo en serverStatus
         if (!empty($activeSessions) && ($serverStatus['total_sessions'] ?? 0) === 0) {
@@ -707,6 +725,10 @@ class SoftEtherService
             'virtualHubs' => $virtualHubs,
             'secureNat' => $secureNat,
             'dhcpTable' => $dhcpTable,
+            'allHubRoutes' => array_values($allHubRoutes),
+            'l3Switches' => $l3Data['switches'] ?? [],
+            'l3Interfaces' => $l3Data['interfaces'] ?? [],
+            'l3Tables' => $l3Data['tables'] ?? [],
             'connectionDetails' => $connectionDetails,
             'from_cache' => false,
             'updated_at' => date('H:i:s'),
@@ -1603,6 +1625,11 @@ class SoftEtherService
                 $subnet = $opt['DhcpSubnetMask_ip'] ?? $opt['Mask_ip'] ?? '255.255.255.0';
                 $startIp = $opt['DhcpLeaseIPStart_ip'] ?? null;
                 $endIp = $opt['DhcpLeaseIPEnd_ip'] ?? null;
+                $rawPushRoutes = trim((string) ($opt['DhcpPushRoutes_str'] ?? ''));
+                $parsedPushRoutes = $this->parsePushRoutes($rawPushRoutes);
+                $applyPushRoutes = array_key_exists('ApplyDhcpPushRoutes_bool', $opt)
+                    ? (bool) $opt['ApplyDhcpPushRoutes_bool']
+                    : !empty($parsedPushRoutes);
 
                 return [
                     'hub_name' => $hubName,
@@ -1622,6 +1649,9 @@ class SoftEtherService
                     'dns_server_2' => ($dns2 && $dns2 !== '0.0.0.0') ? $dns2 : '',
                     'dns_servers' => $dnsList,
                     'domain_name' => (string) ($opt['DhcpDomainName_str'] ?? ''),
+                    'apply_dhcp_push_routes' => $applyPushRoutes,
+                    'dhcp_push_routes' => $rawPushRoutes,
+                    'dhcp_push_routes_list' => $parsedPushRoutes,
                     'mtu' => (int) ($opt['Mtu_u32'] ?? 1500),
                     'nat_tcp_timeout' => (int) ($opt['NatTcpTimeout_u32'] ?? 1800),
                     'nat_udp_timeout' => (int) ($opt['NatUdpTimeout_u32'] ?? 60),
@@ -1656,6 +1686,9 @@ class SoftEtherService
             'dns_server_2' => '1.1.1.1',
             'dns_servers' => [],
             'domain_name' => '',
+            'apply_dhcp_push_routes' => false,
+            'dhcp_push_routes' => '',
+            'dhcp_push_routes_list' => [],
             'mtu' => 1500,
             'nat_tcp_timeout' => 1800,
             'nat_udp_timeout' => 60,
@@ -1668,6 +1701,213 @@ class SoftEtherService
             'dns_sessions' => 0,
             'is_kernel_mode' => false,
             'is_raw_ip_mode' => false,
+        ];
+    }
+
+    /**
+     * Convierte la cadena DhcpPushRoutes de SoftEther en una lista estructurada de rutas
+     */
+    public function parsePushRoutes(?string $raw): array
+    {
+        $clean = trim((string) $raw);
+        if ($clean === '') {
+            return [];
+        }
+
+        $tokens = preg_split('/[\s,;\r\n]+/', $clean, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $routes = [];
+
+        foreach ($tokens as $token) {
+            $parts = explode('/', trim($token));
+            if (count($parts) >= 3) {
+                $routes[] = [
+                    'network' => trim($parts[0]),
+                    'mask' => trim($parts[1]),
+                    'gateway' => trim($parts[2]),
+                ];
+            }
+        }
+
+        return $routes;
+    }
+
+    /**
+     * Valida y formatea un arreglo de rutas estáticas al formato DhcpPushRoutes de SoftEther
+     */
+    public function formatPushRoutes(array $routes): array
+    {
+        $formatted = [];
+
+        foreach ($routes as $idx => $route) {
+            $net = trim((string) ($route['network'] ?? ''));
+            $mask = trim((string) ($route['mask'] ?? ''));
+            $gw = trim((string) ($route['gateway'] ?? ''));
+
+            if ($net === '' && $mask === '' && $gw === '') {
+                continue;
+            }
+
+            if (!filter_var($net, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+                return [
+                    'valid' => false,
+                    'formatted' => '',
+                    'error' => "La ruta #" . ($idx + 1) . " tiene una dirección de red inválida: '{$net}'.",
+                ];
+            }
+            if (!filter_var($mask, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+                return [
+                    'valid' => false,
+                    'formatted' => '',
+                    'error' => "La ruta #" . ($idx + 1) . " tiene una máscara de subred inválida: '{$mask}'. Ejemplo: 255.255.255.0",
+                ];
+            }
+            if (!filter_var($gw, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+                return [
+                    'valid' => false,
+                    'formatted' => '',
+                    'error' => "La ruta #" . ($idx + 1) . " tiene un gateway inválido: '{$gw}'.",
+                ];
+            }
+
+            $formatted[] = "{$net}/{$mask}/{$gw}";
+        }
+
+        return [
+            'valid' => true,
+            'formatted' => implode(', ', $formatted),
+            'error' => null,
+        ];
+    }
+
+    /**
+     * Obtiene las rutas SecureNAT configuradas en todos los Virtual Hubs en paralelo
+     */
+    public function getAllHubSecureNatRoutes(array $virtualHubs = []): array
+    {
+        if (!$this->isConfigured() || empty($virtualHubs) || ($this->circuitBroken[$this->activeServerKey] ?? false)) {
+            return [];
+        }
+
+        $hubNames = array_values(array_unique(array_filter(array_column($virtualHubs, 'hub_name'))));
+        if (empty($hubNames)) {
+            return [];
+        }
+
+        $url = rtrim($this->rpcUrl, '/');
+        $url = str_ends_with($url, '/api') ? $url . '/' : $url . '/api/';
+
+        $headers = [
+            'Content-Type' => 'application/json',
+            'X-VPNADMIN-PASSWORD' => $this->adminPassword,
+        ];
+
+        $resultMap = [];
+
+        try {
+            foreach (array_chunk($hubNames, 20) as $chunk) {
+                $responses = Http::pool(function ($pool) use ($chunk, $url, $headers) {
+                    $calls = [];
+                    foreach ($chunk as $idx => $hubName) {
+                        $client = $pool->as($hubName)
+                            ->connectTimeout(4.0)
+                            ->timeout(8.0)
+                            ->withHeaders($headers);
+
+                        if (!$this->verifySsl) {
+                            $client = $client->withoutVerifying();
+                        }
+
+                        $calls[] = $client->post($url, [
+                            'jsonrpc' => '2.0',
+                            'id' => (string) (time() + 100 + $idx),
+                            'method' => 'GetSecureNATOption',
+                            'params' => (object) ['RpcHubName_str' => $hubName],
+                        ]);
+                    }
+                    return $calls;
+                });
+
+                foreach ($chunk as $hubName) {
+                    $resp = $responses[$hubName] ?? null;
+                    if ($resp && method_exists($resp, 'successful') && $resp->successful()) {
+                        $json = $resp->json();
+                        if (!isset($json['error']) && !empty($json['result'])) {
+                            $opt = $json['result'];
+                            $raw = trim((string) ($opt['DhcpPushRoutes_str'] ?? ''));
+                            $parsed = $this->parsePushRoutes($raw);
+                            $apply = array_key_exists('ApplyDhcpPushRoutes_bool', $opt)
+                                ? (bool) $opt['ApplyDhcpPushRoutes_bool']
+                                : !empty($parsed);
+
+                            $resultMap[$hubName] = [
+                                'hub_name' => $hubName,
+                                'apply_dhcp_push_routes' => $apply,
+                                'dhcp_push_routes' => $raw,
+                                'routes' => $parsed,
+                            ];
+                        }
+                    }
+                }
+            }
+        } catch (Exception $e) {
+            Log::warning("SoftEther getAllHubSecureNatRoutes pool error ({$this->activeServerKey}): " . $e->getMessage());
+        }
+
+        return $resultMap;
+    }
+
+    /**
+     * Guarda exclusivamente las rutas estáticas DHCP Push Routes de SecureNAT en un Virtual Hub
+     */
+    public function saveSecureNatPushRoutes(array $routes, bool $apply = true, ?string $hub = null): array
+    {
+        $hubName = $hub ?: $this->hub;
+
+        if (!$this->isConfigured()) {
+            return [
+                'success' => false,
+                'message' => 'El servidor no está configurado o no responde.',
+            ];
+        }
+
+        $validation = $this->formatPushRoutes($routes);
+        if (!$validation['valid']) {
+            return [
+                'success' => false,
+                'message' => $validation['error'] ?? 'Formato de rutas inválido.',
+            ];
+        }
+
+        $optRes = $this->callRpc('GetSecureNATOption', ['RpcHubName_str' => $hubName]);
+        if (!$optRes['success']) {
+            $optRes = $this->callRpc('GetSecureNATOption', ['HubName_str' => $hubName]);
+        }
+
+        if (!$optRes['success']) {
+            return [
+                'success' => false,
+                'message' => "No se pudo leer la configuración actual de SecureNAT en '{$hubName}': " . ($optRes['error'] ?? 'Error RPC'),
+            ];
+        }
+
+        $payload = $optRes['data'] ?? [];
+        $payload['RpcHubName_str'] = $hubName;
+        $payload['ApplyDhcpPushRoutes_bool'] = $apply;
+        $payload['DhcpPushRoutes_str'] = $validation['formatted'];
+
+        $saveRes = $this->callRpc('SetSecureNATOption', $payload);
+        if ($saveRes['success']) {
+            $this->clearCache($this->activeServerKey);
+            $count = count($this->parsePushRoutes($validation['formatted']));
+            return [
+                'success' => true,
+                'message' => "Se guardaron {$count} ruta(s) en SecureNAT del Virtual Hub '{$hubName}'.",
+            ];
+        }
+
+        return [
+            'success' => false,
+            'message' => "Error al guardar rutas de SecureNAT en '{$hubName}': {$saveRes['error']}",
         ];
     }
 
@@ -1719,6 +1959,29 @@ class SoftEtherService
         $payload['DhcpDomainName_str'] = trim((string) ($config['domain_name'] ?? ''));
         $payload['SaveLog_bool'] = (bool) ($config['save_log'] ?? $opt['SaveLog_bool'] ?? true);
 
+        if (isset($config['dhcp_push_routes_list']) && is_array($config['dhcp_push_routes_list'])) {
+            $routeCheck = $this->formatPushRoutes($config['dhcp_push_routes_list']);
+            if (!$routeCheck['valid']) {
+                return [
+                    'success' => false,
+                    'message' => $routeCheck['error'] ?? 'Error en rutas estáticas.',
+                ];
+            }
+            $payload['DhcpPushRoutes_str'] = $routeCheck['formatted'];
+            $payload['ApplyDhcpPushRoutes_bool'] = (bool) ($config['apply_dhcp_push_routes'] ?? !empty($routeCheck['formatted']));
+        } elseif (array_key_exists('dhcp_push_routes', $config)) {
+            $parsed = $this->parsePushRoutes((string) $config['dhcp_push_routes']);
+            $routeCheck = $this->formatPushRoutes($parsed);
+            if (!$routeCheck['valid']) {
+                return [
+                    'success' => false,
+                    'message' => $routeCheck['error'] ?? 'Error en rutas estáticas.',
+                ];
+            }
+            $payload['DhcpPushRoutes_str'] = $routeCheck['formatted'];
+            $payload['ApplyDhcpPushRoutes_bool'] = (bool) ($config['apply_dhcp_push_routes'] ?? !empty($routeCheck['formatted']));
+        }
+
         $saveRes = $this->callRpc('SetSecureNATOption', $payload);
         if (!$saveRes['success']) {
             return [
@@ -1740,6 +2003,504 @@ class SoftEtherService
             'success' => true,
             'message' => "Configuración de SecureNAT y DHCP guardada correctamente en el Virtual Hub '{$hubName}'.",
         ];
+    }
+
+    // =========================================================================
+    // LAYER 3 SWITCHES, INTERFACES L3 Y TABLAS DE ENRUTAMIENTO (EnumL3Switch/If/Table)
+    // =========================================================================
+
+    /**
+     * Obtiene todos los Virtual Layer 3 Switches, sus Interfaces L3 y sus Tablas de Rutas
+     */
+    public function getL3Switches(): array
+    {
+        if (!$this->isConfigured()) {
+            return ['switches' => [], 'interfaces' => [], 'tables' => []];
+        }
+
+        $res = $this->callRpc('EnumL3Switch');
+        if (!$res['success']) {
+            return ['switches' => [], 'interfaces' => [], 'tables' => []];
+        }
+
+        $rawSwitches = $res['data']['L3SWList'] ?? $res['data']['L3SwitchList'] ?? [];
+        if (empty($rawSwitches)) {
+            return ['switches' => [], 'interfaces' => [], 'tables' => []];
+        }
+
+        $switches = [];
+        $allInterfaces = [];
+        $allTables = [];
+
+        $url = rtrim($this->rpcUrl, '/');
+        $url = str_ends_with($url, '/api') ? $url . '/' : $url . '/api/';
+        $headers = [
+            'Content-Type' => 'application/json',
+            'X-VPNADMIN-PASSWORD' => $this->adminPassword,
+        ];
+
+        $switchMeta = [];
+        foreach ($rawSwitches as $sw) {
+            $name = trim((string) ($sw['Name_str'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+            $switchMeta[$name] = [
+                'name' => $name,
+                'num_interfaces' => (int) ($sw['NumInterfaces_u32'] ?? 0),
+                'num_tables' => (int) ($sw['NumTables_u32'] ?? 0),
+                'active' => !empty($sw['Active_bool']),
+                'online' => !empty($sw['Online_bool']),
+                'interfaces' => [],
+                'tables' => [],
+            ];
+        }
+
+        $names = array_keys($switchMeta);
+        try {
+            $responses = Http::pool(function ($pool) use ($names, $url, $headers) {
+                $calls = [];
+                foreach ($names as $idx => $swName) {
+                    $c1 = $pool->as("if_{$swName}")->connectTimeout(4.0)->timeout(8.0)->withHeaders($headers);
+                    $c2 = $pool->as("tbl_{$swName}")->connectTimeout(4.0)->timeout(8.0)->withHeaders($headers);
+                    if (!$this->verifySsl) {
+                        $c1 = $c1->withoutVerifying();
+                        $c2 = $c2->withoutVerifying();
+                    }
+                    $calls[] = $c1->post($url, [
+                        'jsonrpc' => '2.0',
+                        'id' => (string) (time() + 200 + $idx),
+                        'method' => 'EnumL3If',
+                        'params' => (object) ['Name_str' => $swName],
+                    ]);
+                    $calls[] = $c2->post($url, [
+                        'jsonrpc' => '2.0',
+                        'id' => (string) (time() + 300 + $idx),
+                        'method' => 'EnumL3Table',
+                        'params' => (object) ['Name_str' => $swName],
+                    ]);
+                }
+                return $calls;
+            });
+
+            foreach ($names as $swName) {
+                $ifResp = $responses["if_{$swName}"] ?? null;
+                if ($ifResp && method_exists($ifResp, 'successful') && $ifResp->successful()) {
+                    $ifJson = $ifResp->json();
+                    $ifList = $ifJson['result']['L3IFList'] ?? $ifJson['result']['L3IfList'] ?? [];
+                    foreach ($ifList as $item) {
+                        $row = [
+                            'switch_name' => $swName,
+                            'switch_active' => $switchMeta[$swName]['active'],
+                            'switch_online' => $switchMeta[$swName]['online'],
+                            'hub_name' => (string) ($item['HubName_str'] ?? ''),
+                            'ip_address' => (string) ($item['IpAddress_ip'] ?? ''),
+                            'subnet_mask' => (string) ($item['SubnetMask_ip'] ?? '255.255.255.0'),
+                        ];
+                        $switchMeta[$swName]['interfaces'][] = $row;
+                        $allInterfaces[] = $row;
+                    }
+                }
+
+                $tblResp = $responses["tbl_{$swName}"] ?? null;
+                if ($tblResp && method_exists($tblResp, 'successful') && $tblResp->successful()) {
+                    $tblJson = $tblResp->json();
+                    $tblList = $tblJson['result']['L3Table'] ?? $tblJson['result']['L3TableList'] ?? [];
+                    foreach ($tblList as $item) {
+                        $row = [
+                            'switch_name' => $swName,
+                            'network_address' => (string) ($item['NetworkAddress_ip'] ?? ''),
+                            'subnet_mask' => (string) ($item['SubnetMask_ip'] ?? '255.255.255.0'),
+                            'gateway_address' => (string) ($item['GatewayAddress_ip'] ?? ''),
+                            'metric' => (int) ($item['Metric_u32'] ?? 1),
+                        ];
+                        $switchMeta[$swName]['tables'][] = $row;
+                        $allTables[] = $row;
+                    }
+                }
+            }
+        } catch (Exception $e) {
+            Log::warning("SoftEther getL3Switches pool error ({$this->activeServerKey}): " . $e->getMessage());
+        }
+
+        $switches = array_values($switchMeta);
+
+        return [
+            'switches' => $switches,
+            'interfaces' => $allInterfaces,
+            'tables' => $allTables,
+        ];
+    }
+
+    /**
+     * Ejecuta modificaciones en un L3 Switch deteniéndolo temporalmente si está activo (requisito de SoftEther)
+     */
+    protected function withStoppedL3Switch(string $switchName, callable $callback): array
+    {
+        $enumRes = $this->callRpc('EnumL3Switch');
+        $wasActive = false;
+
+        if ($enumRes['success']) {
+            $rawSwitches = $enumRes['data']['L3SWList'] ?? $enumRes['data']['L3SwitchList'] ?? [];
+            foreach ($rawSwitches as $sw) {
+                if (strcasecmp((string) ($sw['Name_str'] ?? ''), $switchName) === 0) {
+                    $wasActive = !empty($sw['Active_bool']);
+                    break;
+                }
+            }
+        }
+
+        if ($wasActive) {
+            $stopRes = $this->callRpc('StopL3Switch', ['Name_str' => $switchName]);
+            if (!$stopRes['success']) {
+                return [
+                    'success' => false,
+                    'message' => "No se pudo detener el Switch L3 '{$switchName}' para modificarlo: " . ($stopRes['error'] ?? 'Error RPC'),
+                ];
+            }
+        }
+
+        $result = $callback();
+
+        if ($wasActive) {
+            $startRes = $this->callRpc('StartL3Switch', ['Name_str' => $switchName]);
+            if (!$startRes['success'] && !empty($result['success'])) {
+                $result['message'] .= " (Aviso: no se pudo reactivar automáticamente el Switch L3: {$startRes['error']})";
+            }
+        }
+
+        return $result;
+    }
+
+    public function createL3Switch(string $name): array
+    {
+        $clean = trim($name);
+        if ($clean === '') {
+            return ['success' => false, 'message' => 'El nombre del Switch L3 es obligatorio.'];
+        }
+        if (!$this->isConfigured()) {
+            return ['success' => false, 'message' => 'El servidor no está configurado o no responde.'];
+        }
+
+        $res = $this->callRpc('AddL3Switch', ['Name_str' => $clean]);
+        if ($res['success']) {
+            $this->clearCache($this->activeServerKey);
+            return ['success' => true, 'message' => "Switch Virtual L3 '{$clean}' creado exitosamente."];
+        }
+
+        return ['success' => false, 'message' => "Error al crear Switch L3: {$res['error']}"];
+    }
+
+    public function deleteL3Switch(string $name): array
+    {
+        $clean = trim($name);
+        if ($clean === '' || !$this->isConfigured()) {
+            return ['success' => false, 'message' => 'Switch inválido o servidor no configurado.'];
+        }
+
+        @$this->callRpc('StopL3Switch', ['Name_str' => $clean]);
+        $res = $this->callRpc('DelL3Switch', ['Name_str' => $clean]);
+        if ($res['success']) {
+            $this->clearCache($this->activeServerKey);
+            return ['success' => true, 'message' => "Switch Virtual L3 '{$clean}' eliminado exitosamente."];
+        }
+
+        return ['success' => false, 'message' => "No se pudo eliminar el Switch L3: {$res['error']}"];
+    }
+
+    public function toggleL3Switch(string $name, bool $start): array
+    {
+        $clean = trim($name);
+        if ($clean === '' || !$this->isConfigured()) {
+            return ['success' => false, 'message' => 'Switch inválido o servidor no configurado.'];
+        }
+
+        $method = $start ? 'StartL3Switch' : 'StopL3Switch';
+        $res = $this->callRpc($method, ['Name_str' => $clean]);
+        if ($res['success']) {
+            $this->clearCache($this->activeServerKey);
+            $estado = $start ? 'iniciado' : 'detenido';
+            return ['success' => true, 'message' => "Switch Virtual L3 '{$clean}' {$estado} correctamente."];
+        }
+
+        return ['success' => false, 'message' => "Error al cambiar estado del Switch L3 '{$clean}': {$res['error']}"];
+    }
+
+    public function addL3Interface(string $switchName, string $hubName, string $ip, string $mask): array
+    {
+        $switchName = trim($switchName);
+        $hubName = trim($hubName);
+        $ip = trim($ip);
+        $mask = trim($mask);
+
+        if ($switchName === '' || $hubName === '') {
+            return ['success' => false, 'message' => 'Debe seleccionar el Switch L3 y el Virtual Hub.'];
+        }
+        if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            return ['success' => false, 'message' => "Dirección IP inválida: '{$ip}'."];
+        }
+        if (!filter_var($mask, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            return ['success' => false, 'message' => "Máscara de subred inválida: '{$mask}'."];
+        }
+        if (!$this->isConfigured()) {
+            return ['success' => false, 'message' => 'El servidor no está configurado o no responde.'];
+        }
+
+        $res = $this->withStoppedL3Switch($switchName, function () use ($switchName, $hubName, $ip, $mask) {
+            $rpc = $this->callRpc('AddL3If', [
+                'Name_str' => $switchName,
+                'HubName_str' => $hubName,
+                'IpAddress_ip' => $ip,
+                'SubnetMask_ip' => $mask,
+            ]);
+
+            if ($rpc['success']) {
+                return [
+                    'success' => true,
+                    'message' => "Interfaz L3 ({$hubName}: {$ip}/{$mask}) añadida al Switch '{$switchName}'.",
+                ];
+            }
+
+            return [
+                'success' => false,
+                'message' => "Error al añadir interfaz L3: {$rpc['error']}",
+            ];
+        });
+
+        if (!empty($res['success'])) {
+            $this->clearCache($this->activeServerKey);
+        }
+
+        return $res;
+    }
+
+    public function updateL3Interface(
+        string $switchName,
+        string $originalHubName,
+        string $originalIp,
+        string $originalMask,
+        string $newHubName,
+        string $newIp,
+        string $newMask
+    ): array {
+        $switchName = trim($switchName);
+        $originalHubName = trim($originalHubName);
+        $newHubName = trim($newHubName);
+        $newIp = trim($newIp);
+        $newMask = trim($newMask);
+
+        if ($switchName === '' || $newHubName === '') {
+            return ['success' => false, 'message' => 'Switch L3 y Virtual Hub son obligatorios.'];
+        }
+        if (!filter_var($newIp, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            return ['success' => false, 'message' => "Dirección IP inválida: '{$newIp}'."];
+        }
+        if (!filter_var($newMask, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            return ['success' => false, 'message' => "Máscara de subred inválida: '{$newMask}'."];
+        }
+        if (!$this->isConfigured()) {
+            return ['success' => false, 'message' => 'El servidor no está configurado o no responde.'];
+        }
+
+        $res = $this->withStoppedL3Switch($switchName, function () use ($switchName, $originalHubName, $originalIp, $originalMask, $newHubName, $newIp, $newMask) {
+            $del = $this->callRpc('DelL3If', [
+                'Name_str' => $switchName,
+                'HubName_str' => $originalHubName,
+            ]);
+
+            if (!$del['success']) {
+                return [
+                    'success' => false,
+                    'message' => "No se pudo reemplazar la interfaz L3 anterior '{$originalHubName}': {$del['error']}",
+                ];
+            }
+
+            $add = $this->callRpc('AddL3If', [
+                'Name_str' => $switchName,
+                'HubName_str' => $newHubName,
+                'IpAddress_ip' => $newIp,
+                'SubnetMask_ip' => $newMask,
+            ]);
+
+            if ($add['success']) {
+                return [
+                    'success' => true,
+                    'message' => "Interfaz L3 en '{$switchName}' actualizada a {$newHubName} ({$newIp} / {$newMask}).",
+                ];
+            }
+
+            // Rollback si falló la creación de la nueva interfaz
+            if ($originalHubName !== '' && $originalIp !== '' && $originalMask !== '') {
+                @$this->callRpc('AddL3If', [
+                    'Name_str' => $switchName,
+                    'HubName_str' => $originalHubName,
+                    'IpAddress_ip' => $originalIp,
+                    'SubnetMask_ip' => $originalMask,
+                ]);
+            }
+
+            return [
+                'success' => false,
+                'message' => "Error al actualizar interfaz L3 (se restauró la anterior): {$add['error']}",
+            ];
+        });
+
+        if (!empty($res['success'])) {
+            $this->clearCache($this->activeServerKey);
+        }
+
+        return $res;
+    }
+
+    public function deleteL3Interface(string $switchName, string $hubName): array
+    {
+        $switchName = trim($switchName);
+        $hubName = trim($hubName);
+        if ($switchName === '' || $hubName === '' || !$this->isConfigured()) {
+            return ['success' => false, 'message' => 'Parámetros inválidos o servidor desconectado.'];
+        }
+
+        $res = $this->withStoppedL3Switch($switchName, function () use ($switchName, $hubName) {
+            $rpc = $this->callRpc('DelL3If', [
+                'Name_str' => $switchName,
+                'HubName_str' => $hubName,
+            ]);
+            if ($rpc['success']) {
+                return ['success' => true, 'message' => "Interfaz L3 del Hub '{$hubName}' eliminada del Switch '{$switchName}'."];
+            }
+            return ['success' => false, 'message' => "No se pudo eliminar la interfaz L3: {$rpc['error']}"];
+        });
+
+        if (!empty($res['success'])) {
+            $this->clearCache($this->activeServerKey);
+        }
+
+        return $res;
+    }
+
+    public function addL3Route(string $switchName, string $network, string $mask, string $gateway, int $metric = 1): array
+    {
+        $switchName = trim($switchName);
+        $network = trim($network);
+        $mask = trim($mask);
+        $gateway = trim($gateway);
+        $metric = max(1, $metric);
+
+        if ($switchName === '' || !$this->isConfigured()) {
+            return ['success' => false, 'message' => 'Switch L3 requerido o servidor no configurado.'];
+        }
+        if (!filter_var($network, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)
+            || !filter_var($mask, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)
+            || !filter_var($gateway, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            return ['success' => false, 'message' => 'Red destino, máscara y gateway deben ser direcciones IPv4 válidas.'];
+        }
+
+        $res = $this->withStoppedL3Switch($switchName, function () use ($switchName, $network, $mask, $gateway, $metric) {
+            $rpc = $this->callRpc('AddL3Table', [
+                'Name_str' => $switchName,
+                'NetworkAddress_ip' => $network,
+                'SubnetMask_ip' => $mask,
+                'GatewayAddress_ip' => $gateway,
+                'Metric_u32' => $metric,
+            ]);
+            if ($rpc['success']) {
+                return ['success' => true, 'message' => "Ruta L3 ({$network}/{$mask} via {$gateway}) añadida a '{$switchName}'."];
+            }
+            return ['success' => false, 'message' => "Error al añadir ruta L3: {$rpc['error']}"];
+        });
+
+        if (!empty($res['success'])) {
+            $this->clearCache($this->activeServerKey);
+        }
+
+        return $res;
+    }
+
+    public function updateL3Route(string $switchName, array $original, array $updated): array
+    {
+        $switchName = trim($switchName);
+        $newNet = trim((string) ($updated['network_address'] ?? ''));
+        $newMask = trim((string) ($updated['subnet_mask'] ?? ''));
+        $newGw = trim((string) ($updated['gateway_address'] ?? ''));
+        $newMetric = max(1, (int) ($updated['metric'] ?? 1));
+
+        if ($switchName === '' || !$this->isConfigured()) {
+            return ['success' => false, 'message' => 'Switch L3 inválido o servidor no configurado.'];
+        }
+        if (!filter_var($newNet, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)
+            || !filter_var($newMask, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)
+            || !filter_var($newGw, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            return ['success' => false, 'message' => 'Red destino, máscara y gateway deben ser IPv4 válidas.'];
+        }
+
+        $res = $this->withStoppedL3Switch($switchName, function () use ($switchName, $original, $newNet, $newMask, $newGw, $newMetric) {
+            $del = $this->callRpc('DelL3Table', [
+                'Name_str' => $switchName,
+                'NetworkAddress_ip' => trim((string) ($original['network_address'] ?? '')),
+                'SubnetMask_ip' => trim((string) ($original['subnet_mask'] ?? '')),
+                'GatewayAddress_ip' => trim((string) ($original['gateway_address'] ?? '')),
+                'Metric_u32' => max(1, (int) ($original['metric'] ?? 1)),
+            ]);
+            if (!$del['success']) {
+                return ['success' => false, 'message' => "No se pudo actualizar la ruta L3 anterior: {$del['error']}"];
+            }
+
+            $add = $this->callRpc('AddL3Table', [
+                'Name_str' => $switchName,
+                'NetworkAddress_ip' => $newNet,
+                'SubnetMask_ip' => $newMask,
+                'GatewayAddress_ip' => $newGw,
+                'Metric_u32' => $newMetric,
+            ]);
+            if ($add['success']) {
+                return ['success' => true, 'message' => "Ruta L3 en '{$switchName}' actualizada correctamente."];
+            }
+
+            // Rollback
+            @$this->callRpc('AddL3Table', [
+                'Name_str' => $switchName,
+                'NetworkAddress_ip' => trim((string) ($original['network_address'] ?? '')),
+                'SubnetMask_ip' => trim((string) ($original['subnet_mask'] ?? '')),
+                'GatewayAddress_ip' => trim((string) ($original['gateway_address'] ?? '')),
+                'Metric_u32' => max(1, (int) ($original['metric'] ?? 1)),
+            ]);
+
+            return ['success' => false, 'message' => "Error al guardar la nueva ruta L3: {$add['error']}"];
+        });
+
+        if (!empty($res['success'])) {
+            $this->clearCache($this->activeServerKey);
+        }
+
+        return $res;
+    }
+
+    public function deleteL3Route(string $switchName, string $network, string $mask, string $gateway, int $metric = 1): array
+    {
+        $switchName = trim($switchName);
+        if ($switchName === '' || !$this->isConfigured()) {
+            return ['success' => false, 'message' => 'Parámetros inválidos o servidor desconectado.'];
+        }
+
+        $res = $this->withStoppedL3Switch($switchName, function () use ($switchName, $network, $mask, $gateway, $metric) {
+            $rpc = $this->callRpc('DelL3Table', [
+                'Name_str' => $switchName,
+                'NetworkAddress_ip' => trim($network),
+                'SubnetMask_ip' => trim($mask),
+                'GatewayAddress_ip' => trim($gateway),
+                'Metric_u32' => max(1, $metric),
+            ]);
+            if ($rpc['success']) {
+                return ['success' => true, 'message' => "Ruta L3 ({$network}/{$mask}) eliminada del Switch '{$switchName}'."];
+            }
+            return ['success' => false, 'message' => "No se pudo eliminar la ruta L3: {$rpc['error']}"];
+        });
+
+        if (!empty($res['success'])) {
+            $this->clearCache($this->activeServerKey);
+        }
+
+        return $res;
     }
 
     /**

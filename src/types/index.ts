@@ -373,6 +373,12 @@ export interface SoftEtherUser {
   currently_connected: boolean;
 }
 
+export interface SoftEtherPushRoute {
+  network: string;
+  mask: string;
+  gateway: string;
+}
+
 export interface SoftEtherHub {
   hub_name: string;
   status: string;
@@ -389,6 +395,9 @@ export interface SoftEtherHub {
   security_log_switch_type?: number;
   save_packet_log?: boolean;
   packet_log_switch_type?: number;
+  push_routes_count?: number;
+  apply_dhcp_push_routes?: boolean;
+  dhcp_push_routes?: SoftEtherPushRoute[];
 }
 
 export interface SoftEtherServerStatus {
@@ -426,6 +435,31 @@ export interface SoftEtherSecureNat {
   mtu?: number;
   active_dhcp_leases: number;
   total_nat_sessions: number;
+  apply_dhcp_push_routes?: boolean;
+  dhcp_push_routes_list?: SoftEtherPushRoute[];
 }
 
+export interface SoftEtherL3Interface {
+  switch_name: string;
+  switch_active: boolean;
+  hub_name: string;
+  ip_address: string;
+  subnet_mask: string;
+}
+
+export interface SoftEtherL3Table {
+  switch_name: string;
+  network_address: string;
+  subnet_mask: string;
+  gateway_address: string;
+  metric: number;
+}
+
+export interface SoftEtherL3Switch {
+  name: string;
+  active: boolean;
+  online: boolean;
+  interfaces: SoftEtherL3Interface[];
+  tables: SoftEtherL3Table[];
+}
 

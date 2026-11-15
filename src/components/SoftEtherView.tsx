@@ -25,7 +25,10 @@ import {
   Trash2,
   Settings,
   Clock,
-  FileText
+  FileText,
+  Network,
+  Route,
+  Edit2
 } from 'lucide-react';
 import { 
   SoftEtherSession, 
@@ -33,6 +36,10 @@ import {
   SoftEtherHub, 
   SoftEtherServerStatus, 
   SoftEtherSecureNat,
+  SoftEtherPushRoute,
+  SoftEtherL3Switch,
+  SoftEtherL3Interface,
+  SoftEtherL3Table,
   Cliente
 } from '../types';
 
@@ -41,7 +48,7 @@ interface SoftEtherViewProps {
 }
 
 export const SoftEtherView: React.FC<SoftEtherViewProps> = ({ clientes = [] }) => {
-  const [activeTab, setActiveTab] = useState<'resumen' | 'sesiones' | 'usuarios' | 'hubs' | 'config'>('resumen');
+  const [activeTab, setActiveTab] = useState<'resumen' | 'sesiones' | 'usuarios' | 'hubs' | 'l3' | 'config'>('resumen');
   const [selectedServer, setSelectedServer] = useState<'vps1' | 'vps2'>('vps1');
   const [inspectingSession, setInspectingSession] = useState<SoftEtherSession | null>(null);
   const [flushingConfig, setFlushingConfig] = useState(false);
@@ -83,18 +90,59 @@ export const SoftEtherView: React.FC<SoftEtherViewProps> = ({ clientes = [] }) =
   const [newHubPassword, setNewHubPassword] = useState('');
   const [hubToDelete, setHubToDelete] = useState<string | null>(null);
 
-  // Modal de gestión por Virtual Hub (DHCP, SecureNAT, Usuarios, Logs)
+  // Modal de gestión por Virtual Hub (DHCP, SecureNAT, Rutas, Usuarios, Logs)
   const [managingHub, setManagingHub] = useState<string | null>(null);
-  const [hubManageTab, setHubManageTab] = useState<'nat_dhcp' | 'users' | 'logs'>('nat_dhcp');
+  const [hubManageTab, setHubManageTab] = useState<'nat_dhcp' | 'routes' | 'users' | 'logs'>('nat_dhcp');
   const [hubNewUsername, setHubNewUsername] = useState('');
   const [hubNewRealName, setHubNewRealName] = useState('');
   const [hubNewPassword, setHubNewPassword] = useState('');
   const [hubNatConfigs, setHubNatConfigs] = useState<Record<string, SoftEtherSecureNat>>({});
+  const [newRouteNetwork, setNewRouteNetwork] = useState('');
+  const [newRouteMask, setNewRouteMask] = useState('255.255.255.0');
+  const [newRouteGateway, setNewRouteGateway] = useState('');
 
   // Búsqueda y paginación de Virtual Hubs
   const [hubSearch, setHubSearch] = useState('');
   const [hubPage, setHubPage] = useState(1);
   const hubsPerPage = 6;
+
+  // Estado L3 Switches, Interfaces L3 y Rutas L3
+  const [l3Search, setL3Search] = useState('');
+  const [l3SwitchFilter, setL3SwitchFilter] = useState('');
+  const [routeHubSearch, setRouteHubSearch] = useState('');
+  const [l3Switches, setL3Switches] = useState<SoftEtherL3Switch[]>([
+    {
+      name: 'L3_CORE_DATAPLUS',
+      active: true,
+      online: true,
+      interfaces: [
+        { switch_name: 'L3_CORE_DATAPLUS', switch_active: true, hub_name: 'DEFAULT', ip_address: '192.168.30.254', subnet_mask: '255.255.255.0' },
+        { switch_name: 'L3_CORE_DATAPLUS', switch_active: true, hub_name: 'DATAPLUS_REMOTE', ip_address: '10.20.0.254', subnet_mask: '255.255.255.0' }
+      ],
+      tables: [
+        { switch_name: 'L3_CORE_DATAPLUS', network_address: '10.10.0.0', subnet_mask: '255.255.0.0', gateway_address: '192.168.30.1', metric: 1 }
+      ]
+    }
+  ]);
+
+  // Modales L3
+  const [isAddL3SwitchOpen, setIsAddL3SwitchOpen] = useState(false);
+  const [newL3SwitchName, setNewL3SwitchName] = useState('');
+
+  const [isL3IfModalOpen, setIsL3IfModalOpen] = useState(false);
+  const [editingL3IfOrig, setEditingL3IfOrig] = useState<{ switch_name: string; hub_name: string } | null>(null);
+  const [l3IfFormSwitch, setL3IfFormSwitch] = useState('L3_CORE_DATAPLUS');
+  const [l3IfFormHub, setL3IfFormHub] = useState('DEFAULT');
+  const [l3IfFormIp, setL3IfFormIp] = useState('');
+  const [l3IfFormMask, setL3IfFormMask] = useState('255.255.255.0');
+
+  const [isL3RouteModalOpen, setIsL3RouteModalOpen] = useState(false);
+  const [editingL3RouteOrig, setEditingL3RouteOrig] = useState<SoftEtherL3Table | null>(null);
+  const [l3RouteFormSwitch, setL3RouteFormSwitch] = useState('L3_CORE_DATAPLUS');
+  const [l3RouteFormNetwork, setL3RouteFormNetwork] = useState('');
+  const [l3RouteFormMask, setL3RouteFormMask] = useState('255.255.255.0');
+  const [l3RouteFormGateway, setL3RouteFormGateway] = useState('');
+  const [l3RouteFormMetric, setL3RouteFormMetric] = useState(1);
 
   // Estado del servidor
   const [serverStatus] = useState<SoftEtherServerStatus>({
@@ -254,7 +302,13 @@ export const SoftEtherView: React.FC<SoftEtherViewProps> = ({ clientes = [] }) =
       save_security_log: true,
       security_log_switch_type: 4,
       save_packet_log: false,
-      packet_log_switch_type: 4
+      packet_log_switch_type: 4,
+      push_routes_count: 2,
+      apply_dhcp_push_routes: true,
+      dhcp_push_routes: [
+        { network: '10.10.0.0', mask: '255.255.255.0', gateway: '192.168.30.1' },
+        { network: '172.16.10.0', mask: '255.255.255.0', gateway: '192.168.30.254' }
+      ]
     },
     {
       hub_name: 'DATAPLUS_REMOTE',
@@ -271,7 +325,12 @@ export const SoftEtherView: React.FC<SoftEtherViewProps> = ({ clientes = [] }) =
       save_security_log: true,
       security_log_switch_type: 4,
       save_packet_log: true,
-      packet_log_switch_type: 3
+      packet_log_switch_type: 3,
+      push_routes_count: 1,
+      apply_dhcp_push_routes: true,
+      dhcp_push_routes: [
+        { network: '192.168.30.0', mask: '255.255.255.0', gateway: '10.20.0.254' }
+      ]
     }
   ]);
 
@@ -290,7 +349,12 @@ export const SoftEtherView: React.FC<SoftEtherViewProps> = ({ clientes = [] }) =
     domain_name: 'dataplus.local',
     mtu: 1500,
     active_dhcp_leases: 3,
-    total_nat_sessions: 48
+    total_nat_sessions: 48,
+    apply_dhcp_push_routes: true,
+    dhcp_push_routes_list: [
+      { network: '10.10.0.0', mask: '255.255.255.0', gateway: '192.168.30.1' },
+      { network: '172.16.10.0', mask: '255.255.255.0', gateway: '192.168.30.254' }
+    ]
   });
 
   // Desconectar sesión
@@ -417,18 +481,178 @@ export const SoftEtherView: React.FC<SoftEtherViewProps> = ({ clientes = [] }) =
     setHubToDelete(null);
   };
 
-  const openHubManagement = (hubName: string, tab: 'nat_dhcp' | 'users' | 'logs') => {
+  const openHubManagement = (hubName: string, tab: 'nat_dhcp' | 'routes' | 'users' | 'logs') => {
     setManagingHub(hubName);
     setHubManageTab(tab);
     if (!hubNatConfigs[hubName]) {
+      const hubObj = hubs.find(h => h.hub_name === hubName);
       setHubNatConfigs(prev => ({
         ...prev,
         [hubName]: {
           ...secureNat,
           hub_name: hubName,
+          apply_dhcp_push_routes: hubObj?.apply_dhcp_push_routes ?? true,
+          dhcp_push_routes_list: hubObj?.dhcp_push_routes ? [...hubObj.dhcp_push_routes] : [],
         }
       }));
     }
+  };
+
+  // Gestión de L3 Switches, Interfaces L3 y Tablas de Rutas L3
+  const allL3Interfaces: SoftEtherL3Interface[] = l3Switches.flatMap(sw =>
+    sw.interfaces.map(iface => ({ ...iface, switch_name: sw.name, switch_active: sw.active }))
+  );
+
+  const allL3Tables: SoftEtherL3Table[] = l3Switches.flatMap(sw =>
+    sw.tables.map(tbl => ({ ...tbl, switch_name: sw.name }))
+  );
+
+  const handleCreateL3Switch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = newL3SwitchName.trim();
+    if (!name) return;
+    if (l3Switches.some(s => s.name.toLowerCase() === name.toLowerCase())) return;
+    setL3Switches(prev => [...prev, { name, active: false, online: false, interfaces: [], tables: [] }]);
+    setNewL3SwitchName('');
+    setIsAddL3SwitchOpen(false);
+    setActionNotice(`Switch Virtual L3 '${name}' creado exitosamente.`);
+  };
+
+  const handleToggleL3Switch = (name: string) => {
+    setL3Switches(prev => prev.map(s => (s.name === name ? { ...s, active: !s.active, online: !s.active } : s)));
+  };
+
+  const handleDeleteL3Switch = (name: string) => {
+    if (!confirm(`¿Eliminar el Switch Virtual L3 '${name}' y todas sus interfaces?`)) return;
+    setL3Switches(prev => prev.filter(s => s.name !== name));
+  };
+
+  const openNewL3IfModal = (switchName = '') => {
+    setEditingL3IfOrig(null);
+    setL3IfFormSwitch(switchName || l3Switches[0]?.name || '');
+    setL3IfFormHub(hubs[0]?.hub_name || 'DEFAULT');
+    setL3IfFormIp('');
+    setL3IfFormMask('255.255.255.0');
+    setIsL3IfModalOpen(true);
+  };
+
+  const openEditL3IfModal = (iface: SoftEtherL3Interface) => {
+    setEditingL3IfOrig({ switch_name: iface.switch_name, hub_name: iface.hub_name });
+    setL3IfFormSwitch(iface.switch_name);
+    setL3IfFormHub(iface.hub_name);
+    setL3IfFormIp(iface.ip_address);
+    setL3IfFormMask(iface.subnet_mask);
+    setIsL3IfModalOpen(true);
+  };
+
+  const handleSaveL3Interface = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!l3IfFormSwitch || !l3IfFormHub || !l3IfFormIp.trim() || !l3IfFormMask.trim()) return;
+    setL3Switches(prev =>
+      prev.map(sw => {
+        let nextIfaces = [...sw.interfaces];
+        if (editingL3IfOrig && sw.name === editingL3IfOrig.switch_name) {
+          nextIfaces = nextIfaces.filter(i => i.hub_name !== editingL3IfOrig.hub_name);
+        }
+        if (sw.name === l3IfFormSwitch) {
+          nextIfaces = nextIfaces.filter(i => i.hub_name !== l3IfFormHub);
+          nextIfaces.push({
+            switch_name: sw.name,
+            switch_active: sw.active,
+            hub_name: l3IfFormHub,
+            ip_address: l3IfFormIp.trim(),
+            subnet_mask: l3IfFormMask.trim(),
+          });
+        }
+        return { ...sw, interfaces: nextIfaces };
+      })
+    );
+    setIsL3IfModalOpen(false);
+    setEditingL3IfOrig(null);
+    setActionNotice(`Interfaz L3 guardada para el Hub ${l3IfFormHub} (${l3IfFormIp.trim()}).`);
+  };
+
+  const handleDeleteL3Interface = (switchName: string, hubName: string) => {
+    if (!confirm(`¿Eliminar la interfaz L3 del Hub '${hubName}' en el Switch '${switchName}'?`)) return;
+    setL3Switches(prev =>
+      prev.map(sw =>
+        sw.name === switchName ? { ...sw, interfaces: sw.interfaces.filter(i => i.hub_name !== hubName) } : sw
+      )
+    );
+  };
+
+  const openNewL3RouteModal = (switchName = '') => {
+    setEditingL3RouteOrig(null);
+    setL3RouteFormSwitch(switchName || l3Switches[0]?.name || '');
+    setL3RouteFormNetwork('');
+    setL3RouteFormMask('255.255.255.0');
+    setL3RouteFormGateway('');
+    setL3RouteFormMetric(1);
+    setIsL3RouteModalOpen(true);
+  };
+
+  const openEditL3RouteModal = (tbl: SoftEtherL3Table) => {
+    setEditingL3RouteOrig(tbl);
+    setL3RouteFormSwitch(tbl.switch_name);
+    setL3RouteFormNetwork(tbl.network_address);
+    setL3RouteFormMask(tbl.subnet_mask);
+    setL3RouteFormGateway(tbl.gateway_address);
+    setL3RouteFormMetric(tbl.metric);
+    setIsL3RouteModalOpen(true);
+  };
+
+  const handleSaveL3Route = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!l3RouteFormSwitch || !l3RouteFormNetwork.trim() || !l3RouteFormMask.trim() || !l3RouteFormGateway.trim()) return;
+    setL3Switches(prev =>
+      prev.map(sw => {
+        let nextTables = [...sw.tables];
+        if (editingL3RouteOrig && sw.name === editingL3RouteOrig.switch_name) {
+          nextTables = nextTables.filter(
+            t =>
+              !(
+                t.network_address === editingL3RouteOrig.network_address &&
+                t.subnet_mask === editingL3RouteOrig.subnet_mask &&
+                t.gateway_address === editingL3RouteOrig.gateway_address
+              )
+          );
+        }
+        if (sw.name === l3RouteFormSwitch) {
+          nextTables.push({
+            switch_name: sw.name,
+            network_address: l3RouteFormNetwork.trim(),
+            subnet_mask: l3RouteFormMask.trim(),
+            gateway_address: l3RouteFormGateway.trim(),
+            metric: l3RouteFormMetric || 1,
+          });
+        }
+        return { ...sw, tables: nextTables };
+      })
+    );
+    setIsL3RouteModalOpen(false);
+    setEditingL3RouteOrig(null);
+    setActionNotice(`Ruta estática L3 guardada en Switch ${l3RouteFormSwitch}.`);
+  };
+
+  const handleDeleteL3Route = (tbl: SoftEtherL3Table) => {
+    if (!confirm(`¿Eliminar ruta L3 ${tbl.network_address}/${tbl.subnet_mask} del Switch '${tbl.switch_name}'?`)) return;
+    setL3Switches(prev =>
+      prev.map(sw =>
+        sw.name === tbl.switch_name
+          ? {
+              ...sw,
+              tables: sw.tables.filter(
+                t =>
+                  !(
+                    t.network_address === tbl.network_address &&
+                    t.subnet_mask === tbl.subnet_mask &&
+                    t.gateway_address === tbl.gateway_address
+                  )
+              ),
+            }
+          : sw
+      )
+    );
   };
 
   // Probar conexión
@@ -672,6 +896,21 @@ SOFTETHER_VPS2_VERIFY_SSL=false`;
         >
           <Layers className="w-4 h-4" />
           <span>Virtual Hubs & SecureNAT</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('l3')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer shrink-0 ${
+            activeTab === 'l3'
+              ? 'bg-sky-500/15 text-sky-400 border border-sky-500/30'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+          }`}
+        >
+          <Network className="w-4 h-4" />
+          <span>Interfaces L3 & Rutas</span>
+          <span className="ml-1 px-2 py-0.5 rounded-full text-xs bg-slate-800 text-slate-300">
+            {allL3Interfaces.length}
+          </span>
         </button>
 
         <button
@@ -1150,7 +1389,7 @@ SOFTETHER_VPS2_VERIFY_SSL=false`;
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-slate-400">
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs text-slate-400">
                           <div className="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/80">
                             <div>Usuarios</div>
                             <div className="text-sm font-bold text-white mt-0.5">{h.users_count}</div>
@@ -1167,6 +1406,12 @@ SOFTETHER_VPS2_VERIFY_SSL=false`;
                             <div>Tráfico</div>
                             <div className="text-sm font-bold text-emerald-400 mt-0.5">{h.traffic}</div>
                           </div>
+                          <div className="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/80">
+                            <div>Rutas SecureNAT</div>
+                            <div className="text-sm font-bold text-amber-400 mt-0.5">
+                              {h.dhcp_push_routes?.length ?? h.push_routes_count ?? 0}
+                            </div>
+                          </div>
                         </div>
 
                         <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-slate-800/80">
@@ -1176,6 +1421,13 @@ SOFTETHER_VPS2_VERIFY_SSL=false`;
                           >
                             <Settings className="w-3.5 h-3.5" />
                             <span>DHCP & SecureNAT</span>
+                          </button>
+                          <button
+                            onClick={() => openHubManagement(h.hub_name, 'routes')}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25 cursor-pointer"
+                          >
+                            <Route className="w-3.5 h-3.5" />
+                            <span>Rutas ({h.dhcp_push_routes?.length ?? h.push_routes_count ?? 0})</span>
                           </button>
                           <button
                             onClick={() => openHubManagement(h.hub_name, 'users')}
@@ -1286,14 +1538,360 @@ SOFTETHER_VPS2_VERIFY_SSL=false`;
                 <span className="text-slate-400">Servidores DNS Distribuidos:</span>
                 <span className="font-mono text-slate-300">{secureNat.dns_servers.join(', ')}</span>
               </div>
-              <div className="flex items-center justify-between py-2">
+              <div className="flex items-center justify-between py-2 border-b border-slate-800/60">
                 <span className="text-slate-400">Arrendamientos DHCP Activos:</span>
                 <span className="font-mono text-white font-bold">{secureNat.active_dhcp_leases} asignadas</span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-300">Rutas Estáticas (DHCP Push Routes)</span>
+                  <button
+                    onClick={() => openHubManagement(secureNat.hub_name || 'DEFAULT', 'routes')}
+                    className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25 cursor-pointer"
+                  >
+                    Editar Rutas
+                  </button>
+                </div>
+                {(secureNat.dhcp_push_routes_list || []).length > 0 ? (
+                  <div className="space-y-1.5">
+                    {(secureNat.dhcp_push_routes_list || []).map((r, i) => (
+                      <div key={i} className="font-mono text-xs bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sky-400">
+                        {r.network} / {r.mask} → <strong className="text-emerald-400">{r.gateway}</strong>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs text-slate-500">Sin rutas estáticas configuradas.</div>
+                )}
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* TAB 5: INTERFACES L3 & RUTAS SECURENAT */}
+      {activeTab === 'l3' && (() => {
+        const filteredL3Ifs = allL3Interfaces.filter(i => {
+          if (l3SwitchFilter && i.switch_name !== l3SwitchFilter) return false;
+          if (!l3Search.trim()) return true;
+          const q = l3Search.toLowerCase();
+          return (
+            i.switch_name.toLowerCase().includes(q) ||
+            i.hub_name.toLowerCase().includes(q) ||
+            i.ip_address.toLowerCase().includes(q) ||
+            i.subnet_mask.toLowerCase().includes(q)
+          );
+        });
+        const filteredL3Tbls = allL3Tables.filter(t => {
+          if (l3SwitchFilter && t.switch_name !== l3SwitchFilter) return false;
+          if (!l3Search.trim()) return true;
+          const q = l3Search.toLowerCase();
+          return (
+            t.switch_name.toLowerCase().includes(q) ||
+            t.network_address.toLowerCase().includes(q) ||
+            t.gateway_address.toLowerCase().includes(q)
+          );
+        });
+        const filteredHubRoutes = hubs.filter(h => {
+          if (!routeHubSearch.trim()) return true;
+          const q = routeHubSearch.toLowerCase();
+          if (h.hub_name.toLowerCase().includes(q)) return true;
+          return (h.dhcp_push_routes || []).some(
+            r => r.network.includes(q) || r.mask.includes(q) || r.gateway.includes(q)
+          );
+        });
+
+        return (
+          <div className="space-y-6">
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                <div>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    <Network className="w-5 h-5 text-sky-400" />
+                    Switches Virtuales L3 e Interfaces Capa 3
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Visualización y modificación de interfaces Layer 3 y tablas de enrutamiento entre Virtual Hubs.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setIsAddL3SwitchOpen(true)}
+                    className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer"
+                  >
+                    + Nuevo Switch L3
+                  </button>
+                  <button
+                    onClick={() => openNewL3IfModal()}
+                    className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white cursor-pointer"
+                  >
+                    + Nueva Interfaz L3
+                  </button>
+                  <button
+                    onClick={() => openNewL3RouteModal()}
+                    className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer"
+                  >
+                    + Nueva Ruta L3
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {l3Switches.map(sw => (
+                  <div key={sw.name} className="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono font-bold text-sky-400">{sw.name}</span>
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                        sw.active ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                      }`}>
+                        {sw.active ? 'Activo / En línea' : 'Detenido'}
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-400">
+                      Interfaces: <strong className="text-white">{sw.interfaces.length}</strong> · Tablas: <strong className="text-white">{sw.tables.length}</strong>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => handleToggleL3Switch(sw.name)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer ${
+                          sw.active ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                        }`}
+                      >
+                        {sw.active ? 'Detener' : 'Iniciar'}
+                      </button>
+                      <button
+                        onClick={() => openNewL3IfModal(sw.name)}
+                        className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-sky-500/15 text-sky-300 border border-sky-500/30 cursor-pointer"
+                      >
+                        + Interfaz
+                      </button>
+                      <button
+                        onClick={() => handleDeleteL3Switch(sw.name)}
+                        className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30 cursor-pointer"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap gap-3 p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+                <div className="relative flex-1 min-w-[220px]">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={l3Search}
+                    onChange={e => setL3Search(e.target.value)}
+                    placeholder="Buscar por Switch L3, Virtual Hub, IP o Máscara..."
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
+                  />
+                </div>
+                <select
+                  value={l3SwitchFilter}
+                  onChange={e => setL3SwitchFilter(e.target.value)}
+                  className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-sky-400 font-semibold cursor-pointer"
+                >
+                  <option value="">Todos los Switches L3 ({l3Switches.length})</option>
+                  {l3Switches.map(sw => (
+                    <option key={sw.name} value={sw.name}>{sw.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-sky-400 mb-2">
+                  Todas las Interfaces L3 ({filteredL3Ifs.length})
+                </h4>
+                <div className="overflow-x-auto border border-slate-800 rounded-xl">
+                  <table className="w-full text-left text-xs text-slate-300">
+                    <thead className="bg-slate-950 text-slate-400 uppercase border-b border-slate-800">
+                      <tr>
+                        <th className="px-4 py-3">Switch L3</th>
+                        <th className="px-4 py-3">Estado</th>
+                        <th className="px-4 py-3">Virtual Hub</th>
+                        <th className="px-4 py-3">IP L3</th>
+                        <th className="px-4 py-3">Máscara</th>
+                        <th className="px-4 py-3 text-right">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60">
+                      {filteredL3Ifs.map((iface, idx) => (
+                        <tr key={idx} className="hover:bg-slate-800/30">
+                          <td className="px-4 py-3 font-mono font-bold text-white">{iface.switch_name}</td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-0.5 rounded-full font-semibold ${
+                              iface.switch_active ? 'bg-emerald-500/15 text-emerald-400' : 'bg-amber-500/15 text-amber-300'
+                            }`}>
+                              {iface.switch_active ? 'Activo' : 'Detenido'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={() => openHubManagement(iface.hub_name, 'routes')}
+                              className="px-2 py-0.5 rounded bg-sky-500/15 text-sky-300 border border-sky-500/30 font-mono cursor-pointer"
+                            >
+                              {iface.hub_name}
+                            </button>
+                          </td>
+                          <td className="px-4 py-3 font-mono font-semibold text-emerald-400">{iface.ip_address}</td>
+                          <td className="px-4 py-3 font-mono">{iface.subnet_mask}</td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex justify-end gap-2">
+                              <button
+                                onClick={() => openEditL3IfModal(iface)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-500/15 text-sky-300 border border-sky-500/30 hover:bg-sky-500/25 cursor-pointer"
+                              >
+                                <Edit2 className="w-3 h-3" />
+                                Modificar
+                              </button>
+                              <button
+                                onClick={() => handleDeleteL3Interface(iface.switch_name, iface.hub_name)}
+                                className="px-2.5 py-1 rounded-lg bg-rose-500/15 text-rose-300 border border-rose-500/30 hover:bg-rose-500/25 cursor-pointer"
+                              >
+                                Eliminar
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredL3Ifs.length === 0 && (
+                        <tr>
+                          <td colSpan={6} className="text-center py-6 text-slate-500">No se encontraron interfaces L3.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-indigo-300 mb-2">
+                  Tabla de Rutas L3 ({filteredL3Tbls.length})
+                </h4>
+                <div className="overflow-x-auto border border-slate-800 rounded-xl">
+                  <table className="w-full text-left text-xs text-slate-300">
+                    <thead className="bg-slate-950 text-slate-400 uppercase border-b border-slate-800">
+                      <tr>
+                        <th className="px-4 py-3">Switch L3</th>
+                        <th className="px-4 py-3">Red Destino</th>
+                        <th className="px-4 py-3">Máscara</th>
+                        <th className="px-4 py-3">Gateway</th>
+                        <th className="px-4 py-3">Métrica</th>
+                        <th className="px-4 py-3 text-right">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60">
+                      {filteredL3Tbls.map((tbl, idx) => (
+                        <tr key={idx} className="hover:bg-slate-800/30">
+                          <td className="px-4 py-3 font-mono font-bold text-white">{tbl.switch_name}</td>
+                          <td className="px-4 py-3 font-mono text-sky-400">{tbl.network_address}</td>
+                          <td className="px-4 py-3 font-mono">{tbl.subnet_mask}</td>
+                          <td className="px-4 py-3 font-mono text-emerald-400">{tbl.gateway_address}</td>
+                          <td className="px-4 py-3 font-mono">{tbl.metric}</td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex justify-end gap-2">
+                              <button
+                                onClick={() => openEditL3RouteModal(tbl)}
+                                className="px-2.5 py-1 rounded-lg bg-sky-500/15 text-sky-300 border border-sky-500/30 cursor-pointer"
+                              >
+                                Modificar
+                              </button>
+                              <button
+                                onClick={() => handleDeleteL3Route(tbl)}
+                                className="px-2.5 py-1 rounded-lg bg-rose-500/15 text-rose-300 border border-rose-500/30 cursor-pointer"
+                              >
+                                Eliminar
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredL3Tbls.length === 0 && (
+                        <tr>
+                          <td colSpan={6} className="text-center py-6 text-slate-500">Sin rutas estáticas L3 registradas.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+                <div>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    <Route className="w-5 h-5 text-amber-400" />
+                    Rutas Configuradas en SecureNAT por Virtual Hub
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Rutas estáticas distribuidas por DHCP (DhcpPushRoutes) en cada Virtual Hub.
+                  </p>
+                </div>
+                <input
+                  type="text"
+                  value={routeHubSearch}
+                  onChange={e => setRouteHubSearch(e.target.value)}
+                  placeholder="Filtrar por Hub o IP de ruta..."
+                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-200 w-full sm:w-64 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="overflow-x-auto border border-slate-800 rounded-xl">
+                <table className="w-full text-left text-xs text-slate-300">
+                  <thead className="bg-slate-950 text-slate-400 uppercase border-b border-slate-800">
+                    <tr>
+                      <th className="px-4 py-3">Virtual Hub</th>
+                      <th className="px-4 py-3">Push Routes</th>
+                      <th className="px-4 py-3">Rutas Configuradas</th>
+                      <th className="px-4 py-3 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {filteredHubRoutes.map(h => (
+                      <tr key={h.hub_name} className="hover:bg-slate-800/30">
+                        <td className="px-4 py-3 font-mono font-bold text-sky-400">{h.hub_name}</td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-0.5 rounded-full font-semibold ${
+                            (h.apply_dhcp_push_routes ?? true)
+                              ? 'bg-emerald-500/15 text-emerald-400'
+                              : 'bg-amber-500/15 text-amber-300'
+                          }`}>
+                            {(h.apply_dhcp_push_routes ?? true) ? 'Sí (Aplicadas)' : 'Inactivo'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          {(h.dhcp_push_routes || []).length > 0 ? (
+                            <div className="flex flex-wrap gap-1.5">
+                              {(h.dhcp_push_routes || []).map((r, rIdx) => (
+                                <span key={rIdx} className="font-mono px-2 py-0.5 rounded bg-slate-950 border border-slate-800">
+                                  <strong className="text-sky-400">{r.network}</strong>/{r.mask} → <strong className="text-emerald-400">{r.gateway}</strong>
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-slate-500">Sin rutas configuradas</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => openHubManagement(h.hub_name, 'routes')}
+                            className="px-3 py-1 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25 font-semibold cursor-pointer"
+                          >
+                            Editar Rutas
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* TAB 5: GUIA DE CONFIGURACION & CREDENCIALES SEGURAS */}
       {activeTab === 'config' && (
@@ -1711,7 +2309,7 @@ SOFTETHER_VPS2_VERIFY_SSL=false`;
               </h3>
               <p className="text-xs text-slate-400 mb-4">Configuración individual de DHCP, SecureNAT, Usuarios y Logs</p>
 
-              <div className="flex items-center gap-2 border-b border-slate-800 pb-2 mb-5">
+              <div className="flex items-center gap-2 border-b border-slate-800 pb-2 mb-5 flex-wrap">
                 <button
                   onClick={() => setHubManageTab('nat_dhcp')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer ${
@@ -1719,6 +2317,14 @@ SOFTETHER_VPS2_VERIFY_SSL=false`;
                   }`}
                 >
                   DHCP & SecureNAT
+                </button>
+                <button
+                  onClick={() => setHubManageTab('routes')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer ${
+                    hubManageTab === 'routes' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Rutas SecureNAT ({(natCfg.dhcp_push_routes_list || []).length})
                 </button>
                 <button
                   onClick={() => setHubManageTab('users')}
@@ -1817,6 +2423,155 @@ SOFTETHER_VPS2_VERIFY_SSL=false`;
                   </div>
                 </div>
               )}
+
+              {hubManageTab === 'routes' && (() => {
+                const routesList: SoftEtherPushRoute[] = natCfg.dhcp_push_routes_list || [];
+                const syncHubRoutes = (nextRoutes: SoftEtherPushRoute[], applyFlag = natCfg.apply_dhcp_push_routes ?? true) => {
+                  updateCurrentNat({
+                    dhcp_push_routes_list: nextRoutes,
+                    apply_dhcp_push_routes: applyFlag,
+                  });
+                  setHubs(prev =>
+                    prev.map(h =>
+                      h.hub_name === managingHub
+                        ? {
+                            ...h,
+                            dhcp_push_routes: nextRoutes,
+                            push_routes_count: nextRoutes.length,
+                            apply_dhcp_push_routes: applyFlag,
+                          }
+                        : h
+                    )
+                  );
+                };
+
+                return (
+                  <div className="space-y-4 text-xs">
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800">
+                      <label className="flex items-center gap-2 text-slate-200 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={natCfg.apply_dhcp_push_routes ?? true}
+                          onChange={e => syncHubRoutes(routesList, e.target.checked)}
+                        />
+                        <span>Aplicar rutas estáticas push por DHCP (ApplyDhcpPushRoutes)</span>
+                      </label>
+                      <span className="font-mono text-slate-400">{routesList.length} ruta(s)</span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {routesList.map((r, rIdx) => (
+                        <div key={rIdx} className="grid grid-cols-1 sm:grid-cols-4 gap-2 p-2.5 rounded-xl bg-slate-950 border border-slate-800 items-center">
+                          <input
+                            type="text"
+                            value={r.network}
+                            onChange={e => {
+                              const copy = [...routesList];
+                              copy[rIdx] = { ...copy[rIdx], network: e.target.value };
+                              syncHubRoutes(copy);
+                            }}
+                            placeholder="Red destino"
+                            className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sky-400 font-mono"
+                          />
+                          <input
+                            type="text"
+                            value={r.mask}
+                            onChange={e => {
+                              const copy = [...routesList];
+                              copy[rIdx] = { ...copy[rIdx], mask: e.target.value };
+                              syncHubRoutes(copy);
+                            }}
+                            placeholder="Máscara"
+                            className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 font-mono"
+                          />
+                          <input
+                            type="text"
+                            value={r.gateway}
+                            onChange={e => {
+                              const copy = [...routesList];
+                              copy[rIdx] = { ...copy[rIdx], gateway: e.target.value };
+                              syncHubRoutes(copy);
+                            }}
+                            placeholder="Gateway"
+                            className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-emerald-400 font-mono"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => syncHubRoutes(routesList.filter((_, idx) => idx !== rIdx))}
+                            className="px-2.5 py-1.5 rounded-lg bg-rose-500/15 text-rose-300 border border-rose-500/30 cursor-pointer"
+                          >
+                            Quitar
+                          </button>
+                        </div>
+                      ))}
+                      {routesList.length === 0 && (
+                        <div className="text-center py-4 text-slate-500 border border-dashed border-slate-800 rounded-xl">
+                          No hay rutas estáticas configuradas en SecureNAT para este Hub.
+                        </div>
+                      )}
+                    </div>
+
+                    <form
+                      onSubmit={e => {
+                        e.preventDefault();
+                        if (!newRouteNetwork.trim() || !newRouteMask.trim() || !newRouteGateway.trim()) return;
+                        syncHubRoutes([
+                          ...routesList,
+                          {
+                            network: newRouteNetwork.trim(),
+                            mask: newRouteMask.trim(),
+                            gateway: newRouteGateway.trim(),
+                          },
+                        ]);
+                        setNewRouteNetwork('');
+                        setNewRouteGateway('');
+                      }}
+                      className="grid grid-cols-1 sm:grid-cols-4 gap-2 p-3 rounded-xl bg-slate-950 border border-slate-800"
+                    >
+                      <input
+                        type="text"
+                        placeholder="Red (ej: 10.10.0.0)"
+                        value={newRouteNetwork}
+                        onChange={e => setNewRouteNetwork(e.target.value)}
+                        className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white font-mono"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Máscara (255.255.255.0)"
+                        value={newRouteMask}
+                        onChange={e => setNewRouteMask(e.target.value)}
+                        className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white font-mono"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Gateway (ej: 192.168.30.1)"
+                        value={newRouteGateway}
+                        onChange={e => setNewRouteGateway(e.target.value)}
+                        className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white font-mono"
+                      />
+                      <button
+                        type="submit"
+                        className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-semibold cursor-pointer"
+                      >
+                        + Agregar Ruta
+                      </button>
+                    </form>
+
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActionNotice(`Rutas SecureNAT guardadas para ${managingHub}.`);
+                          setManagingHub(null);
+                        }}
+                        className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold cursor-pointer"
+                      >
+                        Guardar Rutas en SoftEther
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {hubManageTab === 'users' && (
                 <div className="space-y-4 text-xs">
@@ -1963,6 +2718,187 @@ SOFTETHER_VPS2_VERIFY_SSL=false`;
           </div>
         );
       })()}
+
+      {/* MODAL: CREAR SWITCH L3 */}
+      {isAddL3SwitchOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
+            <button onClick={() => setIsAddL3SwitchOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white cursor-pointer">
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-base font-bold text-white mb-4">Crear Nuevo Switch Virtual L3</h3>
+            <form onSubmit={handleCreateL3Switch} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">Nombre del Switch L3</label>
+                <input
+                  type="text"
+                  required
+                  value={newL3SwitchName}
+                  onChange={e => setNewL3SwitchName(e.target.value)}
+                  placeholder="ej: L3_CORE_DATAPLUS"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setIsAddL3SwitchOpen(false)} className="px-3 py-1.5 text-slate-400 hover:text-white cursor-pointer">Cancelar</button>
+                <button type="submit" className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold cursor-pointer">Crear Switch L3</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: CREAR / MODIFICAR INTERFAZ L3 */}
+      {isL3IfModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
+            <button onClick={() => setIsL3IfModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white cursor-pointer">
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-base font-bold text-sky-400 mb-4">
+              {editingL3IfOrig ? 'Modificar Interfaz L3' : 'Nueva Interfaz L3'}
+            </h3>
+            <form onSubmit={handleSaveL3Interface} className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">Switch Virtual L3</label>
+                <select
+                  value={l3IfFormSwitch}
+                  onChange={e => setL3IfFormSwitch(e.target.value)}
+                  disabled={Boolean(editingL3IfOrig)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sky-400 font-mono"
+                >
+                  {l3Switches.map(sw => (
+                    <option key={sw.name} value={sw.name}>{sw.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">Virtual Hub</label>
+                <select
+                  value={l3IfFormHub}
+                  onChange={e => setL3IfFormHub(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono"
+                >
+                  {hubs.map(h => (
+                    <option key={h.hub_name} value={h.hub_name}>{h.hub_name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">Dirección IP L3</label>
+                <input
+                  type="text"
+                  required
+                  value={l3IfFormIp}
+                  onChange={e => setL3IfFormIp(e.target.value)}
+                  placeholder="192.168.30.254"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-emerald-400 font-mono"
+                />
+              </div>
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">Máscara de Subred</label>
+                <input
+                  type="text"
+                  required
+                  value={l3IfFormMask}
+                  onChange={e => setL3IfFormMask(e.target.value)}
+                  placeholder="255.255.255.0"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setIsL3IfModalOpen(false)} className="px-3 py-1.5 text-slate-400 hover:text-white cursor-pointer">Cancelar</button>
+                <button type="submit" className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold cursor-pointer">
+                  {editingL3IfOrig ? 'Guardar Cambios' : 'Agregar Interfaz L3'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: CREAR / MODIFICAR RUTA L3 */}
+      {isL3RouteModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
+            <button onClick={() => setIsL3RouteModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white cursor-pointer">
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-base font-bold text-indigo-300 mb-4">
+              {editingL3RouteOrig ? 'Modificar Ruta L3' : 'Nueva Ruta L3'}
+            </h3>
+            <form onSubmit={handleSaveL3Route} className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">Switch Virtual L3</label>
+                <select
+                  value={l3RouteFormSwitch}
+                  onChange={e => setL3RouteFormSwitch(e.target.value)}
+                  disabled={Boolean(editingL3RouteOrig)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sky-400 font-mono"
+                >
+                  {l3Switches.map(sw => (
+                    <option key={sw.name} value={sw.name}>{sw.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Red Destino</label>
+                  <input
+                    type="text"
+                    required
+                    value={l3RouteFormNetwork}
+                    onChange={e => setL3RouteFormNetwork(e.target.value)}
+                    placeholder="10.10.0.0"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Máscara</label>
+                  <input
+                    type="text"
+                    required
+                    value={l3RouteFormMask}
+                    onChange={e => setL3RouteFormMask(e.target.value)}
+                    placeholder="255.255.255.0"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Gateway</label>
+                  <input
+                    type="text"
+                    required
+                    value={l3RouteFormGateway}
+                    onChange={e => setL3RouteFormGateway(e.target.value)}
+                    placeholder="192.168.30.1"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-emerald-400 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Métrica</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={999}
+                    value={l3RouteFormMetric}
+                    onChange={e => setL3RouteFormMetric(parseInt(e.target.value, 10) || 1)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setIsL3RouteModalOpen(false)} className="px-3 py-1.5 text-slate-400 hover:text-white cursor-pointer">Cancelar</button>
+                <button type="submit" className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold cursor-pointer">
+                  {editingL3RouteOrig ? 'Guardar Cambios' : 'Agregar Ruta L3'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

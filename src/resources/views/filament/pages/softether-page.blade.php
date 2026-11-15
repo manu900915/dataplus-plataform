@@ -400,6 +400,11 @@
                 <span>Virtual Hubs & SecureNAT ({{ count($virtualHubs) }})</span>
             </button>
 
+            <button type="button" wire:click="setActiveTab('l3')" class="se-tab-btn {{ $activeTab === 'l3' ? 'active' : '' }}">
+                <svg style="width: 1rem; height: 1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                <span>Interfaces L3 & Rutas ({{ count($l3Interfaces) }})</span>
+            </button>
+
             <button type="button" wire:click="setActiveTab('config')" class="se-tab-btn {{ $activeTab === 'config' ? 'active' : '' }}">
                 <svg style="width: 1rem; height: 1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /></svg>
                 <span>Configuración (.env)</span>
@@ -896,7 +901,7 @@
                                     <div>Tablas MAC: <strong style="color: #ffffff;">{{ $hub['mac_tables'] ?? 0 }}</strong></div>
                                     <div>Tablas IP: <strong style="color: #ffffff;">{{ $hub['ip_tables'] ?? 0 }}</strong></div>
                                     <div>Tráfico: <strong style="color: #38bdf8;">{{ $hub['traffic'] ?? '0 B' }}</strong></div>
-                                    <div>Última com.: <span style="font-size: 0.75rem;">{{ $hub['last_comm'] ?? 'N/D' }}</span></div>
+                                    <div>Rutas SecureNAT: <strong style="color: {{ ($hub['push_routes_count'] ?? 0) > 0 ? '#34d399' : '#94a3b8' }};">{{ $hub['push_routes_count'] ?? 0 }}</strong></div>
                                 </div>
                                 <!-- Acciones de gestión directa del Virtual Hub -->
                                 <div style="display: flex; gap: 0.45rem; flex-wrap: wrap; margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px solid #1e293b;">
@@ -905,6 +910,12 @@
                                             class="se-btn se-btn-emerald"
                                             style="padding: 0.3rem 0.65rem; font-size: 0.73rem;">
                                         ⚙ DHCP & SecureNAT
+                                    </button>
+                                    <button type="button"
+                                            wire:click="abrirGestionHub('{{ $hub['hub_name'] }}', 'routes')"
+                                            class="se-btn se-btn-amber"
+                                            style="padding: 0.3rem 0.65rem; font-size: 0.73rem;">
+                                        🛣 Rutas ({{ $hub['push_routes_count'] ?? 0 }})
                                     </button>
                                     <button type="button"
                                             wire:click="abrirGestionHub('{{ $hub['hub_name'] }}', 'users')"
@@ -1048,11 +1059,317 @@
                             </div>
                         @endif
 
+                        <!-- Rutas Estáticas SecureNAT del Hub Activo -->
+                        <div style="margin-top: 0.5rem; padding: 0.75rem; border-radius: 0.5rem; background: #090e1a; border: 1px solid #1e293b;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; gap: 0.5rem;">
+                                <span style="color: #cbd5e1; font-weight: 600; font-size: 0.8rem;">
+                                    Rutas Estáticas (DHCP Push Routes)
+                                </span>
+                                <button type="button"
+                                        wire:click="abrirGestionHub('{{ $connectionDetails['hub'] }}', 'routes')"
+                                        class="se-btn se-btn-amber"
+                                        style="padding: 0.2rem 0.55rem; font-size: 0.72rem;">
+                                    Editar Rutas
+                                </button>
+                            </div>
+                            @if(!empty($secureNat['dhcp_push_routes_list']))
+                                <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                                    @foreach($secureNat['dhcp_push_routes_list'] as $rItem)
+                                        <div style="font-family: monospace; font-size: 0.75rem; color: #38bdf8; background: #0f172a; border: 1px solid #1e293b; border-radius: 0.35rem; padding: 0.3rem 0.5rem;">
+                                            {{ $rItem['network'] }} / {{ $rItem['mask'] }} → <strong style="color: #34d399;">{{ $rItem['gateway'] }}</strong>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @else
+                                <div style="font-size: 0.75rem; color: #64748b;">
+                                    Sin rutas estáticas push configuradas en este Virtual Hub.
+                                </div>
+                            @endif
+                        </div>
+
                         @if(empty($secureNat['nat_enabled']) && empty($secureNat['dhcp_enabled']))
                             <div style="padding: 0.75rem; border-radius: 0.5rem; background: rgba(148, 163, 184, 0.08); border: 1px dashed #334155; color: #94a3b8; font-size: 0.775rem; margin-top: 0.5rem; line-height: 1.45;">
                                 <strong style="color: #e2e8f0;">Nota técnica sobre SecureNAT:</strong> En este hub, SecureNAT (Virtual NAT y DHCP de SoftEther) está <em>deshabilitado</em>. Esto es lo habitual cuando el servidor utiliza <strong>Local Bridge (TAP)</strong> conectado a la interfaz física de red del VPS, o cuando las IPs las asigna un DHCP externo/dnsmasq del sistema operativo en lugar de la función interna de SoftEther.
                             </div>
                         @endif
+                    </div>
+                </div>
+            </div>
+        @endif
+
+        <!-- TAB 5: INTERFACES L3 (SWITCHES CAPA 3) & RUTAS SECURENAT POR HUB -->
+        @if($activeTab === 'l3')
+            @php
+                $filteredL3Interfaces = $this->getFilteredL3Interfaces();
+                $filteredL3Tables = $this->getFilteredL3Tables();
+                $filteredHubRoutes = $this->getFilteredAllHubRoutes();
+            @endphp
+            <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                <!-- SECCIÓN A: SWITCHES E INTERFACES LAYER 3 -->
+                <div class="se-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid #1e293b; padding-bottom: 0.75rem; flex-wrap: wrap; gap: 0.75rem;">
+                        <div>
+                            <h3 style="font-size: 1rem; font-weight: 700; color: #ffffff; margin: 0;">
+                                Switches Virtuales L3 e Interfaces Capa 3 ({{ $connectionDetails['server_name'] }})
+                            </h3>
+                            <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.25rem 0 0 0;">
+                                Enrutamiento entre Virtual Hubs mediante Virtual Layer 3 Switches ({{ count($l3Switches) }} switch(es), {{ count($l3Interfaces) }} interfaz(ces), {{ count($l3Tables) }} ruta(s)).
+                            </p>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <button type="button" wire:click="abrirModalCrearL3Switch" class="se-btn se-btn-emerald" style="font-size: 0.75rem;">
+                                + Nuevo Switch L3
+                            </button>
+                            <button type="button" wire:click="abrirModalNuevaInterfazL3" class="se-btn se-btn-sky" style="font-size: 0.75rem;">
+                                + Nueva Interfaz L3
+                            </button>
+                            <button type="button" wire:click="abrirModalNuevaRutaL3" class="se-btn se-btn-indigo" style="font-size: 0.75rem;">
+                                + Nueva Ruta L3
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Tarjetas resumen de Switches L3 -->
+                    @if(!empty($l3Switches))
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0.85rem; margin-bottom: 1.25rem;">
+                            @foreach($l3Switches as $sw)
+                                <div style="background: #090e1a; border: 1px solid {{ !empty($sw['active']) ? 'rgba(16, 185, 129, 0.35)' : '#1e293b' }}; border-radius: 0.5rem; padding: 0.85rem;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.45rem; gap: 0.5rem;">
+                                        <span style="font-family: monospace; font-weight: 700; color: #38bdf8; font-size: 0.95rem;">{{ $sw['name'] }}</span>
+                                        <span class="se-badge {{ !empty($sw['active']) && !empty($sw['online']) ? 'se-badge-emerald' : (!empty($sw['active']) ? 'se-badge-amber' : 'se-badge-rose') }}">
+                                            {{ !empty($sw['active']) ? (!empty($sw['online']) ? 'Activo / En línea' : 'Activo (Error/Offline)') : 'Detenido' }}
+                                        </span>
+                                    </div>
+                                    <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.65rem;">
+                                        Interfaces: <strong style="color: #ffffff;">{{ count($sw['interfaces'] ?? []) }}</strong> ·
+                                        Tablas de rutas: <strong style="color: #ffffff;">{{ count($sw['tables'] ?? []) }}</strong>
+                                    </div>
+                                    <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+                                        <button type="button"
+                                                wire:click="toggleL3Switch('{{ $sw['name'] }}', {{ !empty($sw['active']) ? 'false' : 'true' }})"
+                                                class="se-btn {{ !empty($sw['active']) ? 'se-btn-amber' : 'se-btn-emerald' }}"
+                                                style="padding: 0.25rem 0.55rem; font-size: 0.72rem;">
+                                            {{ !empty($sw['active']) ? 'Detener' : 'Iniciar' }}
+                                        </button>
+                                        <button type="button"
+                                                wire:click="abrirModalNuevaInterfazL3('{{ $sw['name'] }}')"
+                                                class="se-btn se-btn-sky"
+                                                style="padding: 0.25rem 0.55rem; font-size: 0.72rem;">
+                                            + Interfaz
+                                        </button>
+                                        <button type="button"
+                                                wire:click="eliminarL3Switch('{{ $sw['name'] }}')"
+                                                wire:confirm="¿Seguro que desea eliminar el Switch Virtual L3 '{{ $sw['name'] }}' y todas sus interfaces?"
+                                                class="se-btn se-btn-rose"
+                                                style="padding: 0.25rem 0.55rem; font-size: 0.72rem;">
+                                            Eliminar
+                                        </button>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    <!-- Filtros para Interfaces L3 -->
+                    <div style="display: flex; flex-wrap: wrap; gap: 0.65rem; align-items: center; margin-bottom: 1rem; padding: 0.75rem; background: #090e1a; border: 1px solid #1e293b; border-radius: 0.5rem;">
+                        <input type="text"
+                               wire:model.live.debounce.250ms="l3Search"
+                               placeholder="Buscar por Switch L3, Virtual Hub, IP o Máscara..."
+                               style="flex: 1; min-width: 240px; background: #0f172a; border: 1px solid #334155; border-radius: 0.45rem; padding: 0.45rem 0.75rem; color: #ffffff; font-size: 0.8rem; outline: none;" />
+                        <select wire:model.live="l3SwitchFilter"
+                                style="background: #0f172a; border: 1px solid #334155; border-radius: 0.45rem; padding: 0.45rem 0.75rem; color: #38bdf8; font-size: 0.8rem; font-weight: 600; cursor: pointer;">
+                            <option value="">Todos los Switches L3 ({{ count($l3Switches) }})</option>
+                            @foreach($l3Switches as $sw)
+                                <option value="{{ $sw['name'] }}">{{ $sw['name'] }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <!-- Tabla de Todas las Interfaces L3 -->
+                    <h4 style="font-size: 0.85rem; font-weight: 600; color: #38bdf8; margin: 0 0 0.5rem 0;">
+                        Todas las Interfaces L3 ({{ count($filteredL3Interfaces) }})
+                    </h4>
+                    <div style="overflow-x: auto; margin-bottom: 1.5rem;">
+                        <table class="se-table">
+                            <thead>
+                                <tr>
+                                    <th>Switch L3</th>
+                                    <th>Estado Switch</th>
+                                    <th>Virtual Hub Asignado</th>
+                                    <th>Dirección IP L3</th>
+                                    <th>Máscara de Subred</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($filteredL3Interfaces as $if)
+                                    <tr>
+                                        <td style="font-family: monospace; font-weight: 700; color: #ffffff;">{{ $if['switch_name'] }}</td>
+                                        <td>
+                                            <span class="se-badge {{ !empty($if['switch_active']) ? 'se-badge-emerald' : 'se-badge-amber' }}">
+                                                {{ !empty($if['switch_active']) ? 'Activo' : 'Detenido' }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <button type="button"
+                                                    wire:click="abrirGestionHub('{{ $if['hub_name'] }}', 'routes')"
+                                                    class="se-badge se-badge-sky"
+                                                    style="cursor: pointer; font-family: monospace;">
+                                                {{ $if['hub_name'] }}
+                                            </button>
+                                        </td>
+                                        <td style="font-family: monospace; font-weight: 600; color: #34d399;">{{ $if['ip_address'] }}</td>
+                                        <td style="font-family: monospace; color: #cbd5e1;">{{ $if['subnet_mask'] }}</td>
+                                        <td>
+                                            <div style="display: flex; gap: 0.4rem;">
+                                                <button type="button"
+                                                        wire:click="abrirModalEditarInterfazL3('{{ $if['switch_name'] }}', '{{ $if['hub_name'] }}', '{{ $if['ip_address'] }}', '{{ $if['subnet_mask'] }}')"
+                                                        class="se-btn se-btn-sky"
+                                                        style="padding: 0.3rem 0.6rem; font-size: 0.73rem;">
+                                                    Modificar
+                                                </button>
+                                                <button type="button"
+                                                        wire:click="eliminarInterfazL3('{{ $if['switch_name'] }}', '{{ $if['hub_name'] }}')"
+                                                        wire:confirm="¿Eliminar la interfaz L3 del Hub '{{ $if['hub_name'] }}' en el Switch '{{ $if['switch_name'] }}'?"
+                                                        class="se-btn se-btn-rose"
+                                                        style="padding: 0.3rem 0.6rem; font-size: 0.73rem;">
+                                                    Eliminar
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="6" style="text-align: center; color: #94a3b8; padding: 1.5rem;">
+                                            No se encontraron interfaces L3 registradas en este servidor SoftEther.
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Tabla de Enrutamiento Estático L3 -->
+                    <h4 style="font-size: 0.85rem; font-weight: 600; color: #a5b4fc; margin: 0 0 0.5rem 0;">
+                        Tabla de Rutas de Switches L3 ({{ count($filteredL3Tables) }})
+                    </h4>
+                    <div style="overflow-x: auto;">
+                        <table class="se-table">
+                            <thead>
+                                <tr>
+                                    <th>Switch L3</th>
+                                    <th>Red Destino</th>
+                                    <th>Máscara</th>
+                                    <th>Gateway</th>
+                                    <th>Métrica</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($filteredL3Tables as $tbl)
+                                    <tr>
+                                        <td style="font-family: monospace; font-weight: 700; color: #ffffff;">{{ $tbl['switch_name'] }}</td>
+                                        <td style="font-family: monospace; color: #38bdf8;">{{ $tbl['network_address'] }}</td>
+                                        <td style="font-family: monospace;">{{ $tbl['subnet_mask'] }}</td>
+                                        <td style="font-family: monospace; color: #34d399;">{{ $tbl['gateway_address'] }}</td>
+                                        <td style="font-family: monospace;">{{ $tbl['metric'] }}</td>
+                                        <td>
+                                            <div style="display: flex; gap: 0.4rem;">
+                                                <button type="button"
+                                                        wire:click="abrirModalEditarRutaL3('{{ $tbl['switch_name'] }}', '{{ $tbl['network_address'] }}', '{{ $tbl['subnet_mask'] }}', '{{ $tbl['gateway_address'] }}', {{ (int) ($tbl['metric'] ?? 1) }})"
+                                                        class="se-btn se-btn-sky"
+                                                        style="padding: 0.3rem 0.6rem; font-size: 0.73rem;">
+                                                    Modificar
+                                                </button>
+                                                <button type="button"
+                                                        wire:click="eliminarRutaL3('{{ $tbl['switch_name'] }}', '{{ $tbl['network_address'] }}', '{{ $tbl['subnet_mask'] }}', '{{ $tbl['gateway_address'] }}', {{ (int) ($tbl['metric'] ?? 1) }})"
+                                                        wire:confirm="¿Eliminar la ruta L3 {{ $tbl['network_address'] }}/{{ $tbl['subnet_mask'] }} del Switch '{{ $tbl['switch_name'] }}'?"
+                                                        class="se-btn se-btn-rose"
+                                                        style="padding: 0.3rem 0.6rem; font-size: 0.73rem;">
+                                                    Eliminar
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="6" style="text-align: center; color: #94a3b8; padding: 1.5rem;">
+                                            No hay rutas estáticas configuradas en los Switches L3.
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN B: RUTAS SECURENAT CONFIGURADAS POR CADA VIRTUAL HUB -->
+                <div class="se-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid #1e293b; padding-bottom: 0.75rem; flex-wrap: wrap; gap: 0.75rem;">
+                        <div>
+                            <h3 style="font-size: 1rem; font-weight: 700; color: #ffffff; margin: 0;">
+                                Rutas Configuradas en SecureNAT por Virtual Hub
+                            </h3>
+                            <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.25rem 0 0 0;">
+                                Vista consolidada de las rutas estáticas empujadas por DHCP (DhcpPushRoutes) en cada Virtual Hub.
+                            </p>
+                        </div>
+                        <input type="text"
+                               wire:model.live.debounce.250ms="routeHubSearch"
+                               placeholder="Filtrar por Virtual Hub o IP de ruta..."
+                               style="min-width: 260px; background: #090e1a; border: 1px solid #334155; border-radius: 0.45rem; padding: 0.45rem 0.75rem; color: #ffffff; font-size: 0.8rem; outline: none;" />
+                    </div>
+
+                    <div style="overflow-x: auto;">
+                        <table class="se-table">
+                            <thead>
+                                <tr>
+                                    <th>Virtual Hub</th>
+                                    <th>Push Routes Activo</th>
+                                    <th>Rutas Configuradas (Red / Máscara → Gateway)</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($filteredHubRoutes as $hr)
+                                    <tr>
+                                        <td style="font-family: monospace; font-weight: 700; color: #38bdf8;">{{ $hr['hub_name'] }}</td>
+                                        <td>
+                                            <span class="se-badge {{ !empty($hr['apply_dhcp_push_routes']) ? 'se-badge-emerald' : 'se-badge-amber' }}">
+                                                {{ !empty($hr['apply_dhcp_push_routes']) ? 'Sí (Aplicadas)' : 'Inactivo' }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            @if(!empty($hr['routes']))
+                                                <div style="display: flex; flex-wrap: wrap; gap: 0.35rem;">
+                                                    @foreach($hr['routes'] as $r)
+                                                        <span style="font-family: monospace; font-size: 0.74rem; padding: 0.2rem 0.5rem; border-radius: 0.35rem; background: #090e1a; border: 1px solid #334155; color: #e2e8f0;">
+                                                            <strong style="color: #38bdf8;">{{ $r['network'] }}</strong>/{{ $r['mask'] }} → <strong style="color: #34d399;">{{ $r['gateway'] }}</strong>
+                                                        </span>
+                                                    @endforeach
+                                                </div>
+                                            @else
+                                                <span style="color: #64748b; font-size: 0.75rem;">Sin rutas configuradas</span>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            <button type="button"
+                                                    wire:click="abrirGestionHub('{{ $hr['hub_name'] }}', 'routes')"
+                                                    class="se-btn se-btn-amber"
+                                                    style="padding: 0.3rem 0.65rem; font-size: 0.73rem;">
+                                                Editar Rutas
+                                            </button>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="4" style="text-align: center; color: #94a3b8; padding: 1.5rem;">
+                                            No se encontraron configuraciones de SecureNAT para mostrar.
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -1299,6 +1616,9 @@ docker exec dp-prod-app php artisan cache:clear
                         <button type="button" wire:click="setHubManageTab('nat_dhcp')" class="se-tab-btn {{ $hubManageTab === 'nat_dhcp' ? 'active' : '' }}">
                             <span>⚙ DHCP & SecureNAT</span>
                         </button>
+                        <button type="button" wire:click="setHubManageTab('routes')" class="se-tab-btn {{ $hubManageTab === 'routes' ? 'active' : '' }}">
+                            <span>🛣 Rutas SecureNAT ({{ count($hubRoutesList) }})</span>
+                        </button>
                         <button type="button" wire:click="setHubManageTab('users')" class="se-tab-btn {{ $hubManageTab === 'users' ? 'active' : '' }}">
                             <span>👥 Usuarios del Hub ({{ count($hubManageUsers) }})</span>
                         </button>
@@ -1430,6 +1750,92 @@ docker exec dp-prod-app php artisan cache:clear
                                 </div>
                             </div>
                         @endif
+                    @endif
+
+                    <!-- SUB-TAB 1B: RUTAS ESTÁTICAS DE SECURENAT (DhcpPushRoutes) -->
+                    @if($hubManageTab === 'routes')
+                        <div style="display: flex; flex-direction: column; gap: 1rem; font-size: 0.825rem;">
+                            <div style="padding: 0.85rem; background: #090e1a; border: 1px solid #1e293b; border-radius: 0.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                                <label style="display: flex; align-items: center; gap: 0.55rem; color: #e2e8f0; font-weight: 600; cursor: pointer;">
+                                    <input type="checkbox" wire:model="hubApplyPushRoutes" />
+                                    <span>Aplicar y enviar rutas estáticas vía DHCP a los clientes (`ApplyDhcpPushRoutes`)</span>
+                                </label>
+                                <span class="se-badge {{ $hubApplyPushRoutes ? 'se-badge-emerald' : 'se-badge-amber' }}">
+                                    {{ $hubApplyPushRoutes ? 'Activo' : 'Inactivo' }}
+                                </span>
+                            </div>
+
+                            <!-- Lista editable de rutas configuradas -->
+                            <div style="overflow-x: auto;">
+                                <table class="se-table" style="font-size: 0.78rem;">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Red Destino (IP)</th>
+                                            <th>Máscara de Subred</th>
+                                            <th>Gateway (IP)</th>
+                                            <th>Acción</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse($hubRoutesList as $rIdx => $routeRow)
+                                            <tr>
+                                                <td style="color: #64748b;">{{ $rIdx + 1 }}</td>
+                                                <td>
+                                                    <input type="text" wire:model="hubRoutesList.{{ $rIdx }}.network" style="width: 100%; min-width: 125px; background: #1e293b; border: 1px solid #475569; border-radius: 0.4rem; padding: 0.35rem 0.5rem; color: #38bdf8; font-family: monospace;" />
+                                                </td>
+                                                <td>
+                                                    <input type="text" wire:model="hubRoutesList.{{ $rIdx }}.mask" style="width: 100%; min-width: 125px; background: #1e293b; border: 1px solid #475569; border-radius: 0.4rem; padding: 0.35rem 0.5rem; color: #ffffff; font-family: monospace;" />
+                                                </td>
+                                                <td>
+                                                    <input type="text" wire:model="hubRoutesList.{{ $rIdx }}.gateway" style="width: 100%; min-width: 125px; background: #1e293b; border: 1px solid #475569; border-radius: 0.4rem; padding: 0.35rem 0.5rem; color: #34d399; font-family: monospace;" />
+                                                </td>
+                                                <td>
+                                                    <button type="button" wire:click="eliminarRutaHub({{ $rIdx }})" class="se-btn se-btn-rose" style="padding: 0.3rem 0.55rem; font-size: 0.72rem;">
+                                                        Quitar
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="5" style="text-align: center; color: #94a3b8; padding: 1.25rem;">
+                                                    No hay rutas estáticas configuradas en SecureNAT para {{ $managingHub }}.
+                                                </td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Agregar nueva ruta estática -->
+                            <div style="padding: 0.85rem; background: #090e1a; border: 1px dashed #334155; border-radius: 0.5rem;">
+                                <div style="font-size: 0.8rem; font-weight: 600; color: #38bdf8; margin-bottom: 0.55rem;">
+                                    + Agregar Nueva Ruta a SecureNAT
+                                </div>
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.55rem; align-items: end;">
+                                    <div>
+                                        <label style="display: block; color: #94a3b8; font-size: 0.72rem; margin-bottom: 0.2rem;">Red Destino</label>
+                                        <input type="text" wire:model="newHubRouteNetwork" placeholder="ej: 192.168.10.0" style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.4rem; padding: 0.4rem; color: #ffffff; font-family: monospace;" />
+                                    </div>
+                                    <div>
+                                        <label style="display: block; color: #94a3b8; font-size: 0.72rem; margin-bottom: 0.2rem;">Máscara de Subred</label>
+                                        <input type="text" wire:model="newHubRouteMask" placeholder="255.255.255.0" style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.4rem; padding: 0.4rem; color: #ffffff; font-family: monospace;" />
+                                    </div>
+                                    <div>
+                                        <label style="display: block; color: #94a3b8; font-size: 0.72rem; margin-bottom: 0.2rem;">Gateway</label>
+                                        <input type="text" wire:model="newHubRouteGateway" placeholder="ej: 192.168.30.1" style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.4rem; padding: 0.4rem; color: #ffffff; font-family: monospace;" />
+                                    </div>
+                                    <button type="button" wire:click="agregarRutaHub" class="se-btn se-btn-sky" style="justify-content: center; height: 34px;">
+                                        + Añadir a la lista
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                                <button type="button" wire:click="cerrarGestionHub" class="se-btn" style="background: #334155; color: #ffffff;">Cerrar</button>
+                                <button type="button" wire:click="guardarRutasHub" class="se-btn se-btn-emerald">Guardar Rutas en SecureNAT</button>
+                            </div>
+                        </div>
                     @endif
 
                     <!-- SUB-TAB 2: USUARIOS DEL HUB -->
@@ -1674,6 +2080,125 @@ docker exec dp-prod-app php artisan cache:clear
                             <span>Sí, Eliminar Virtual Hub</span>
                         </button>
                     </div>
+                </div>
+            </div>
+        @endif
+
+        <!-- MODAL CREAR SWITCH L3 -->
+        @if($isCreatingL3Switch)
+            <div class="se-modal-overlay">
+                <div class="se-modal" style="max-width: 480px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 0.75rem; margin-bottom: 1rem;">
+                        <h3 style="font-size: 1.05rem; font-weight: 700; color: #34d399; margin: 0;">
+                            Nuevo Virtual Layer 3 Switch
+                        </h3>
+                        <button type="button" wire:click="cerrarModalCrearL3Switch" style="background: transparent; border: none; color: #94a3b8; font-size: 1.25rem; cursor: pointer;">✕</button>
+                    </div>
+                    <form wire:submit.prevent="crearL3Switch" style="display: flex; flex-direction: column; gap: 1rem; font-size: 0.85rem;">
+                        <div>
+                            <label style="display: block; color: #94a3b8; margin-bottom: 0.25rem;">Nombre del Switch L3 <span style="color: #fb7185;">*</span></label>
+                            <input type="text" wire:model="newL3SwitchName" required placeholder="ej: L3_Router_Principal" style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.5rem; padding: 0.5rem; color: #ffffff; font-family: monospace;" />
+                        </div>
+                        <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                            <button type="button" wire:click="cerrarModalCrearL3Switch" class="se-btn" style="background: #334155; color: #ffffff;">Cancelar</button>
+                            <button type="submit" class="se-btn se-btn-emerald">Crear Switch L3</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        @endif
+
+        <!-- MODAL CREAR / MODIFICAR INTERFAZ L3 -->
+        @if($isEditingL3If)
+            <div class="se-modal-overlay">
+                <div class="se-modal" style="max-width: 520px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 0.75rem; margin-bottom: 1rem;">
+                        <h3 style="font-size: 1.05rem; font-weight: 700; color: #38bdf8; margin: 0;">
+                            {{ $editingL3IfOriginal ? 'Modificar Interfaz L3' : 'Nueva Interfaz L3' }}
+                        </h3>
+                        <button type="button" wire:click="cerrarModalInterfazL3" style="background: transparent; border: none; color: #94a3b8; font-size: 1.25rem; cursor: pointer;">✕</button>
+                    </div>
+                    <form wire:submit.prevent="guardarInterfazL3" style="display: flex; flex-direction: column; gap: 0.9rem; font-size: 0.85rem;">
+                        <div>
+                            <label style="display: block; color: #94a3b8; margin-bottom: 0.25rem;">Switch L3 <span style="color: #fb7185;">*</span></label>
+                            <select wire:model="l3IfFormSwitch" {{ $editingL3IfOriginal ? 'disabled' : '' }} required style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.5rem; padding: 0.5rem; color: #38bdf8; font-family: monospace;">
+                                @foreach($l3Switches as $sw)
+                                    <option value="{{ $sw['name'] }}">{{ $sw['name'] }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display: block; color: #94a3b8; margin-bottom: 0.25rem;">Virtual Hub Conectado <span style="color: #fb7185;">*</span></label>
+                            <select wire:model="l3IfFormHub" required style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.5rem; padding: 0.5rem; color: #ffffff; font-family: monospace;">
+                                @foreach($virtualHubs as $vh)
+                                    <option value="{{ $vh['hub_name'] }}">{{ $vh['hub_name'] }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                            <div>
+                                <label style="display: block; color: #94a3b8; margin-bottom: 0.25rem;">Dirección IP L3 <span style="color: #fb7185;">*</span></label>
+                                <input type="text" wire:model="l3IfFormIp" required placeholder="192.168.10.1" style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.5rem; padding: 0.5rem; color: #34d399; font-family: monospace;" />
+                            </div>
+                            <div>
+                                <label style="display: block; color: #94a3b8; margin-bottom: 0.25rem;">Máscara de Subred <span style="color: #fb7185;">*</span></label>
+                                <input type="text" wire:model="l3IfFormMask" required placeholder="255.255.255.0" style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.5rem; padding: 0.5rem; color: #ffffff; font-family: monospace;" />
+                            </div>
+                        </div>
+                        <div style="padding: 0.65rem 0.85rem; border-radius: 0.5rem; background: rgba(14, 165, 233, 0.1); border: 1px solid rgba(14, 165, 233, 0.25); color: #7dd3fc; font-size: 0.75rem;">
+                            ℹ Si el Switch L3 está activo, el sistema lo detendrá brevemente, aplicará el cambio de interfaz y lo iniciará nuevamente de forma automática.
+                        </div>
+                        <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                            <button type="button" wire:click="cerrarModalInterfazL3" class="se-btn" style="background: #334155; color: #ffffff;">Cancelar</button>
+                            <button type="submit" class="se-btn se-btn-sky">Guardar Interfaz L3</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        @endif
+
+        <!-- MODAL CREAR / MODIFICAR RUTA L3 -->
+        @if($isEditingL3Route)
+            <div class="se-modal-overlay">
+                <div class="se-modal" style="max-width: 520px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 0.75rem; margin-bottom: 1rem;">
+                        <h3 style="font-size: 1.05rem; font-weight: 700; color: #a5b4fc; margin: 0;">
+                            {{ $editingL3RouteOriginal ? 'Modificar Ruta de Switch L3' : 'Nueva Ruta de Switch L3' }}
+                        </h3>
+                        <button type="button" wire:click="cerrarModalRutaL3" style="background: transparent; border: none; color: #94a3b8; font-size: 1.25rem; cursor: pointer;">✕</button>
+                    </div>
+                    <form wire:submit.prevent="guardarRutaL3" style="display: flex; flex-direction: column; gap: 0.9rem; font-size: 0.85rem;">
+                        <div>
+                            <label style="display: block; color: #94a3b8; margin-bottom: 0.25rem;">Switch L3 <span style="color: #fb7185;">*</span></label>
+                            <select wire:model="l3RouteFormSwitch" {{ $editingL3RouteOriginal ? 'disabled' : '' }} required style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.5rem; padding: 0.5rem; color: #38bdf8; font-family: monospace;">
+                                @foreach($l3Switches as $sw)
+                                    <option value="{{ $sw['name'] }}">{{ $sw['name'] }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                            <div>
+                                <label style="display: block; color: #94a3b8; margin-bottom: 0.25rem;">Red Destino <span style="color: #fb7185;">*</span></label>
+                                <input type="text" wire:model="l3RouteFormNetwork" required placeholder="192.168.20.0" style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.5rem; padding: 0.5rem; color: #38bdf8; font-family: monospace;" />
+                            </div>
+                            <div>
+                                <label style="display: block; color: #94a3b8; margin-bottom: 0.25rem;">Máscara <span style="color: #fb7185;">*</span></label>
+                                <input type="text" wire:model="l3RouteFormMask" required placeholder="255.255.255.0" style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.5rem; padding: 0.5rem; color: #ffffff; font-family: monospace;" />
+                            </div>
+                            <div>
+                                <label style="display: block; color: #94a3b8; margin-bottom: 0.25rem;">Gateway <span style="color: #fb7185;">*</span></label>
+                                <input type="text" wire:model="l3RouteFormGateway" required placeholder="192.168.10.254" style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.5rem; padding: 0.5rem; color: #34d399; font-family: monospace;" />
+                            </div>
+                            <div>
+                                <label style="display: block; color: #94a3b8; margin-bottom: 0.25rem;">Métrica <span style="color: #fb7185;">*</span></label>
+                                <input type="number" min="1" wire:model="l3RouteFormMetric" required style="width: 100%; background: #1e293b; border: 1px solid #475569; border-radius: 0.5rem; padding: 0.5rem; color: #ffffff; font-family: monospace;" />
+                            </div>
+                        </div>
+                        <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                            <button type="button" wire:click="cerrarModalRutaL3" class="se-btn" style="background: #334155; color: #ffffff;">Cancelar</button>
+                            <button type="submit" class="se-btn se-btn-indigo">Guardar Ruta L3</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         @endif

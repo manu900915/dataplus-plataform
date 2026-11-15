@@ -31,6 +31,10 @@ class SoftEtherPage extends Page
     public array $virtualHubs = [];
     public array $secureNat = [];
     public array $dhcpTable = [];
+    public array $allHubRoutes = [];
+    public array $l3Switches = [];
+    public array $l3Interfaces = [];
+    public array $l3Tables = [];
     public array $connectionDetails = [];
 
     public ?array $testResult = null;
@@ -70,9 +74,9 @@ class SoftEtherPage extends Page
     public int $userPage = 1;
     public int $usersPerPage = 15;
 
-    // Modal de Gestión Completa por Virtual Hub (DHCP, SecureNAT, Usuarios, Logs)
+    // Modal de Gestión Completa por Virtual Hub (DHCP, SecureNAT, Rutas, Usuarios, Logs)
     public ?string $managingHub = null;
-    public string $hubManageTab = 'nat_dhcp'; // nat_dhcp, users, logs
+    public string $hubManageTab = 'nat_dhcp'; // nat_dhcp, routes, users, logs
     public array $hubManageSecureNat = [];
     public array $hubManageDhcpTable = [];
     public array $hubManageUsers = [];
@@ -95,6 +99,11 @@ class SoftEtherPage extends Page
         'nat_udp_timeout' => 60,
         'save_log' => true,
     ];
+    public bool $hubApplyPushRoutes = true;
+    public array $hubRoutesList = [];
+    public string $newHubRouteNetwork = '';
+    public string $newHubRouteMask = '255.255.255.0';
+    public string $newHubRouteGateway = '';
     public array $logForm = [
         'save_security_log' => true,
         'security_log_switch_type' => 4,
@@ -105,6 +114,32 @@ class SoftEtherPage extends Page
     public string $hubNewRealname = '';
     public string $hubNewPassword = '';
     public string $hubNewNote = '';
+
+    // Pestaña Interfaces L3 & Rutas
+    public string $l3Search = '';
+    public string $l3SwitchFilter = '';
+    public string $routeHubSearch = '';
+
+    // Modal Crear Switch L3
+    public bool $isCreatingL3Switch = false;
+    public string $newL3SwitchName = '';
+
+    // Modal Crear/Editar Interfaz L3
+    public bool $isEditingL3If = false;
+    public ?array $editingL3IfOriginal = null;
+    public string $l3IfFormSwitch = '';
+    public string $l3IfFormHub = '';
+    public string $l3IfFormIp = '';
+    public string $l3IfFormMask = '255.255.255.0';
+
+    // Modal Crear/Editar Ruta L3
+    public bool $isEditingL3Route = false;
+    public ?array $editingL3RouteOriginal = null;
+    public string $l3RouteFormSwitch = '';
+    public string $l3RouteFormNetwork = '';
+    public string $l3RouteFormMask = '255.255.255.0';
+    public string $l3RouteFormGateway = '';
+    public int $l3RouteFormMetric = 1;
 
     public function mount(): void
     {
@@ -158,6 +193,10 @@ class SoftEtherPage extends Page
         $this->virtualHubs = $telemetry['virtualHubs'] ?? [];
         $this->secureNat = $telemetry['secureNat'] ?? [];
         $this->dhcpTable = $telemetry['dhcpTable'] ?? [];
+        $this->allHubRoutes = $telemetry['allHubRoutes'] ?? [];
+        $this->l3Switches = $telemetry['l3Switches'] ?? [];
+        $this->l3Interfaces = $telemetry['l3Interfaces'] ?? [];
+        $this->l3Tables = $telemetry['l3Tables'] ?? [];
         $this->connectionDetails = $telemetry['connectionDetails'] ?? [];
 
         if (empty($this->selectedHub)) {
@@ -855,6 +894,12 @@ class SoftEtherPage extends Page
             'save_log' => (bool) ($nat['save_log'] ?? true),
         ];
 
+        $this->hubApplyPushRoutes = (bool) ($nat['apply_dhcp_push_routes'] ?? !empty($nat['dhcp_push_routes_list']));
+        $this->hubRoutesList = array_values($nat['dhcp_push_routes_list'] ?? []);
+        $this->newHubRouteNetwork = '';
+        $this->newHubRouteMask = '255.255.255.0';
+        $this->newHubRouteGateway = $nat['dhcp_gateway_ip'] ?: ($nat['virtual_gateway_ip'] ?: '192.168.30.1');
+
         $this->logForm = [
             'save_security_log' => (bool) ($logs['save_security_log'] ?? false),
             'security_log_switch_type' => (int) ($logs['security_log_switch_type'] ?? 4),
@@ -998,6 +1043,359 @@ class SoftEtherPage extends Page
                 ->body($res['message'])
                 ->danger()
                 ->send();
+        }
+    }
+
+    // =========================================================================
+    // RUTAS ESTÁTICAS DE SECURENAT POR VIRTUAL HUB
+    // =========================================================================
+
+    public function agregarRutaHub(): void
+    {
+        $net = trim($this->newHubRouteNetwork);
+        $mask = trim($this->newHubRouteMask);
+        $gw = trim($this->newHubRouteGateway);
+
+        if (!filter_var($net, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)
+            || !filter_var($mask, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)
+            || !filter_var($gw, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            Notification::make()
+                ->title('Datos de ruta inválidos')
+                ->body('Red destino, máscara de subred y gateway deben ser direcciones IPv4 válidas.')
+                ->warning()
+                ->send();
+            return;
+        }
+
+        $this->hubRoutesList[] = [
+            'network' => $net,
+            'mask' => $mask,
+            'gateway' => $gw,
+        ];
+
+        $this->newHubRouteNetwork = '';
+    }
+
+    public function eliminarRutaHub(int $index): void
+    {
+        if (isset($this->hubRoutesList[$index])) {
+            unset($this->hubRoutesList[$index]);
+            $this->hubRoutesList = array_values($this->hubRoutesList);
+        }
+    }
+
+    public function guardarRutasHub(): void
+    {
+        if (empty($this->managingHub)) {
+            return;
+        }
+
+        /** @var SoftEtherService $service */
+        $service = app(SoftEtherService::class);
+        $service->setServer($this->selectedServer, $this->managingHub);
+
+        $res = $service->saveSecureNatPushRoutes($this->hubRoutesList, $this->hubApplyPushRoutes, $this->managingHub);
+
+        if ($res['success']) {
+            Notification::make()
+                ->title('Rutas SecureNAT guardadas')
+                ->body($res['message'])
+                ->success()
+                ->send();
+
+            $this->cargarDatosHubGestionado();
+            $this->loadData(false, true);
+        } else {
+            Notification::make()
+                ->title('Error al guardar rutas')
+                ->body($res['message'])
+                ->danger()
+                ->send();
+        }
+    }
+
+    // =========================================================================
+    // LAYER 3 SWITCHES, INTERFACES L3 Y TABLAS DE RUTAS
+    // =========================================================================
+
+    public function getFilteredL3Interfaces(): array
+    {
+        $search = trim(mb_strtolower($this->l3Search));
+        $swFilter = trim($this->l3SwitchFilter);
+
+        return array_values(array_filter($this->l3Interfaces, function ($if) use ($search, $swFilter) {
+            if ($swFilter !== '' && strcasecmp($if['switch_name'] ?? '', $swFilter) !== 0) {
+                return false;
+            }
+            if ($search !== '') {
+                $sw = mb_strtolower($if['switch_name'] ?? '');
+                $hub = mb_strtolower($if['hub_name'] ?? '');
+                $ip = mb_strtolower($if['ip_address'] ?? '');
+                $mask = mb_strtolower($if['subnet_mask'] ?? '');
+                return str_contains($sw, $search) || str_contains($hub, $search) || str_contains($ip, $search) || str_contains($mask, $search);
+            }
+            return true;
+        }));
+    }
+
+    public function getFilteredL3Tables(): array
+    {
+        $search = trim(mb_strtolower($this->l3Search));
+        $swFilter = trim($this->l3SwitchFilter);
+
+        return array_values(array_filter($this->l3Tables, function ($tbl) use ($search, $swFilter) {
+            if ($swFilter !== '' && strcasecmp($tbl['switch_name'] ?? '', $swFilter) !== 0) {
+                return false;
+            }
+            if ($search !== '') {
+                $sw = mb_strtolower($tbl['switch_name'] ?? '');
+                $net = mb_strtolower($tbl['network_address'] ?? '');
+                $gw = mb_strtolower($tbl['gateway_address'] ?? '');
+                return str_contains($sw, $search) || str_contains($net, $search) || str_contains($gw, $search);
+            }
+            return true;
+        }));
+    }
+
+    public function getFilteredAllHubRoutes(): array
+    {
+        $search = trim(mb_strtolower($this->routeHubSearch));
+        $items = $this->allHubRoutes;
+
+        if ($search === '') {
+            return $items;
+        }
+
+        return array_values(array_filter($items, function ($item) use ($search) {
+            $hub = mb_strtolower($item['hub_name'] ?? '');
+            $raw = mb_strtolower($item['dhcp_push_routes'] ?? '');
+            return str_contains($hub, $search) || str_contains($raw, $search);
+        }));
+    }
+
+    public function abrirModalCrearL3Switch(): void
+    {
+        $this->newL3SwitchName = '';
+        $this->isCreatingL3Switch = true;
+    }
+
+    public function cerrarModalCrearL3Switch(): void
+    {
+        $this->isCreatingL3Switch = false;
+        $this->newL3SwitchName = '';
+    }
+
+    public function crearL3Switch(): void
+    {
+        /** @var SoftEtherService $service */
+        $service = app(SoftEtherService::class);
+        $service->setServer($this->selectedServer);
+        $res = $service->createL3Switch($this->newL3SwitchName);
+
+        if ($res['success']) {
+            Notification::make()->title('Switch L3 creado')->body($res['message'])->success()->send();
+            $this->isCreatingL3Switch = false;
+            $this->newL3SwitchName = '';
+            $this->loadData(false, true);
+        } else {
+            Notification::make()->title('Error al crear Switch L3')->body($res['message'])->danger()->send();
+        }
+    }
+
+    public function toggleL3Switch(string $switchName, bool $start): void
+    {
+        /** @var SoftEtherService $service */
+        $service = app(SoftEtherService::class);
+        $service->setServer($this->selectedServer);
+        $res = $service->toggleL3Switch($switchName, $start);
+
+        if ($res['success']) {
+            Notification::make()->title('Switch L3 actualizado')->body($res['message'])->success()->send();
+            $this->loadData(false, true);
+        } else {
+            Notification::make()->title('Error al cambiar estado del Switch L3')->body($res['message'])->danger()->send();
+        }
+    }
+
+    public function eliminarL3Switch(string $switchName): void
+    {
+        /** @var SoftEtherService $service */
+        $service = app(SoftEtherService::class);
+        $service->setServer($this->selectedServer);
+        $res = $service->deleteL3Switch($switchName);
+
+        if ($res['success']) {
+            Notification::make()->title('Switch L3 eliminado')->body($res['message'])->success()->send();
+            $this->loadData(false, true);
+        } else {
+            Notification::make()->title('Error al eliminar Switch L3')->body($res['message'])->danger()->send();
+        }
+    }
+
+    public function abrirModalNuevaInterfazL3(?string $switchName = null): void
+    {
+        $this->editingL3IfOriginal = null;
+        $this->l3IfFormSwitch = $switchName ?: ($this->l3SwitchFilter ?: ($this->l3Switches[0]['name'] ?? ''));
+        $this->l3IfFormHub = $this->virtualHubs[0]['hub_name'] ?? 'DEFAULT';
+        $this->l3IfFormIp = '';
+        $this->l3IfFormMask = '255.255.255.0';
+        $this->isEditingL3If = true;
+    }
+
+    public function abrirModalEditarInterfazL3(string $switchName, string $hubName, string $ip, string $mask): void
+    {
+        $this->editingL3IfOriginal = [
+            'switch_name' => $switchName,
+            'hub_name' => $hubName,
+            'ip_address' => $ip,
+            'subnet_mask' => $mask,
+        ];
+        $this->l3IfFormSwitch = $switchName;
+        $this->l3IfFormHub = $hubName;
+        $this->l3IfFormIp = $ip;
+        $this->l3IfFormMask = $mask;
+        $this->isEditingL3If = true;
+    }
+
+    public function cerrarModalInterfazL3(): void
+    {
+        $this->isEditingL3If = false;
+        $this->editingL3IfOriginal = null;
+    }
+
+    public function guardarInterfazL3(): void
+    {
+        /** @var SoftEtherService $service */
+        $service = app(SoftEtherService::class);
+        $service->setServer($this->selectedServer);
+
+        if ($this->editingL3IfOriginal) {
+            $res = $service->updateL3Interface(
+                $this->editingL3IfOriginal['switch_name'],
+                $this->editingL3IfOriginal['hub_name'],
+                $this->editingL3IfOriginal['ip_address'],
+                $this->editingL3IfOriginal['subnet_mask'],
+                $this->l3IfFormHub,
+                $this->l3IfFormIp,
+                $this->l3IfFormMask
+            );
+        } else {
+            $res = $service->addL3Interface(
+                $this->l3IfFormSwitch,
+                $this->l3IfFormHub,
+                $this->l3IfFormIp,
+                $this->l3IfFormMask
+            );
+        }
+
+        if ($res['success']) {
+            Notification::make()->title('Interfaz L3 guardada')->body($res['message'])->success()->send();
+            $this->isEditingL3If = false;
+            $this->editingL3IfOriginal = null;
+            $this->loadData(false, true);
+        } else {
+            Notification::make()->title('Error al guardar interfaz L3')->body($res['message'])->danger()->send();
+        }
+    }
+
+    public function eliminarInterfazL3(string $switchName, string $hubName): void
+    {
+        /** @var SoftEtherService $service */
+        $service = app(SoftEtherService::class);
+        $service->setServer($this->selectedServer);
+        $res = $service->deleteL3Interface($switchName, $hubName);
+
+        if ($res['success']) {
+            Notification::make()->title('Interfaz L3 eliminada')->body($res['message'])->success()->send();
+            $this->loadData(false, true);
+        } else {
+            Notification::make()->title('Error al eliminar interfaz L3')->body($res['message'])->danger()->send();
+        }
+    }
+
+    public function abrirModalNuevaRutaL3(?string $switchName = null): void
+    {
+        $this->editingL3RouteOriginal = null;
+        $this->l3RouteFormSwitch = $switchName ?: ($this->l3SwitchFilter ?: ($this->l3Switches[0]['name'] ?? ''));
+        $this->l3RouteFormNetwork = '';
+        $this->l3RouteFormMask = '255.255.255.0';
+        $this->l3RouteFormGateway = '';
+        $this->l3RouteFormMetric = 1;
+        $this->isEditingL3Route = true;
+    }
+
+    public function abrirModalEditarRutaL3(string $switchName, string $network, string $mask, string $gateway, int $metric): void
+    {
+        $this->editingL3RouteOriginal = [
+            'switch_name' => $switchName,
+            'network_address' => $network,
+            'subnet_mask' => $mask,
+            'gateway_address' => $gateway,
+            'metric' => $metric,
+        ];
+        $this->l3RouteFormSwitch = $switchName;
+        $this->l3RouteFormNetwork = $network;
+        $this->l3RouteFormMask = $mask;
+        $this->l3RouteFormGateway = $gateway;
+        $this->l3RouteFormMetric = max(1, $metric);
+        $this->isEditingL3Route = true;
+    }
+
+    public function cerrarModalRutaL3(): void
+    {
+        $this->isEditingL3Route = false;
+        $this->editingL3RouteOriginal = null;
+    }
+
+    public function guardarRutaL3(): void
+    {
+        /** @var SoftEtherService $service */
+        $service = app(SoftEtherService::class);
+        $service->setServer($this->selectedServer);
+
+        if ($this->editingL3RouteOriginal) {
+            $res = $service->updateL3Route(
+                $this->editingL3RouteOriginal['switch_name'],
+                $this->editingL3RouteOriginal,
+                [
+                    'network_address' => $this->l3RouteFormNetwork,
+                    'subnet_mask' => $this->l3RouteFormMask,
+                    'gateway_address' => $this->l3RouteFormGateway,
+                    'metric' => $this->l3RouteFormMetric,
+                ]
+            );
+        } else {
+            $res = $service->addL3Route(
+                $this->l3RouteFormSwitch,
+                $this->l3RouteFormNetwork,
+                $this->l3RouteFormMask,
+                $this->l3RouteFormGateway,
+                $this->l3RouteFormMetric
+            );
+        }
+
+        if ($res['success']) {
+            Notification::make()->title('Ruta L3 guardada')->body($res['message'])->success()->send();
+            $this->isEditingL3Route = false;
+            $this->editingL3RouteOriginal = null;
+            $this->loadData(false, true);
+        } else {
+            Notification::make()->title('Error al guardar ruta L3')->body($res['message'])->danger()->send();
+        }
+    }
+
+    public function eliminarRutaL3(string $switchName, string $network, string $mask, string $gateway, int $metric): void
+    {
+        /** @var SoftEtherService $service */
+        $service = app(SoftEtherService::class);
+        $service->setServer($this->selectedServer);
+        $res = $service->deleteL3Route($switchName, $network, $mask, $gateway, $metric);
+
+        if ($res['success']) {
+            Notification::make()->title('Ruta L3 eliminada')->body($res['message'])->success()->send();
+            $this->loadData(false, true);
+        } else {
+            Notification::make()->title('Error al eliminar ruta L3')->body($res['message'])->danger()->send();
         }
     }
 }
