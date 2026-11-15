@@ -734,7 +734,7 @@ class SoftEtherService
         }
 
         $ver = $this->getCacheVersion($this->activeServerKey);
-        $cacheKey = "softether_telemetry_{$this->activeServerKey}_{$this->hub}_v{$ver}";
+        $cacheKey = "softether_telemetry_v2_{$this->activeServerKey}_{$this->hub}_v{$ver}";
 
         if (!$forceRefresh) {
             try {
@@ -755,6 +755,7 @@ class SoftEtherService
         $virtualHubs = [];
         $serverStatus = null;
         $rawL3Switches = [];
+        $l3ListRes = null;
 
         if ($this->isConfigured()) {
             // LOTE 1 PARALELO: EnumHub + GetServerInfo + GetServerStatus + EnumL3Switch en 1 solo RTT
@@ -798,7 +799,9 @@ class SoftEtherService
                 }
 
                 $l3ListRes = $this->extractPoolResult($batch1['l3'] ?? null);
-                $rawL3Switches = $l3ListRes['L3SWList'] ?? $l3ListRes['L3SwitchList'] ?? [];
+                if ($l3ListRes !== null) {
+                    $rawL3Switches = $l3ListRes['L3SWList'] ?? $l3ListRes['L3SwitchList'] ?? $l3ListRes['L3SwList'] ?? [];
+                }
             } catch (Exception $e) {
                 Log::warning("SoftEther telemetry batch1 error ({$this->activeServerKey}): " . $e->getMessage());
             }
@@ -808,6 +811,14 @@ class SoftEtherService
             }
             if ($serverStatus === null) {
                 $serverStatus = $this->getServerStatus();
+            }
+            // Fallback garantizado para EnumL3Switch si el lote paralelo falló o requirió encabezado de Hub
+            if ($l3ListRes === null && !($this->circuitBroken[$this->activeServerKey] ?? false)) {
+                $l3Fallback = $this->callRpc('EnumL3Switch');
+                if (!empty($l3Fallback['success'])) {
+                    $l3DataFallback = $l3Fallback['data'] ?? [];
+                    $rawL3Switches = $l3DataFallback['L3SWList'] ?? $l3DataFallback['L3SwitchList'] ?? $l3DataFallback['L3SwList'] ?? [];
+                }
             }
         } else {
             $serverStatus = $this->getServerStatus();
@@ -824,7 +835,7 @@ class SoftEtherService
             }
         }
 
-        // LOTE 2 PARALELO: sesiones, dhcp, SecureNAT del hub activo + usuarios, rutas y L3 de todos los hubs/switches
+        // LOTE 2 PARALELO: sesiones, dhcp, SecureNAT del hub activo + L3 prioritario + usuarios y rutas de todos los hubs
         $activeSessions = [];
         $dhcpTable = [];
         $secureNat = null;
@@ -856,6 +867,8 @@ class SoftEtherService
                 ];
             }
 
+            $switchNames = array_values(array_map('strval', array_keys($switchMeta)));
+
             $poolRequests = [
                 ['key' => 'cur_sessions', 'method' => 'EnumSession', 'params' => ['HubName_str' => $this->hub]],
                 ['key' => 'cur_nat_stat', 'method' => 'GetSecureNATStatus', 'params' => ['HubName_str' => $this->hub]],
@@ -863,29 +876,31 @@ class SoftEtherService
                 ['key' => 'cur_dhcp', 'method' => 'EnumDHCP', 'params' => ['HubName_str' => $this->hub]],
             ];
 
-            foreach ($hubNames as $hName) {
-                $poolRequests[] = ['key' => "users_{$hName}", 'method' => 'EnumUser', 'params' => ['HubName_str' => $hName]];
-                $poolRequests[] = ['key' => "natopt_{$hName}", 'method' => 'GetSecureNATOption', 'params' => ['RpcHubName_str' => $hName]];
+            // Priorizar L3 Interfaces & Tablas en el primer chunk para no quedar detrás de decenas de Virtual Hubs
+            foreach ($switchNames as $sIdx => $swName) {
+                $poolRequests[] = ['key' => "l3if_{$sIdx}", 'method' => 'EnumL3If', 'params' => ['Name_str' => $swName]];
+                $poolRequests[] = ['key' => "l3tbl_{$sIdx}", 'method' => 'EnumL3Table', 'params' => ['Name_str' => $swName]];
             }
 
-            foreach (array_keys($switchMeta) as $swName) {
-                $poolRequests[] = ['key' => "l3if_{$swName}", 'method' => 'EnumL3If', 'params' => ['Name_str' => $swName]];
-                $poolRequests[] = ['key' => "l3tbl_{$swName}", 'method' => 'EnumL3Table', 'params' => ['Name_str' => $swName]];
+            foreach ($hubNames as $hIdx => $hName) {
+                $poolRequests[] = ['key' => "users_{$hIdx}", 'method' => 'EnumUser', 'params' => ['HubName_str' => $hName]];
+                $poolRequests[] = ['key' => "natopt_{$hIdx}", 'method' => 'GetSecureNATOption', 'params' => ['RpcHubName_str' => $hName]];
             }
 
             $collected = [];
-            try {
-                foreach (array_chunk($poolRequests, 30) as $chunk) {
-                    $responses = Http::pool(function ($pool) use ($chunk, $url, $headers) {
+            // Chunks moderados (12) con aislamiento individual de errores para no saturar TLS de SoftEther
+            foreach (array_chunk($poolRequests, 12) as $chunkOffset => $chunk) {
+                try {
+                    $responses = Http::pool(function ($pool) use ($chunk, $chunkOffset, $url, $headers) {
                         $calls = [];
                         foreach ($chunk as $idx => $req) {
-                            $c = $pool->as($req['key'])->connectTimeout(3.5)->timeout(7.0)->withHeaders($headers);
+                            $c = $pool->as($req['key'])->connectTimeout(3.5)->timeout(8.0)->withHeaders($headers);
                             if (!$this->verifySsl) {
                                 $c = $c->withoutVerifying();
                             }
                             $calls[] = $c->post($url, [
                                 'jsonrpc' => '2.0',
-                                'id' => (string) (time() + 100 + $idx),
+                                'id' => (string) (time() + 100 + ($chunkOffset * 20) + $idx),
                                 'method' => $req['method'],
                                 'params' => (object) $req['params'],
                             ]);
@@ -895,9 +910,9 @@ class SoftEtherService
                     foreach ($chunk as $req) {
                         $collected[$req['key']] = $this->extractPoolResult($responses[$req['key']] ?? null);
                     }
+                } catch (Exception $e) {
+                    Log::warning("SoftEther telemetry batch2 chunk {$chunkOffset} error ({$this->activeServerKey}): " . $e->getMessage());
                 }
-            } catch (Exception $e) {
-                Log::warning("SoftEther telemetry batch2 error ({$this->activeServerKey}): " . $e->getMessage());
             }
 
             // Sesiones activas
@@ -909,8 +924,12 @@ class SoftEtherService
             $dhcpTable = $collected['cur_dhcp']['DhcpTable'] ?? [];
 
             // Rutas SecureNAT de todos los hubs
-            foreach ($hubNames as $hName) {
-                $opt = $collected["natopt_{$hName}"] ?? null;
+            $curNatOptKey = null;
+            foreach ($hubNames as $hIdx => $hName) {
+                if (strcasecmp($hName, $this->hub) === 0) {
+                    $curNatOptKey = "natopt_{$hIdx}";
+                }
+                $opt = $collected["natopt_{$hIdx}"] ?? null;
                 if (is_array($opt)) {
                     $raw = trim((string) ($opt['DhcpPushRoutes_str'] ?? ''));
                     $parsed = $this->parsePushRoutes($raw);
@@ -927,8 +946,8 @@ class SoftEtherService
                 }
             }
 
-            // SecureNAT del hub actual (reutiliza natopt_$hub del pool!)
-            $curOpt = $collected["natopt_{$this->hub}"] ?? null;
+            // SecureNAT del hub actual (reutiliza natopt_$hIdx del pool!)
+            $curOpt = $curNatOptKey !== null ? ($collected[$curNatOptKey] ?? null) : null;
             $curStat = $collected['cur_nat_stat'] ?? null;
             $curHubStat = $collected['cur_hub_stat'] ?? null;
             if ($curOpt !== null || $curStat !== null || $curHubStat !== null) {
@@ -948,8 +967,8 @@ class SoftEtherService
                 }
             }
 
-            foreach ($hubNames as $hName) {
-                $uList = $collected["users_{$hName}"]['UserList'] ?? [];
+            foreach ($hubNames as $hIdx => $hName) {
+                $uList = $collected["users_{$hIdx}"]['UserList'] ?? [];
                 foreach ($uList as $u) {
                     $allVpnUsers[] = $this->mapSoftEtherUser($u, $hName, $timedMap, $connectedKeys);
                 }
@@ -960,11 +979,28 @@ class SoftEtherService
                 return $cmp !== 0 ? $cmp : strcasecmp($a['username'] ?? '', $b['username'] ?? '');
             });
 
-            // L3 Switches, Interfaces y Tablas
+            // L3 Switches, Interfaces y Tablas (con fallback individual via callRpc si algún pool falló)
             $allInterfaces = [];
             $allTables = [];
-            foreach (array_keys($switchMeta) as $swName) {
-                $ifList = $collected["l3if_{$swName}"]['L3IFList'] ?? $collected["l3if_{$swName}"]['L3IfList'] ?? [];
+            foreach ($switchNames as $sIdx => $swName) {
+                $ifData = $collected["l3if_{$sIdx}"] ?? null;
+                if ($ifData === null && !($this->circuitBroken[$this->activeServerKey] ?? false)) {
+                    $ifRpc = $this->callRpc('EnumL3If', ['Name_str' => $swName]);
+                    if (!empty($ifRpc['success'])) {
+                        $ifData = $ifRpc['data'] ?? [];
+                    }
+                }
+                $ifList = is_array($ifData)
+                    ? ($ifData['L3IFList'] ?? $ifData['L3IfList'] ?? $ifData['L3IfTable'] ?? [])
+                    : [];
+                if (empty($ifList) && ($switchMeta[$swName]['num_interfaces'] ?? 0) > 0 && !($this->circuitBroken[$this->activeServerKey] ?? false)) {
+                    $ifRpc = $this->callRpc('EnumL3If', ['Name_str' => $swName]);
+                    if (!empty($ifRpc['success'])) {
+                        $d = $ifRpc['data'] ?? [];
+                        $ifList = $d['L3IFList'] ?? $d['L3IfList'] ?? $d['L3IfTable'] ?? [];
+                    }
+                }
+
                 foreach ($ifList as $item) {
                     $row = [
                         'switch_name' => $swName,
@@ -978,7 +1014,24 @@ class SoftEtherService
                     $allInterfaces[] = $row;
                 }
 
-                $tblList = $collected["l3tbl_{$swName}"]['L3Table'] ?? $collected["l3tbl_{$swName}"]['L3TableList'] ?? [];
+                $tblData = $collected["l3tbl_{$sIdx}"] ?? null;
+                if ($tblData === null && !($this->circuitBroken[$this->activeServerKey] ?? false)) {
+                    $tblRpc = $this->callRpc('EnumL3Table', ['Name_str' => $swName]);
+                    if (!empty($tblRpc['success'])) {
+                        $tblData = $tblRpc['data'] ?? [];
+                    }
+                }
+                $tblList = is_array($tblData)
+                    ? ($tblData['L3Table'] ?? $tblData['L3TableList'] ?? [])
+                    : [];
+                if (empty($tblList) && ($switchMeta[$swName]['num_tables'] ?? 0) > 0 && !($this->circuitBroken[$this->activeServerKey] ?? false)) {
+                    $tblRpc = $this->callRpc('EnumL3Table', ['Name_str' => $swName]);
+                    if (!empty($tblRpc['success'])) {
+                        $d = $tblRpc['data'] ?? [];
+                        $tblList = $d['L3Table'] ?? $d['L3TableList'] ?? [];
+                    }
+                }
+
                 foreach ($tblList as $item) {
                     $row = [
                         'switch_name' => $swName,
@@ -997,6 +1050,15 @@ class SoftEtherService
                 'interfaces' => $allInterfaces,
                 'tables' => $allTables,
             ];
+
+            // Fallback final si hay switches con interfaces reportadas pero quedaron vacías
+            $expectedIfTotal = array_sum(array_column($switchMeta, 'num_interfaces'));
+            if ((empty($l3Data['switches']) || ($expectedIfTotal > 0 && empty($l3Data['interfaces']))) && !($this->circuitBroken[$this->activeServerKey] ?? false)) {
+                $directL3 = $this->getL3Switches();
+                if (!empty($directL3['switches']) && (empty($l3Data['switches']) || count($directL3['interfaces'] ?? []) > count($l3Data['interfaces']))) {
+                    $l3Data = $directL3;
+                }
+            }
         } else {
             $secureNat = $this->getSecureNatStatus($this->hub);
         }
@@ -2464,7 +2526,7 @@ class SoftEtherService
             return ['switches' => [], 'interfaces' => [], 'tables' => []];
         }
 
-        $rawSwitches = $res['data']['L3SWList'] ?? $res['data']['L3SwitchList'] ?? [];
+        $rawSwitches = $res['data']['L3SWList'] ?? $res['data']['L3SwitchList'] ?? $res['data']['L3SwList'] ?? [];
         if (empty($rawSwitches)) {
             return ['switches' => [], 'interfaces' => [], 'tables' => []];
         }
@@ -2473,12 +2535,8 @@ class SoftEtherService
         $allInterfaces = [];
         $allTables = [];
 
-        $url = rtrim($this->rpcUrl, '/');
-        $url = str_ends_with($url, '/api') ? $url . '/' : $url . '/api/';
-        $headers = [
-            'Content-Type' => 'application/json',
-            'X-VPNADMIN-PASSWORD' => $this->adminPassword,
-        ];
+        $url = $this->buildRpcUrl();
+        $headers = $this->buildRpcHeaders();
 
         $switchMeta = [];
         foreach ($rawSwitches as $sw) {
@@ -2497,13 +2555,14 @@ class SoftEtherService
             ];
         }
 
-        $names = array_keys($switchMeta);
+        $names = array_values(array_map('strval', array_keys($switchMeta)));
+        $responses = [];
         try {
             $responses = Http::pool(function ($pool) use ($names, $url, $headers) {
                 $calls = [];
                 foreach ($names as $idx => $swName) {
-                    $c1 = $pool->as("if_{$swName}")->connectTimeout(4.0)->timeout(8.0)->withHeaders($headers);
-                    $c2 = $pool->as("tbl_{$swName}")->connectTimeout(4.0)->timeout(8.0)->withHeaders($headers);
+                    $c1 = $pool->as("if_{$idx}")->connectTimeout(4.0)->timeout(8.0)->withHeaders($headers);
+                    $c2 = $pool->as("tbl_{$idx}")->connectTimeout(4.0)->timeout(8.0)->withHeaders($headers);
                     if (!$this->verifySsl) {
                         $c1 = $c1->withoutVerifying();
                         $c2 = $c2->withoutVerifying();
@@ -2523,45 +2582,55 @@ class SoftEtherService
                 }
                 return $calls;
             });
-
-            foreach ($names as $swName) {
-                $ifResp = $responses["if_{$swName}"] ?? null;
-                if ($ifResp && method_exists($ifResp, 'successful') && $ifResp->successful()) {
-                    $ifJson = $ifResp->json();
-                    $ifList = $ifJson['result']['L3IFList'] ?? $ifJson['result']['L3IfList'] ?? [];
-                    foreach ($ifList as $item) {
-                        $row = [
-                            'switch_name' => $swName,
-                            'switch_active' => $switchMeta[$swName]['active'],
-                            'switch_online' => $switchMeta[$swName]['online'],
-                            'hub_name' => (string) ($item['HubName_str'] ?? ''),
-                            'ip_address' => (string) ($item['IpAddress_ip'] ?? ''),
-                            'subnet_mask' => (string) ($item['SubnetMask_ip'] ?? '255.255.255.0'),
-                        ];
-                        $switchMeta[$swName]['interfaces'][] = $row;
-                        $allInterfaces[] = $row;
-                    }
-                }
-
-                $tblResp = $responses["tbl_{$swName}"] ?? null;
-                if ($tblResp && method_exists($tblResp, 'successful') && $tblResp->successful()) {
-                    $tblJson = $tblResp->json();
-                    $tblList = $tblJson['result']['L3Table'] ?? $tblJson['result']['L3TableList'] ?? [];
-                    foreach ($tblList as $item) {
-                        $row = [
-                            'switch_name' => $swName,
-                            'network_address' => (string) ($item['NetworkAddress_ip'] ?? ''),
-                            'subnet_mask' => (string) ($item['SubnetMask_ip'] ?? '255.255.255.0'),
-                            'gateway_address' => (string) ($item['GatewayAddress_ip'] ?? ''),
-                            'metric' => (int) ($item['Metric_u32'] ?? 1),
-                        ];
-                        $switchMeta[$swName]['tables'][] = $row;
-                        $allTables[] = $row;
-                    }
-                }
-            }
         } catch (Exception $e) {
             Log::warning("SoftEther getL3Switches pool error ({$this->activeServerKey}): " . $e->getMessage());
+        }
+
+        foreach ($names as $idx => $swName) {
+            $ifData = $this->extractPoolResult($responses["if_{$idx}"] ?? null);
+            if ($ifData === null && !($this->circuitBroken[$this->activeServerKey] ?? false)) {
+                $ifRpc = $this->callRpc('EnumL3If', ['Name_str' => $swName]);
+                if (!empty($ifRpc['success'])) {
+                    $ifData = $ifRpc['data'] ?? [];
+                }
+            }
+            $ifList = is_array($ifData)
+                ? ($ifData['L3IFList'] ?? $ifData['L3IfList'] ?? $ifData['L3IfTable'] ?? [])
+                : [];
+            foreach ($ifList as $item) {
+                $row = [
+                    'switch_name' => $swName,
+                    'switch_active' => $switchMeta[$swName]['active'],
+                    'switch_online' => $switchMeta[$swName]['online'],
+                    'hub_name' => (string) ($item['HubName_str'] ?? ''),
+                    'ip_address' => (string) ($item['IpAddress_ip'] ?? ''),
+                    'subnet_mask' => (string) ($item['SubnetMask_ip'] ?? '255.255.255.0'),
+                ];
+                $switchMeta[$swName]['interfaces'][] = $row;
+                $allInterfaces[] = $row;
+            }
+
+            $tblData = $this->extractPoolResult($responses["tbl_{$idx}"] ?? null);
+            if ($tblData === null && !($this->circuitBroken[$this->activeServerKey] ?? false)) {
+                $tblRpc = $this->callRpc('EnumL3Table', ['Name_str' => $swName]);
+                if (!empty($tblRpc['success'])) {
+                    $tblData = $tblRpc['data'] ?? [];
+                }
+            }
+            $tblList = is_array($tblData)
+                ? ($tblData['L3Table'] ?? $tblData['L3TableList'] ?? [])
+                : [];
+            foreach ($tblList as $item) {
+                $row = [
+                    'switch_name' => $swName,
+                    'network_address' => (string) ($item['NetworkAddress_ip'] ?? ''),
+                    'subnet_mask' => (string) ($item['SubnetMask_ip'] ?? '255.255.255.0'),
+                    'gateway_address' => (string) ($item['GatewayAddress_ip'] ?? ''),
+                    'metric' => (int) ($item['Metric_u32'] ?? 1),
+                ];
+                $switchMeta[$swName]['tables'][] = $row;
+                $allTables[] = $row;
+            }
         }
 
         $switches = array_values($switchMeta);

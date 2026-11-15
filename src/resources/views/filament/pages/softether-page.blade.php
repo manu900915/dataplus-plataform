@@ -238,8 +238,6 @@
                 return {
                     activeTab: $wire.entangle('activeTab'),
                     selectedHub: $wire.entangle('selectedHub'),
-                    userHubFilter: $wire.entangle('userHubFilter'),
-                    l3SwitchFilter: $wire.entangle('l3SwitchFilter'),
 
                     // Modal Inspección Sesión (apertura optimista en 0ms)
                     inspectSession: $wire.entangle('inspectSession'),
@@ -322,7 +320,7 @@
                     },
 
                     openCreateUserModal(hub = null) {
-                        this.newUserHub = hub || this.userHubFilter || this.selectedHub || defaults.defaultHub || 'DEFAULT';
+                        this.newUserHub = hub || $wire.userHubFilter || this.selectedHub || defaults.defaultHub || 'DEFAULT';
                         this.newUsername = '';
                         this.newRealname = '';
                         this.newPassword = '';
@@ -418,7 +416,7 @@
                         const switches = Array.isArray($wire.l3Switches) ? $wire.l3Switches : [];
                         const hubs = Array.isArray($wire.virtualHubs) ? $wire.virtualHubs : [];
                         this.editingL3IfOriginal = null;
-                        this.l3IfFormSwitch = switchName || this.l3SwitchFilter || (switches[0]?.name || '');
+                        this.l3IfFormSwitch = switchName || $wire.l3SwitchFilter || (switches[0]?.name || '');
                         this.l3IfFormHub = hubs[0]?.hub_name || 'DEFAULT';
                         this.l3IfFormIp = '';
                         this.l3IfFormMask = '255.255.255.0';
@@ -442,7 +440,7 @@
                     openNewL3RouteModal(switchName = '') {
                         const switches = Array.isArray($wire.l3Switches) ? $wire.l3Switches : [];
                         this.editingL3RouteOriginal = null;
-                        this.l3RouteFormSwitch = switchName || this.l3SwitchFilter || (switches[0]?.name || '');
+                        this.l3RouteFormSwitch = switchName || $wire.l3SwitchFilter || (switches[0]?.name || '');
                         this.l3RouteFormNetwork = '';
                         this.l3RouteFormMask = '255.255.255.0';
                         this.l3RouteFormGateway = '';

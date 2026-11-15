@@ -170,6 +170,9 @@ class SoftEtherPage extends Page
         $this->inspectSession = null;
         $this->managingHub = null;
         $this->userHubFilter = '';
+        $this->l3Search = '';
+        $this->l3SwitchFilter = '';
+        $this->routeHubSearch = '';
         $this->userPage = 1;
         $this->hubPage = 1;
         $this->resetFilterMemos();
