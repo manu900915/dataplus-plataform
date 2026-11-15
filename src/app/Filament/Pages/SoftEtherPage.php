@@ -141,6 +141,22 @@ class SoftEtherPage extends Page
     public string $l3RouteFormGateway = '';
     public int $l3RouteFormMetric = 1;
 
+    // Memoización por petición HTTP para evitar re-filtrar listas 3 veces en el mismo render de Blade
+    protected ?array $memoFilteredHubs = null;
+    protected ?array $memoFilteredUsers = null;
+    protected ?array $memoFilteredL3Ifs = null;
+    protected ?array $memoFilteredL3Tbls = null;
+    protected ?array $memoFilteredAllHubRoutes = null;
+
+    protected function resetFilterMemos(): void
+    {
+        $this->memoFilteredHubs = null;
+        $this->memoFilteredUsers = null;
+        $this->memoFilteredL3Ifs = null;
+        $this->memoFilteredL3Tbls = null;
+        $this->memoFilteredAllHubRoutes = null;
+    }
+
     public function mount(): void
     {
         $this->loadData();
@@ -156,6 +172,7 @@ class SoftEtherPage extends Page
         $this->userHubFilter = '';
         $this->userPage = 1;
         $this->hubPage = 1;
+        $this->resetFilterMemos();
         $this->loadData(false, false); // Carga instantánea desde caché
 
         $srvName = $this->connectionDetails['server_name'] ?? $serverId;
@@ -198,6 +215,7 @@ class SoftEtherPage extends Page
         $this->l3Interfaces = $telemetry['l3Interfaces'] ?? [];
         $this->l3Tables = $telemetry['l3Tables'] ?? [];
         $this->connectionDetails = $telemetry['connectionDetails'] ?? [];
+        $this->resetFilterMemos();
 
         if (empty($this->selectedHub)) {
             $this->selectedHub = $this->connectionDetails['hub'] ?? 'DEFAULT';
@@ -676,12 +694,14 @@ class SoftEtherPage extends Page
     public function updatedHubSearch(): void
     {
         $this->hubPage = 1;
+        $this->memoFilteredHubs = null;
     }
 
     public function limpiarBusquedaHub(): void
     {
         $this->hubSearch = '';
         $this->hubPage = 1;
+        $this->memoFilteredHubs = null;
     }
 
     public function setHubPage(int $page): void
@@ -698,12 +718,16 @@ class SoftEtherPage extends Page
 
     public function getFilteredVirtualHubs(): array
     {
-        $search = trim(mb_strtolower($this->hubSearch));
-        if (empty($search)) {
-            return $this->virtualHubs;
+        if ($this->memoFilteredHubs !== null) {
+            return $this->memoFilteredHubs;
         }
 
-        return array_values(array_filter($this->virtualHubs, function ($h) use ($search) {
+        $search = trim(mb_strtolower($this->hubSearch));
+        if (empty($search)) {
+            return $this->memoFilteredHubs = $this->virtualHubs;
+        }
+
+        return $this->memoFilteredHubs = array_values(array_filter($this->virtualHubs, function ($h) use ($search) {
             $name = mb_strtolower($h['hub_name'] ?? '');
             $status = mb_strtolower($h['status'] ?? '');
             $type = mb_strtolower($h['type'] ?? '');
@@ -738,16 +762,19 @@ class SoftEtherPage extends Page
     public function updatedUserSearch(): void
     {
         $this->userPage = 1;
+        $this->memoFilteredUsers = null;
     }
 
     public function updatedUserHubFilter(): void
     {
         $this->userPage = 1;
+        $this->memoFilteredUsers = null;
     }
 
     public function updatedUserStatusFilter(): void
     {
         $this->userPage = 1;
+        $this->memoFilteredUsers = null;
     }
 
     public function limpiarFiltrosUsuarios(): void
@@ -756,6 +783,7 @@ class SoftEtherPage extends Page
         $this->userHubFilter = '';
         $this->userStatusFilter = 'todos';
         $this->userPage = 1;
+        $this->memoFilteredUsers = null;
     }
 
     public function setUserPage(int $page): void
@@ -772,12 +800,16 @@ class SoftEtherPage extends Page
 
     public function getFilteredVpnUsers(): array
     {
+        if ($this->memoFilteredUsers !== null) {
+            return $this->memoFilteredUsers;
+        }
+
         $source = !empty($this->allVpnUsers) ? $this->allVpnUsers : $this->vpnUsers;
         $search = trim(mb_strtolower($this->userSearch));
         $hubFilter = trim($this->userHubFilter);
         $statusFilter = $this->userStatusFilter;
 
-        return array_values(array_filter($source, function ($u) use ($search, $hubFilter, $statusFilter) {
+        return $this->memoFilteredUsers = array_values(array_filter($source, function ($u) use ($search, $hubFilter, $statusFilter) {
             $hubName = $u['hub_name'] ?? ($this->connectionDetails['hub'] ?? 'DEFAULT');
 
             if (!empty($hubFilter) && strcasecmp($hubName, $hubFilter) !== 0) {
@@ -834,10 +866,12 @@ class SoftEtherPage extends Page
     // GESTIÓN COMPLETA POR VIRTUAL HUB (DHCP, SECURENAT, USUARIOS, LOGS)
     // =========================================================================
 
-    public function abrirGestionHub(string $hubName, string $subTab = 'nat_dhcp'): void
+    public function abrirGestionHub(string $hubName, ?string $subTab = null): void
     {
         $this->managingHub = trim($hubName);
-        $this->hubManageTab = $subTab;
+        if ($subTab !== null && $subTab !== '') {
+            $this->hubManageTab = $subTab;
+        }
         $this->hubNewUsername = '';
         $this->hubNewRealname = '';
         $this->hubNewPassword = '';
@@ -865,10 +899,11 @@ class SoftEtherPage extends Page
         $service = app(SoftEtherService::class);
         $service->setServer($this->selectedServer, $this->managingHub);
 
-        $nat = $service->getSecureNatStatus($this->managingHub);
-        $dhcp = $service->getDhcpTable($this->managingHub);
-        $users = $service->getUsers($this->managingHub);
-        $logs = $service->getHubLog($this->managingHub);
+        $details = $service->getHubManagementDetails($this->managingHub);
+        $nat = $details['secureNat'] ?? [];
+        $dhcp = $details['dhcpTable'] ?? [];
+        $users = $details['users'] ?? [];
+        $logs = $details['logs'] ?? [];
 
         $this->hubManageSecureNat = $nat;
         $this->hubManageDhcpTable = $dhcp;
@@ -1118,12 +1153,33 @@ class SoftEtherPage extends Page
     // LAYER 3 SWITCHES, INTERFACES L3 Y TABLAS DE RUTAS
     // =========================================================================
 
+    public function updatedL3Search(): void
+    {
+        $this->memoFilteredL3Ifs = null;
+        $this->memoFilteredL3Tbls = null;
+    }
+
+    public function updatedL3SwitchFilter(): void
+    {
+        $this->memoFilteredL3Ifs = null;
+        $this->memoFilteredL3Tbls = null;
+    }
+
+    public function updatedRouteHubSearch(): void
+    {
+        $this->memoFilteredAllHubRoutes = null;
+    }
+
     public function getFilteredL3Interfaces(): array
     {
+        if ($this->memoFilteredL3Ifs !== null) {
+            return $this->memoFilteredL3Ifs;
+        }
+
         $search = trim(mb_strtolower($this->l3Search));
         $swFilter = trim($this->l3SwitchFilter);
 
-        return array_values(array_filter($this->l3Interfaces, function ($if) use ($search, $swFilter) {
+        return $this->memoFilteredL3Ifs = array_values(array_filter($this->l3Interfaces, function ($if) use ($search, $swFilter) {
             if ($swFilter !== '' && strcasecmp($if['switch_name'] ?? '', $swFilter) !== 0) {
                 return false;
             }
@@ -1140,10 +1196,14 @@ class SoftEtherPage extends Page
 
     public function getFilteredL3Tables(): array
     {
+        if ($this->memoFilteredL3Tbls !== null) {
+            return $this->memoFilteredL3Tbls;
+        }
+
         $search = trim(mb_strtolower($this->l3Search));
         $swFilter = trim($this->l3SwitchFilter);
 
-        return array_values(array_filter($this->l3Tables, function ($tbl) use ($search, $swFilter) {
+        return $this->memoFilteredL3Tbls = array_values(array_filter($this->l3Tables, function ($tbl) use ($search, $swFilter) {
             if ($swFilter !== '' && strcasecmp($tbl['switch_name'] ?? '', $swFilter) !== 0) {
                 return false;
             }
@@ -1159,14 +1219,18 @@ class SoftEtherPage extends Page
 
     public function getFilteredAllHubRoutes(): array
     {
+        if ($this->memoFilteredAllHubRoutes !== null) {
+            return $this->memoFilteredAllHubRoutes;
+        }
+
         $search = trim(mb_strtolower($this->routeHubSearch));
         $items = $this->allHubRoutes;
 
         if ($search === '') {
-            return $items;
+            return $this->memoFilteredAllHubRoutes = $items;
         }
 
-        return array_values(array_filter($items, function ($item) use ($search) {
+        return $this->memoFilteredAllHubRoutes = array_values(array_filter($items, function ($item) use ($search) {
             $hub = mb_strtolower($item['hub_name'] ?? '');
             $raw = mb_strtolower($item['dhcp_push_routes'] ?? '');
             return str_contains($hub, $search) || str_contains($raw, $search);

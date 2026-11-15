@@ -633,12 +633,102 @@ class SoftEtherService
         $this->resetCircuitBreaker($key);
     }
 
+    protected function buildRpcUrl(): string
+    {
+        $url = rtrim($this->rpcUrl, '/');
+        return str_ends_with($url, '/api') ? $url . '/' : $url . '/api/';
+    }
+
+    protected function buildRpcHeaders(?string $hub = null): array
+    {
+        $headers = [
+            'Content-Type' => 'application/json',
+            'X-VPNADMIN-PASSWORD' => $this->adminPassword,
+        ];
+        if (!empty($hub)) {
+            $headers['X-VPNADMIN-HUBNAME'] = $hub;
+        }
+        return $headers;
+    }
+
+    protected function extractPoolResult($resp): ?array
+    {
+        if ($resp && method_exists($resp, 'successful') && $resp->successful()) {
+            $json = $resp->json();
+            if (is_array($json) && !isset($json['error'])) {
+                return $json['result'] ?? [];
+            }
+        }
+        return null;
+    }
+
+    protected function mapVirtualHubItem(array $h): array
+    {
+        $recv = $h['Ex.Recv.UnicastBytes_u64'] ?? $h['Recv_u64'] ?? 0;
+        $send = $h['Ex.Send.UnicastBytes_u64'] ?? $h['Send_u64'] ?? 0;
+
+        return [
+            'hub_name' => $h['HubName_str'] ?? 'DEFAULT',
+            'status' => (!empty($h['Online_bool'])) ? 'Online' : 'Offline',
+            'type' => ($h['HubType_u32'] ?? 0) === 0 ? 'Standalone' : 'Cluster Hub',
+            'users_count' => (int) ($h['NumUsers_u32'] ?? 0),
+            'groups_count' => (int) ($h['NumGroups_u32'] ?? 0),
+            'active_sessions' => (int) ($h['NumSessions_u32'] ?? 0),
+            'mac_tables' => (int) ($h['NumMacTables_u32'] ?? 0),
+            'ip_tables' => (int) ($h['NumIpTables_u32'] ?? 0),
+            'secure_nat' => 'SecureNAT',
+            'last_comm' => !empty($h['LastCommTime_dt']) ? $h['LastCommTime_dt'] : 'Sin actividad',
+            'traffic' => $this->formatBytes($recv + $send),
+        ];
+    }
+
+    protected function formatServerStatusFromData(?array $iData, ?array $sData): array
+    {
+        $iData = $iData ?? [];
+        $sData = $sData ?? [];
+
+        $uptimeSeconds = (int) ($sData['ServerUptime_u64'] ?? $sData['Uptime_u64'] ?? 0);
+        $uptimeStr = $uptimeSeconds > 0 ? $this->formatSeconds($uptimeSeconds) : 'Activo en producción';
+
+        $totSessions = (int) ($sData['NumSessionsTotal_u32'] ?? $sData['TotalSessions_u32'] ?? 0);
+        $totUsers = (int) ($sData['NumUsers_u32'] ?? 0);
+        $totTcp = (int) ($sData['NumTcpConnections_u32'] ?? 0);
+
+        $recvBytes = ($sData['Recv.UnicastBytes_u64'] ?? 0) + ($sData['Recv.BroadcastBytes_u64'] ?? 0);
+        $sendBytes = ($sData['Send.UnicastBytes_u64'] ?? 0) + ($sData['Send.BroadcastBytes_u64'] ?? 0);
+
+        return [
+            'is_live' => true,
+            'server_name' => $iData['ServerProductName_str'] ?? "{$this->servers[$this->activeServerKey]['name']}",
+            'version' => trim(($iData['ServerVersionString_str'] ?? 'v4.38') . ' ' . ($iData['ServerBuildInfoString_str'] ?? '')),
+            'os_name' => $iData['OsProductName_str'] ?? $iData['OsSystemName_str'] ?? 'Linux',
+            'server_type' => ($sData['ServerType_u32'] ?? 0) === 0 ? 'Standalone Server' : 'Farm Controller',
+            'uptime' => $uptimeStr,
+            'started_at' => !empty($sData['StartTime_dt']) ? $sData['StartTime_dt'] : 'Operativo',
+            'total_sessions' => $totSessions,
+            'total_users' => $totUsers,
+            'total_tcp_connections' => $totTcp,
+            'traffic_total_in' => $this->formatBytes($recvBytes),
+            'traffic_total_out' => $this->formatBytes($sendBytes),
+            'transfer_speed_in' => 'En tiempo real',
+            'transfer_speed_out' => 'En tiempo real',
+            'listeners' => [
+                ['port' => $this->port, 'protocol' => 'TCP / Admin RPC API', 'status' => 'Activo (Escuchando)'],
+                ['port' => 443, 'protocol' => 'TCP / HTTPS (SoftEther & SSTP)', 'status' => 'Activo (Escuchando)'],
+                ['port' => 992, 'protocol' => 'TCP / Admin Telnet', 'status' => 'Activo (Escuchando)'],
+                ['port' => 1194, 'protocol' => 'UDP / OpenVPN', 'status' => 'Activo (Escuchando)'],
+            ],
+            'virtual_nat_enabled' => true,
+            'virtual_dhcp_enabled' => true,
+            'error_message' => null,
+        ];
+    }
+
     /**
-     * Obtiene el paquete completo de telemetría de forma ultra-rápida (con auto-resolución de Hub y caché)
+     * Obtiene el paquete completo de telemetría de forma ultra-rápida (con lotes paralelos Http::pool y caché)
      */
     public function getTelemetry(bool $forceRefresh = false): array
     {
-        // Procesar deshabilitaciones temporales vencidas antes de devolver telemetría
         if ($this->isConfigured()) {
             $this->processExpiredTimedDisables($this->activeServerKey);
         }
@@ -660,17 +750,73 @@ class SoftEtherService
             }
         }
 
-        // Si es refresco forzado, restablecemos el circuit breaker
         $this->resetCircuitBreaker($this->activeServerKey);
 
-        // 1. Obtener lista de Virtual Hubs disponibles primero (EnumHub)
-        $virtualHubs = $this->getVirtualHubs();
+        $virtualHubs = [];
+        $serverStatus = null;
+        $rawL3Switches = [];
 
-        // 2. Auto-resolución de Hub: Si el hub configurado no existe en el servidor, conmutar al primer hub real activo
+        if ($this->isConfigured()) {
+            // LOTE 1 PARALELO: EnumHub + GetServerInfo + GetServerStatus + EnumL3Switch en 1 solo RTT
+            $url = $this->buildRpcUrl();
+            $headers = $this->buildRpcHeaders();
+
+            try {
+                $batch1 = Http::pool(function ($pool) use ($url, $headers) {
+                    $calls = [];
+                    $defs = [
+                        'hubs' => ['EnumHub', []],
+                        'info' => ['GetServerInfo', []],
+                        'status' => ['GetServerStatus', []],
+                        'l3' => ['EnumL3Switch', []],
+                    ];
+                    $idx = 0;
+                    foreach ($defs as $key => [$method, $params]) {
+                        $c = $pool->as($key)->connectTimeout(3.5)->timeout(7.0)->withHeaders($headers);
+                        if (!$this->verifySsl) {
+                            $c = $c->withoutVerifying();
+                        }
+                        $calls[] = $c->post($url, [
+                            'jsonrpc' => '2.0',
+                            'id' => (string) (time() + ($idx++)),
+                            'method' => $method,
+                            'params' => (object) $params,
+                        ]);
+                    }
+                    return $calls;
+                });
+
+                $hubsData = $this->extractPoolResult($batch1['hubs'] ?? null);
+                if (!empty($hubsData['HubList'])) {
+                    $virtualHubs = array_map(fn ($h) => $this->mapVirtualHubItem($h), $hubsData['HubList']);
+                }
+
+                $infoData = $this->extractPoolResult($batch1['info'] ?? null);
+                $statusData = $this->extractPoolResult($batch1['status'] ?? null);
+                if ($infoData !== null || $statusData !== null) {
+                    $serverStatus = $this->formatServerStatusFromData($infoData, $statusData);
+                }
+
+                $l3ListRes = $this->extractPoolResult($batch1['l3'] ?? null);
+                $rawL3Switches = $l3ListRes['L3SWList'] ?? $l3ListRes['L3SwitchList'] ?? [];
+            } catch (Exception $e) {
+                Log::warning("SoftEther telemetry batch1 error ({$this->activeServerKey}): " . $e->getMessage());
+            }
+
+            if (empty($virtualHubs)) {
+                $virtualHubs = $this->getVirtualHubs();
+            }
+            if ($serverStatus === null) {
+                $serverStatus = $this->getServerStatus();
+            }
+        } else {
+            $serverStatus = $this->getServerStatus();
+        }
+
+        // Auto-resolución de Hub: si el hub configurado no existe, elegir el primero con sesiones o el primero disponible
         if (!empty($virtualHubs)) {
             $hubNames = array_column($virtualHubs, 'hub_name');
             if (!in_array($this->hub, $hubNames)) {
-                // Seleccionar el hub con mayor número de sesiones o el primero online
                 $sortedHubs = $virtualHubs;
                 usort($sortedHubs, fn ($a, $b) => ($b['active_sessions'] ?? 0) <=> ($a['active_sessions'] ?? 0));
                 $autoHub = $sortedHubs[0]['hub_name'] ?? ($hubNames[0] ?? 'DEFAULT');
@@ -678,15 +824,189 @@ class SoftEtherService
             }
         }
 
-        // 3. Consultar estado del servidor y telemetría de sesiones y usuarios
-        $serverStatus = $this->getServerStatus();
-        $activeSessions = $this->getActiveSessions($this->hub);
-        $vpnUsers = $this->getUsers($this->hub);
-        $allVpnUsers = $this->getAllUsers($virtualHubs, $activeSessions);
-        $secureNat = $this->getSecureNatStatus($this->hub);
-        $dhcpTable = $this->getDhcpTable($this->hub);
-        $allHubRoutes = $this->getAllHubSecureNatRoutes($virtualHubs);
-        $l3Data = $this->getL3Switches();
+        // LOTE 2 PARALELO: sesiones, dhcp, SecureNAT del hub activo + usuarios, rutas y L3 de todos los hubs/switches
+        $activeSessions = [];
+        $dhcpTable = [];
+        $secureNat = null;
+        $allVpnUsers = [];
+        $allHubRoutes = [];
+        $l3Data = ['switches' => [], 'interfaces' => [], 'tables' => []];
+
+        if ($this->isConfigured() && !($this->circuitBroken[$this->activeServerKey] ?? false)) {
+            $url = $this->buildRpcUrl();
+            $headers = $this->buildRpcHeaders();
+            $hubNames = !empty($virtualHubs)
+                ? array_values(array_unique(array_filter(array_column($virtualHubs, 'hub_name'))))
+                : [$this->hub];
+
+            $switchMeta = [];
+            foreach ($rawL3Switches as $sw) {
+                $name = trim((string) ($sw['Name_str'] ?? ''));
+                if ($name === '') {
+                    continue;
+                }
+                $switchMeta[$name] = [
+                    'name' => $name,
+                    'num_interfaces' => (int) ($sw['NumInterfaces_u32'] ?? 0),
+                    'num_tables' => (int) ($sw['NumTables_u32'] ?? 0),
+                    'active' => !empty($sw['Active_bool']),
+                    'online' => !empty($sw['Online_bool']),
+                    'interfaces' => [],
+                    'tables' => [],
+                ];
+            }
+
+            $poolRequests = [
+                ['key' => 'cur_sessions', 'method' => 'EnumSession', 'params' => ['HubName_str' => $this->hub]],
+                ['key' => 'cur_nat_stat', 'method' => 'GetSecureNATStatus', 'params' => ['HubName_str' => $this->hub]],
+                ['key' => 'cur_hub_stat', 'method' => 'GetHubStatus', 'params' => ['HubName_str' => $this->hub]],
+                ['key' => 'cur_dhcp', 'method' => 'EnumDHCP', 'params' => ['HubName_str' => $this->hub]],
+            ];
+
+            foreach ($hubNames as $hName) {
+                $poolRequests[] = ['key' => "users_{$hName}", 'method' => 'EnumUser', 'params' => ['HubName_str' => $hName]];
+                $poolRequests[] = ['key' => "natopt_{$hName}", 'method' => 'GetSecureNATOption', 'params' => ['RpcHubName_str' => $hName]];
+            }
+
+            foreach (array_keys($switchMeta) as $swName) {
+                $poolRequests[] = ['key' => "l3if_{$swName}", 'method' => 'EnumL3If', 'params' => ['Name_str' => $swName]];
+                $poolRequests[] = ['key' => "l3tbl_{$swName}", 'method' => 'EnumL3Table', 'params' => ['Name_str' => $swName]];
+            }
+
+            $collected = [];
+            try {
+                foreach (array_chunk($poolRequests, 30) as $chunk) {
+                    $responses = Http::pool(function ($pool) use ($chunk, $url, $headers) {
+                        $calls = [];
+                        foreach ($chunk as $idx => $req) {
+                            $c = $pool->as($req['key'])->connectTimeout(3.5)->timeout(7.0)->withHeaders($headers);
+                            if (!$this->verifySsl) {
+                                $c = $c->withoutVerifying();
+                            }
+                            $calls[] = $c->post($url, [
+                                'jsonrpc' => '2.0',
+                                'id' => (string) (time() + 100 + $idx),
+                                'method' => $req['method'],
+                                'params' => (object) $req['params'],
+                            ]);
+                        }
+                        return $calls;
+                    });
+                    foreach ($chunk as $req) {
+                        $collected[$req['key']] = $this->extractPoolResult($responses[$req['key']] ?? null);
+                    }
+                }
+            } catch (Exception $e) {
+                Log::warning("SoftEther telemetry batch2 error ({$this->activeServerKey}): " . $e->getMessage());
+            }
+
+            // Sesiones activas
+            if (!empty($collected['cur_sessions']['SessionList'])) {
+                $activeSessions = $this->mapSessionList($collected['cur_sessions']['SessionList'], $this->hub);
+            }
+
+            // Tabla DHCP
+            $dhcpTable = $collected['cur_dhcp']['DhcpTable'] ?? [];
+
+            // Rutas SecureNAT de todos los hubs
+            foreach ($hubNames as $hName) {
+                $opt = $collected["natopt_{$hName}"] ?? null;
+                if (is_array($opt)) {
+                    $raw = trim((string) ($opt['DhcpPushRoutes_str'] ?? ''));
+                    $parsed = $this->parsePushRoutes($raw);
+                    $apply = array_key_exists('ApplyDhcpPushRoutes_bool', $opt)
+                        ? (bool) $opt['ApplyDhcpPushRoutes_bool']
+                        : !empty($parsed);
+
+                    $allHubRoutes[$hName] = [
+                        'hub_name' => $hName,
+                        'apply_dhcp_push_routes' => $apply,
+                        'dhcp_push_routes' => $raw,
+                        'routes' => $parsed,
+                    ];
+                }
+            }
+
+            // SecureNAT del hub actual (reutiliza natopt_$hub del pool!)
+            $curOpt = $collected["natopt_{$this->hub}"] ?? null;
+            $curStat = $collected['cur_nat_stat'] ?? null;
+            $curHubStat = $collected['cur_hub_stat'] ?? null;
+            if ($curOpt !== null || $curStat !== null || $curHubStat !== null) {
+                $secureNat = $this->buildSecureNatStatusArray($this->hub, $curOpt, $curStat, $curHubStat);
+            } else {
+                $secureNat = $this->getSecureNatStatus($this->hub);
+            }
+
+            // Usuarios VPN de todos los hubs
+            $timedMap = $this->loadTimedDisables();
+            $connectedKeys = [];
+            foreach ($activeSessions as $s) {
+                $u = strtolower($s['username'] ?? '');
+                $h = $s['hub_name'] ?? $this->hub;
+                if ($u !== '') {
+                    $connectedKeys[strtolower($h . '::' . $u)] = true;
+                }
+            }
+
+            foreach ($hubNames as $hName) {
+                $uList = $collected["users_{$hName}"]['UserList'] ?? [];
+                foreach ($uList as $u) {
+                    $allVpnUsers[] = $this->mapSoftEtherUser($u, $hName, $timedMap, $connectedKeys);
+                }
+            }
+
+            usort($allVpnUsers, function ($a, $b) {
+                $cmp = strcasecmp($a['hub_name'] ?? '', $b['hub_name'] ?? '');
+                return $cmp !== 0 ? $cmp : strcasecmp($a['username'] ?? '', $b['username'] ?? '');
+            });
+
+            // L3 Switches, Interfaces y Tablas
+            $allInterfaces = [];
+            $allTables = [];
+            foreach (array_keys($switchMeta) as $swName) {
+                $ifList = $collected["l3if_{$swName}"]['L3IFList'] ?? $collected["l3if_{$swName}"]['L3IfList'] ?? [];
+                foreach ($ifList as $item) {
+                    $row = [
+                        'switch_name' => $swName,
+                        'switch_active' => $switchMeta[$swName]['active'],
+                        'switch_online' => $switchMeta[$swName]['online'],
+                        'hub_name' => (string) ($item['HubName_str'] ?? ''),
+                        'ip_address' => (string) ($item['IpAddress_ip'] ?? ''),
+                        'subnet_mask' => (string) ($item['SubnetMask_ip'] ?? '255.255.255.0'),
+                    ];
+                    $switchMeta[$swName]['interfaces'][] = $row;
+                    $allInterfaces[] = $row;
+                }
+
+                $tblList = $collected["l3tbl_{$swName}"]['L3Table'] ?? $collected["l3tbl_{$swName}"]['L3TableList'] ?? [];
+                foreach ($tblList as $item) {
+                    $row = [
+                        'switch_name' => $swName,
+                        'network_address' => (string) ($item['NetworkAddress_ip'] ?? ''),
+                        'subnet_mask' => (string) ($item['SubnetMask_ip'] ?? '255.255.255.0'),
+                        'gateway_address' => (string) ($item['GatewayAddress_ip'] ?? ''),
+                        'metric' => (int) ($item['Metric_u32'] ?? 1),
+                    ];
+                    $switchMeta[$swName]['tables'][] = $row;
+                    $allTables[] = $row;
+                }
+            }
+
+            $l3Data = [
+                'switches' => array_values($switchMeta),
+                'interfaces' => $allInterfaces,
+                'tables' => $allTables,
+            ];
+        } else {
+            $secureNat = $this->getSecureNatStatus($this->hub);
+        }
+
+        // Derivar usuarios del hub actual sin hacer RPC extra
+        $vpnUsers = array_values(array_filter(
+            $allVpnUsers,
+            fn ($u) => strcasecmp($u['hub_name'] ?? '', $this->hub) === 0
+        ));
+
         $connectionDetails = $this->getConnectionDetails();
         $connectionDetails['available_hubs'] = !empty($virtualHubs) ? array_column($virtualHubs, 'hub_name') : [$this->hub];
 
@@ -706,7 +1026,6 @@ class SoftEtherService
             }, $virtualHubs);
         }
 
-        // 4. Si el servidor respondió con sesiones o usuarios reales, reflejarlo en serverStatus
         if (!empty($activeSessions) && ($serverStatus['total_sessions'] ?? 0) === 0) {
             $serverStatus['total_sessions'] = count($activeSessions);
             $serverStatus['is_live'] = true;
@@ -735,7 +1054,7 @@ class SoftEtherService
         ];
 
         try {
-            Cache::put($cacheKey, $data, 15);
+            Cache::put($cacheKey, $data, 30);
         } catch (Exception $e) {
             // Ignorar fallo de almacenamiento
         }
@@ -744,54 +1063,138 @@ class SoftEtherService
     }
 
     /**
-     * Obtiene el estado general del servidor VPN en vivo (GetServerInfo + GetServerStatus con fallback a GetHubStatus)
+     * Obtiene todo el paquete de gestión individual de un Virtual Hub en 1 solo viaje paralelo (Http::pool)
+     */
+    public function getHubManagementDetails(string $hubName): array
+    {
+        $hubName = trim($hubName) ?: $this->hub;
+
+        if (!$this->isConfigured() || ($this->circuitBroken[$this->activeServerKey] ?? false)) {
+            return [
+                'secureNat' => $this->getSecureNatStatus($hubName),
+                'dhcpTable' => [],
+                'users' => [],
+                'logs' => $this->getHubLog($hubName),
+            ];
+        }
+
+        $url = $this->buildRpcUrl();
+        $headers = $this->buildRpcHeaders();
+
+        $optData = null;
+        $statData = null;
+        $hStatData = null;
+        $dhcpData = null;
+        $usersData = null;
+        $logData = null;
+
+        try {
+            $responses = Http::pool(function ($pool) use ($url, $headers, $hubName) {
+                $defs = [
+                    'nat_opt' => ['GetSecureNATOption', ['RpcHubName_str' => $hubName]],
+                    'nat_stat' => ['GetSecureNATStatus', ['HubName_str' => $hubName]],
+                    'hub_stat' => ['GetHubStatus', ['HubName_str' => $hubName]],
+                    'dhcp' => ['EnumDHCP', ['HubName_str' => $hubName]],
+                    'users' => ['EnumUser', ['HubName_str' => $hubName]],
+                    'log' => ['GetHubLog', ['HubName_str' => $hubName]],
+                ];
+                $calls = [];
+                $idx = 0;
+                foreach ($defs as $key => [$method, $params]) {
+                    $c = $pool->as($key)->connectTimeout(3.5)->timeout(7.0)->withHeaders($headers);
+                    if (!$this->verifySsl) {
+                        $c = $c->withoutVerifying();
+                    }
+                    $calls[] = $c->post($url, [
+                        'jsonrpc' => '2.0',
+                        'id' => (string) (time() + 500 + ($idx++)),
+                        'method' => $method,
+                        'params' => (object) $params,
+                    ]);
+                }
+                return $calls;
+            });
+
+            $optData = $this->extractPoolResult($responses['nat_opt'] ?? null);
+            $statData = $this->extractPoolResult($responses['nat_stat'] ?? null);
+            $hStatData = $this->extractPoolResult($responses['hub_stat'] ?? null);
+            $dhcpData = $this->extractPoolResult($responses['dhcp'] ?? null);
+            $usersData = $this->extractPoolResult($responses['users'] ?? null);
+            $logData = $this->extractPoolResult($responses['log'] ?? null);
+        } catch (Exception $e) {
+            Log::warning("SoftEther getHubManagementDetails pool error ({$hubName}): " . $e->getMessage());
+        }
+
+        if ($optData === null) {
+            $fallbackOpt = $this->callRpc('GetSecureNATOption', ['HubName_str' => $hubName]);
+            if ($fallbackOpt['success']) {
+                $optData = $fallbackOpt['data'];
+            }
+        }
+
+        $secureNat = ($optData !== null || $statData !== null || $hStatData !== null)
+            ? $this->buildSecureNatStatusArray($hubName, $optData, $statData, $hStatData)
+            : $this->getSecureNatStatus($hubName);
+
+        $timedMap = $this->loadTimedDisables();
+        $users = [];
+        foreach (($usersData['UserList'] ?? []) as $u) {
+            $users[] = $this->mapSoftEtherUser($u, $hubName, $timedMap);
+        }
+
+        $logs = is_array($logData) ? [
+            'hub_name' => $hubName,
+            'is_live' => true,
+            'save_security_log' => (bool) ($logData['SaveSecurityLog_bool'] ?? false),
+            'security_log_switch_type' => (int) ($logData['SecurityLogSwitchType_u32'] ?? 4),
+            'save_packet_log' => (bool) ($logData['SavePacketLog_bool'] ?? false),
+            'packet_log_switch_type' => (int) ($logData['PacketLogSwitchType_u32'] ?? 4),
+            'packet_log_config' => is_array($logData['PacketLogConfig_u32'] ?? null) && count($logData['PacketLogConfig_u32']) === 8
+                ? $logData['PacketLogConfig_u32']
+                : [1, 0, 1, 0, 0, 0, 0, 0],
+        ] : $this->getHubLog($hubName);
+
+        return [
+            'secureNat' => $secureNat,
+            'dhcpTable' => $dhcpData['DhcpTable'] ?? [],
+            'users' => $users,
+            'logs' => $logs,
+        ];
+    }
+
+    /**
+     * Obtiene el estado general del servidor VPN en vivo (GetServerInfo + GetServerStatus en paralelo con fallback a GetHubStatus)
      */
     public function getServerStatus(): array
     {
         if ($this->isConfigured()) {
-            $info = $this->callRpc('GetServerInfo');
-            $status = $this->callRpc('GetServerStatus');
+            $url = $this->buildRpcUrl();
+            $headers = $this->buildRpcHeaders();
+            $iData = null;
+            $sData = null;
 
-            if ($info['success'] || $status['success']) {
-                $iData = $info['data'] ?? [];
-                $sData = $status['data'] ?? [];
+            try {
+                $responses = Http::pool(function ($pool) use ($url, $headers) {
+                    $c1 = $pool->as('info')->connectTimeout(3.5)->timeout(7.0)->withHeaders($headers);
+                    $c2 = $pool->as('status')->connectTimeout(3.5)->timeout(7.0)->withHeaders($headers);
+                    if (!$this->verifySsl) {
+                        $c1 = $c1->withoutVerifying();
+                        $c2 = $c2->withoutVerifying();
+                    }
+                    return [
+                        $c1->post($url, ['jsonrpc' => '2.0', 'id' => (string) time(), 'method' => 'GetServerInfo', 'params' => (object) []]),
+                        $c2->post($url, ['jsonrpc' => '2.0', 'id' => (string) (time() + 1), 'method' => 'GetServerStatus', 'params' => (object) []]),
+                    ];
+                });
 
-                $uptimeSeconds = (int) ($sData['ServerUptime_u64'] ?? $sData['Uptime_u64'] ?? 0);
-                $uptimeStr = $uptimeSeconds > 0 ? $this->formatSeconds($uptimeSeconds) : 'Activo en producción';
+                $iData = $this->extractPoolResult($responses['info'] ?? null);
+                $sData = $this->extractPoolResult($responses['status'] ?? null);
+            } catch (Exception $e) {
+                // Fallback a llamada simple abajo
+            }
 
-                $totSessions = (int) ($sData['NumSessionsTotal_u32'] ?? $sData['TotalSessions_u32'] ?? 0);
-                $totUsers = (int) ($sData['NumUsers_u32'] ?? 0);
-                $totTcp = (int) ($sData['NumTcpConnections_u32'] ?? 0);
-
-                // Tráfico recibido y enviado (Páginas 7-8: Recv.UnicastBytes_u64 y Send.UnicastBytes_u64)
-                $recvBytes = ($sData['Recv.UnicastBytes_u64'] ?? 0) + ($sData['Recv.BroadcastBytes_u64'] ?? 0);
-                $sendBytes = ($sData['Send.UnicastBytes_u64'] ?? 0) + ($sData['Send.BroadcastBytes_u64'] ?? 0);
-
-                return [
-                    'is_live' => true,
-                    'server_name' => $iData['ServerProductName_str'] ?? "{$this->servers[$this->activeServerKey]['name']}",
-                    'version' => trim(($iData['ServerVersionString_str'] ?? 'v4.38') . ' ' . ($iData['ServerBuildInfoString_str'] ?? '')),
-                    'os_name' => $iData['OsProductName_str'] ?? $iData['OsSystemName_str'] ?? 'Linux',
-                    'server_type' => ($sData['ServerType_u32'] ?? 0) === 0 ? 'Standalone Server' : 'Farm Controller',
-                    'uptime' => $uptimeStr,
-                    'started_at' => !empty($sData['StartTime_dt']) ? $sData['StartTime_dt'] : 'Operativo',
-                    'total_sessions' => $totSessions,
-                    'total_users' => $totUsers,
-                    'total_tcp_connections' => $totTcp,
-                    'traffic_total_in' => $this->formatBytes($recvBytes),
-                    'traffic_total_out' => $this->formatBytes($sendBytes),
-                    'transfer_speed_in' => 'En tiempo real',
-                    'transfer_speed_out' => 'En tiempo real',
-                    'listeners' => [
-                        ['port' => $this->port, 'protocol' => 'TCP / Admin RPC API', 'status' => 'Activo (Escuchando)'],
-                        ['port' => 443, 'protocol' => 'TCP / HTTPS (SoftEther & SSTP)', 'status' => 'Activo (Escuchando)'],
-                        ['port' => 992, 'protocol' => 'TCP / Admin Telnet', 'status' => 'Activo (Escuchando)'],
-                        ['port' => 1194, 'protocol' => 'UDP / OpenVPN', 'status' => 'Activo (Escuchando)'],
-                    ],
-                    'virtual_nat_enabled' => true,
-                    'virtual_dhcp_enabled' => true,
-                    'error_message' => null,
-                ];
+            if ($iData !== null || $sData !== null) {
+                return $this->formatServerStatusFromData($iData, $sData);
             }
 
             // Fallback: Si las APIs de nivel Servidor fallan por permisos (ej. clave de Hub Admin), consultar GetHubStatus
@@ -826,7 +1229,7 @@ class SoftEtherService
             }
         }
 
-        $err = $this->lastError[$this->activeServerKey] ?? ($info['error'] ?? ($status['error'] ?? 'Sin conexión en vivo con el servidor'));
+        $err = $this->lastError[$this->activeServerKey] ?? 'Sin conexión en vivo con el servidor';
         return [
             'is_live' => false,
             'server_name' => "{$this->servers[$this->activeServerKey]['name']}",
@@ -995,6 +1398,37 @@ class SoftEtherService
         ];
     }
 
+    protected function mapSessionList(array $sessionList, string $hubName): array
+    {
+        return array_map(function ($s) use ($hubName) {
+            $name = $s['Name_str'] ?? 'SID-UNKNOWN';
+            $user = $s['Username_str'] ?? 'vpn_user';
+            $ip = $s['ClientIP_ip'] ?? $s['RemoteHostname_str'] ?? '127.0.0.1';
+            $proto = !empty($s['LinkMode_bool']) ? 'Cascade Link' : (!empty($s['SecureNATMode_bool']) ? 'SecureNAT' : 'SoftEther VPN');
+
+            return [
+                'session_name' => $name,
+                'hub_name' => $hubName,
+                'username' => $user,
+                'cliente_nombre' => $this->findClientNameForUser($user),
+                'tipo_equipo' => !empty($s['RemoteHostname_str']) ? $s['RemoteHostname_str'] : 'Cliente VPN',
+                'sim_numero' => 'Enlace Activo',
+                'ip_publica_origen' => (string) $ip,
+                'ip_virtual_dhcp' => 'Asignada por DHCP',
+                'protocolo' => $proto,
+                'duracion' => !empty($s['CreatedTime_dt']) ? $this->formatDuration($s['CreatedTime_dt']) : 'Conectado',
+                'tiempo_conectado_segundos' => 3600,
+                'trafico_in' => !empty($s['PacketSize_u64']) ? $this->formatBytes($s['PacketSize_u64']) : '0 B',
+                'trafico_out' => '0 B',
+                'bitrate_actual' => 'En línea',
+                'calidad_enlace' => 'Excelente',
+                'estado' => 'Conectado',
+                'is_bridge' => !empty($s['BridgeMode_bool']),
+                'is_securenat' => !empty($s['SecureNATMode_bool']),
+            ];
+        }, $sessionList);
+    }
+
     /**
      * Obtiene las sesiones activas actualmente conectadas al Hub (EnumSession, Páginas 97-99)
      */
@@ -1005,33 +1439,7 @@ class SoftEtherService
         if ($this->isConfigured()) {
             $res = $this->callRpc('EnumSession', ['HubName_str' => $hubName]);
             if ($res['success'] && !empty($res['data']['SessionList'])) {
-                return array_map(function ($s) use ($hubName) {
-                    $name = $s['Name_str'] ?? 'SID-UNKNOWN';
-                    $user = $s['Username_str'] ?? 'vpn_user';
-                    $ip = $s['ClientIP_ip'] ?? $s['RemoteHostname_str'] ?? '127.0.0.1';
-                    $proto = !empty($s['LinkMode_bool']) ? 'Cascade Link' : (!empty($s['SecureNATMode_bool']) ? 'SecureNAT' : 'SoftEther VPN');
-
-                    return [
-                        'session_name' => $name,
-                        'hub_name' => $hubName,
-                        'username' => $user,
-                        'cliente_nombre' => $this->findClientNameForUser($user),
-                        'tipo_equipo' => !empty($s['RemoteHostname_str']) ? $s['RemoteHostname_str'] : 'Cliente VPN',
-                        'sim_numero' => 'Enlace Activo',
-                        'ip_publica_origen' => (string) $ip,
-                        'ip_virtual_dhcp' => 'Asignada por DHCP',
-                        'protocolo' => $proto,
-                        'duracion' => !empty($s['CreatedTime_dt']) ? $this->formatDuration($s['CreatedTime_dt']) : 'Conectado',
-                        'tiempo_conectado_segundos' => 3600,
-                        'trafico_in' => !empty($s['PacketSize_u64']) ? $this->formatBytes($s['PacketSize_u64']) : '0 B',
-                        'trafico_out' => '0 B',
-                        'bitrate_actual' => 'En línea',
-                        'calidad_enlace' => 'Excelente',
-                        'estado' => 'Conectado',
-                        'is_bridge' => !empty($s['BridgeMode_bool']),
-                        'is_securenat' => !empty($s['SecureNATMode_bool']),
-                    ];
-                }, $res['data']['SessionList']);
+                return $this->mapSessionList($res['data']['SessionList'], $hubName);
             }
         }
 
@@ -1588,83 +1996,116 @@ class SoftEtherService
         ];
     }
 
+    protected function buildSecureNatStatusArray(string $hubName, ?array $opt, ?array $stat, ?array $hStat): array
+    {
+        $opt = $opt ?? [];
+        $stat = $stat ?? [];
+        $hStat = $hStat ?? [];
+
+        $dns1 = (string) ($opt['DhcpDnsServerAddress_ip'] ?? '');
+        $dns2 = (string) ($opt['DhcpDnsServerAddress2_ip'] ?? '');
+        $dnsList = array_values(array_filter([$dns1, $dns2], fn ($ip) => !empty($ip) && $ip !== '0.0.0.0'));
+
+        $secureNatEngineOn = !empty($hStat['SecureNATEnabled_bool']);
+        $useNatOpt = !empty($opt['UseNat_bool']);
+        $useDhcpOpt = !empty($opt['UseDhcp_bool']);
+
+        $useNat = $secureNatEngineOn ? $useNatOpt : false;
+        $useDhcp = $secureNatEngineOn ? $useDhcpOpt : false;
+
+        $gwIp = $opt['Ip_ip'] ?? $opt['DhcpGatewayAddress_ip'] ?? null;
+        $dhcpGwIp = $opt['DhcpGatewayAddress_ip'] ?? $gwIp ?? null;
+        $subnet = $opt['DhcpSubnetMask_ip'] ?? $opt['Mask_ip'] ?? '255.255.255.0';
+        $startIp = $opt['DhcpLeaseIPStart_ip'] ?? null;
+        $endIp = $opt['DhcpLeaseIPEnd_ip'] ?? null;
+        $rawPushRoutes = trim((string) ($opt['DhcpPushRoutes_str'] ?? ''));
+        $parsedPushRoutes = $this->parsePushRoutes($rawPushRoutes);
+        $applyPushRoutes = array_key_exists('ApplyDhcpPushRoutes_bool', $opt)
+            ? (bool) $opt['ApplyDhcpPushRoutes_bool']
+            : !empty($parsedPushRoutes);
+
+        return [
+            'hub_name' => $hubName,
+            'is_live' => true,
+            'securenat_enabled' => $secureNatEngineOn,
+            'use_nat' => $useNatOpt,
+            'use_dhcp' => $useDhcpOpt,
+            'nat_enabled' => $useNat,
+            'dhcp_enabled' => $useDhcp,
+            'virtual_gateway_ip' => $gwIp ?: '192.168.30.1',
+            'virtual_subnet_mask' => $subnet ?: '255.255.255.0',
+            'dhcp_gateway_ip' => ($dhcpGwIp && $dhcpGwIp !== '0.0.0.0') ? $dhcpGwIp : ($gwIp ?: '192.168.30.1'),
+            'dhcp_lease_start' => $startIp ?: '192.168.30.10',
+            'dhcp_lease_end' => $endIp ?: '192.168.30.200',
+            'dhcp_lease_expire_seconds' => (int) ($opt['DhcpExpireTimeSpan_u32'] ?? 7200),
+            'dns_server_1' => ($dns1 && $dns1 !== '0.0.0.0') ? $dns1 : '',
+            'dns_server_2' => ($dns2 && $dns2 !== '0.0.0.0') ? $dns2 : '',
+            'dns_servers' => $dnsList,
+            'domain_name' => (string) ($opt['DhcpDomainName_str'] ?? ''),
+            'apply_dhcp_push_routes' => $applyPushRoutes,
+            'dhcp_push_routes' => $rawPushRoutes,
+            'dhcp_push_routes_list' => $parsedPushRoutes,
+            'mtu' => (int) ($opt['Mtu_u32'] ?? 1500),
+            'nat_tcp_timeout' => (int) ($opt['NatTcpTimeout_u32'] ?? 1800),
+            'nat_udp_timeout' => (int) ($opt['NatUdpTimeout_u32'] ?? 60),
+            'save_log' => (bool) ($opt['SaveLog_bool'] ?? true),
+            'active_dhcp_leases' => (int) ($stat['NumDhcpClients_u32'] ?? 0),
+            'total_nat_sessions' => (int) (($stat['NumTcpSessions_u32'] ?? 0) + ($stat['NumUdpSessions_u32'] ?? 0)),
+            'tcp_sessions' => (int) ($stat['NumTcpSessions_u32'] ?? 0),
+            'udp_sessions' => (int) ($stat['NumUdpSessions_u32'] ?? 0),
+            'icmp_sessions' => (int) ($stat['NumIcmpSessions_u32'] ?? 0),
+            'dns_sessions' => (int) ($stat['NumDnsSessions_u32'] ?? 0),
+            'is_kernel_mode' => !empty($stat['IsKernelMode_bool']),
+            'is_raw_ip_mode' => !empty($stat['IsRawIpMode_bool']),
+        ];
+    }
+
     /**
-     * Obtiene el estado real de SecureNAT y opciones DHCP (GetSecureNATOption + GetSecureNATStatus + GetHubStatus)
+     * Obtiene el estado real de SecureNAT y opciones DHCP en paralelo (GetSecureNATOption + GetSecureNATStatus + GetHubStatus)
      */
     public function getSecureNatStatus(?string $hub = null): array
     {
         $hubName = $hub ?: $this->hub;
 
-        if ($this->isConfigured()) {
-            $optRes = $this->callRpc('GetSecureNATOption', ['RpcHubName_str' => $hubName]);
-            if (!$optRes['success']) {
-                $optRes = $this->callRpc('GetSecureNATOption', ['HubName_str' => $hubName]);
+        if ($this->isConfigured() && !($this->circuitBroken[$this->activeServerKey] ?? false)) {
+            $url = $this->buildRpcUrl();
+            $headers = $this->buildRpcHeaders();
+            $optData = null;
+            $statData = null;
+            $hStatData = null;
+
+            try {
+                $responses = Http::pool(function ($pool) use ($url, $headers, $hubName) {
+                    $c1 = $pool->as('opt')->connectTimeout(3.5)->timeout(7.0)->withHeaders($headers);
+                    $c2 = $pool->as('stat')->connectTimeout(3.5)->timeout(7.0)->withHeaders($headers);
+                    $c3 = $pool->as('hstat')->connectTimeout(3.5)->timeout(7.0)->withHeaders($headers);
+                    if (!$this->verifySsl) {
+                        $c1 = $c1->withoutVerifying();
+                        $c2 = $c2->withoutVerifying();
+                        $c3 = $c3->withoutVerifying();
+                    }
+                    return [
+                        $c1->post($url, ['jsonrpc' => '2.0', 'id' => (string) time(), 'method' => 'GetSecureNATOption', 'params' => (object) ['RpcHubName_str' => $hubName]]),
+                        $c2->post($url, ['jsonrpc' => '2.0', 'id' => (string) (time() + 1), 'method' => 'GetSecureNATStatus', 'params' => (object) ['HubName_str' => $hubName]]),
+                        $c3->post($url, ['jsonrpc' => '2.0', 'id' => (string) (time() + 2), 'method' => 'GetHubStatus', 'params' => (object) ['HubName_str' => $hubName]]),
+                    ];
+                });
+                $optData = $this->extractPoolResult($responses['opt'] ?? null);
+                $statData = $this->extractPoolResult($responses['stat'] ?? null);
+                $hStatData = $this->extractPoolResult($responses['hstat'] ?? null);
+            } catch (Exception $e) {
+                // Fallback
             }
 
-            $statusRes = $this->callRpc('GetSecureNATStatus', ['HubName_str' => $hubName]);
-            $hubStatusRes = $this->callRpc('GetHubStatus', ['HubName_str' => $hubName]);
+            if ($optData === null) {
+                $fallback = $this->callRpc('GetSecureNATOption', ['HubName_str' => $hubName]);
+                if ($fallback['success']) {
+                    $optData = $fallback['data'];
+                }
+            }
 
-            if ($optRes['success'] || $statusRes['success'] || $hubStatusRes['success']) {
-                $opt = $optRes['data'] ?? [];
-                $stat = $statusRes['data'] ?? [];
-                $hStat = $hubStatusRes['data'] ?? [];
-
-                $dns1 = (string) ($opt['DhcpDnsServerAddress_ip'] ?? '');
-                $dns2 = (string) ($opt['DhcpDnsServerAddress2_ip'] ?? '');
-                $dnsList = array_values(array_filter([$dns1, $dns2], fn ($ip) => !empty($ip) && $ip !== '0.0.0.0'));
-
-                $secureNatEngineOn = !empty($hStat['SecureNATEnabled_bool']);
-                $useNatOpt = !empty($opt['UseNat_bool']);
-                $useDhcpOpt = !empty($opt['UseDhcp_bool']);
-
-                $useNat = $secureNatEngineOn ? $useNatOpt : false;
-                $useDhcp = $secureNatEngineOn ? $useDhcpOpt : false;
-
-                $gwIp = $opt['Ip_ip'] ?? $opt['DhcpGatewayAddress_ip'] ?? null;
-                $dhcpGwIp = $opt['DhcpGatewayAddress_ip'] ?? $gwIp ?? null;
-                $subnet = $opt['DhcpSubnetMask_ip'] ?? $opt['Mask_ip'] ?? '255.255.255.0';
-                $startIp = $opt['DhcpLeaseIPStart_ip'] ?? null;
-                $endIp = $opt['DhcpLeaseIPEnd_ip'] ?? null;
-                $rawPushRoutes = trim((string) ($opt['DhcpPushRoutes_str'] ?? ''));
-                $parsedPushRoutes = $this->parsePushRoutes($rawPushRoutes);
-                $applyPushRoutes = array_key_exists('ApplyDhcpPushRoutes_bool', $opt)
-                    ? (bool) $opt['ApplyDhcpPushRoutes_bool']
-                    : !empty($parsedPushRoutes);
-
-                return [
-                    'hub_name' => $hubName,
-                    'is_live' => true,
-                    'securenat_enabled' => $secureNatEngineOn,
-                    'use_nat' => $useNatOpt,
-                    'use_dhcp' => $useDhcpOpt,
-                    'nat_enabled' => $useNat,
-                    'dhcp_enabled' => $useDhcp,
-                    'virtual_gateway_ip' => $gwIp ?: '192.168.30.1',
-                    'virtual_subnet_mask' => $subnet ?: '255.255.255.0',
-                    'dhcp_gateway_ip' => ($dhcpGwIp && $dhcpGwIp !== '0.0.0.0') ? $dhcpGwIp : ($gwIp ?: '192.168.30.1'),
-                    'dhcp_lease_start' => $startIp ?: '192.168.30.10',
-                    'dhcp_lease_end' => $endIp ?: '192.168.30.200',
-                    'dhcp_lease_expire_seconds' => (int) ($opt['DhcpExpireTimeSpan_u32'] ?? 7200),
-                    'dns_server_1' => ($dns1 && $dns1 !== '0.0.0.0') ? $dns1 : '',
-                    'dns_server_2' => ($dns2 && $dns2 !== '0.0.0.0') ? $dns2 : '',
-                    'dns_servers' => $dnsList,
-                    'domain_name' => (string) ($opt['DhcpDomainName_str'] ?? ''),
-                    'apply_dhcp_push_routes' => $applyPushRoutes,
-                    'dhcp_push_routes' => $rawPushRoutes,
-                    'dhcp_push_routes_list' => $parsedPushRoutes,
-                    'mtu' => (int) ($opt['Mtu_u32'] ?? 1500),
-                    'nat_tcp_timeout' => (int) ($opt['NatTcpTimeout_u32'] ?? 1800),
-                    'nat_udp_timeout' => (int) ($opt['NatUdpTimeout_u32'] ?? 60),
-                    'save_log' => (bool) ($opt['SaveLog_bool'] ?? true),
-                    'active_dhcp_leases' => (int) ($stat['NumDhcpClients_u32'] ?? 0),
-                    'total_nat_sessions' => (int) (($stat['NumTcpSessions_u32'] ?? 0) + ($stat['NumUdpSessions_u32'] ?? 0)),
-                    'tcp_sessions' => (int) ($stat['NumTcpSessions_u32'] ?? 0),
-                    'udp_sessions' => (int) ($stat['NumUdpSessions_u32'] ?? 0),
-                    'icmp_sessions' => (int) ($stat['NumIcmpSessions_u32'] ?? 0),
-                    'dns_sessions' => (int) ($stat['NumDnsSessions_u32'] ?? 0),
-                    'is_kernel_mode' => !empty($stat['IsKernelMode_bool']),
-                    'is_raw_ip_mode' => !empty($stat['IsRawIpMode_bool']),
-                ];
+            if ($optData !== null || $statData !== null || $hStatData !== null) {
+                return $this->buildSecureNatStatusArray($hubName, $optData, $statData, $hStatData);
             }
         }
 

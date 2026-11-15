@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, 
   Wifi, 
@@ -143,6 +143,23 @@ export const SoftEtherView: React.FC<SoftEtherViewProps> = ({ clientes = [] }) =
   const [l3RouteFormMask, setL3RouteFormMask] = useState('255.255.255.0');
   const [l3RouteFormGateway, setL3RouteFormGateway] = useState('');
   const [l3RouteFormMetric, setL3RouteFormMetric] = useState(1);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (userToTimedDisable) { setUserToTimedDisable(null); return; }
+      if (isL3RouteModalOpen) { setIsL3RouteModalOpen(false); return; }
+      if (isL3IfModalOpen) { setIsL3IfModalOpen(false); return; }
+      if (isAddL3SwitchOpen) { setIsAddL3SwitchOpen(false); return; }
+      if (hubToDelete) { setHubToDelete(null); return; }
+      if (isAddHubModalOpen) { setIsAddHubModalOpen(false); return; }
+      if (isAddUserModalOpen) { setIsAddUserModalOpen(false); return; }
+      if (inspectingSession) { setInspectingSession(null); return; }
+      if (managingHub) { setManagingHub(null); }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [userToTimedDisable, isL3RouteModalOpen, isL3IfModalOpen, isAddL3SwitchOpen, hubToDelete, isAddHubModalOpen, isAddUserModalOpen, inspectingSession, managingHub]);
 
   // Estado del servidor
   const [serverStatus] = useState<SoftEtherServerStatus>({
