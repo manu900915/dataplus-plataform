@@ -363,20 +363,33 @@ export const App: React.FC = () => {
       const clienteTel = cli?.telefono || '';
       const solucion = newSrv.gr_tipo_solucion || newSrv.gr_marca_modelo || 'Router 4G LTE';
       const sim = newSrv.gr_sim_numero || '';
-      const tarifa = newSrv.gr_recarga_monto ? Number(newSrv.gr_recarga_monto) : 0;
+      const tarifa = Math.max(0, Number(newSrv.gr_mensualidad_monto ?? 0));
+      const moneda = newSrv.gr_mensualidad_moneda || 'CUP';
+      const periodicidad = newSrv.gr_periodicidad_pago || 'mensual';
+      const mesesPeriodo =
+        periodicidad === 'trimestral' ? 3 : periodicidad === 'personalizado' ? Math.max(1, Number(newSrv.gr_meses_pago || 1)) : 1;
+      const montoPeriodo = tarifa * mesesPeriodo;
 
       setSuscripciones(prev => {
         const existingIdx = prev.findIndex(
-          s => s.cliente_id === newSrv.cliente_id || s.cliente_nombre.toLowerCase() === clienteNombre.toLowerCase()
+          s => s.servicio_id === newSrv.id || (!s.servicio_id && (s.cliente_id === newSrv.cliente_id || s.cliente_nombre.toLowerCase() === clienteNombre.toLowerCase()))
         );
         if (existingIdx >= 0) {
           const updated = [...prev];
+          const cur = updated[existingIdx];
+          const newTarifa = tarifa > 0 ? tarifa : cur.tarifa_mensual;
+          const total = newTarifa * mesesPeriodo + (cur.deuda_acumulada || 0);
           updated[existingIdx] = {
-            ...updated[existingIdx],
-            sim_numero: sim || updated[existingIdx].sim_numero,
-            tipo_solucion: solucion || updated[existingIdx].tipo_solucion,
-            cliente_telefono: clienteTel || updated[existingIdx].cliente_telefono,
-            tarifa_mensual: updated[existingIdx].tarifa_mensual || tarifa,
+            ...cur,
+            servicio_id: newSrv.id,
+            sim_numero: sim || cur.sim_numero,
+            tipo_solucion: solucion || cur.tipo_solucion,
+            cliente_telefono: clienteTel || cur.cliente_telefono,
+            moneda,
+            tarifa_mensual: newTarifa,
+            periodicidad_pago: periodicidad,
+            meses_periodo: mesesPeriodo,
+            monto_a_cobrar: total,
           };
           return updated;
         }
@@ -386,24 +399,25 @@ export const App: React.FC = () => {
           id: `sub-${Date.now()}`,
           codigo: subCode,
           cliente_id: newSrv.cliente_id,
+          servicio_id: newSrv.id,
           cliente_nombre: clienteNombre,
           cliente_telefono: clienteTel,
-          servicio_tipo: 'Gestion_Remota',
+          nombre_servicio: 'Gestión Remota 4G',
           tipo_solucion: solucion,
           sim_numero: sim,
-          moneda: 'CUP',
+          moneda,
           tarifa_mensual: tarifa,
-          dia_pago_limite: 15,
-          mes_adelantado: true,
+          periodicidad_pago: periodicidad,
+          meses_periodo: mesesPeriodo,
+          dia_limite_pago: 15,
           tiene_deuda: false,
           meses_deuda_count: 0,
           meses_deuda_detalle: [],
           deuda_acumulada: 0,
-          ultimo_mes_pagado: '',
-          estado_cobro_mes_actual: 'Al_Dia',
-          monto_a_cobrar: tarifa,
-          activo: true,
-          historial_pagos: [],
+          estado_cobro_mes_actual: 'Pendiente',
+          monto_a_cobrar: montoPeriodo,
+          activo: newSrv.estado !== 'Inactivo',
+          fecha_inicio: newSrv.fecha_instalacion || new Date().toISOString().split('T')[0],
           notas: 'Añadido automáticamente al registrar el servicio de Gestión Remota.'
         };
         return [newSub, ...prev];
@@ -420,18 +434,32 @@ export const App: React.FC = () => {
       const clienteTel = cli?.telefono || '';
       const solucion = actualizado.gr_tipo_solucion || actualizado.gr_marca_modelo || 'Router 4G LTE';
       const sim = actualizado.gr_sim_numero || '';
+      const tarifa = Math.max(0, Number(actualizado.gr_mensualidad_monto ?? 0));
+      const moneda = actualizado.gr_mensualidad_moneda || 'CUP';
+      const periodicidad = actualizado.gr_periodicidad_pago || 'mensual';
+      const mesesPeriodo =
+        periodicidad === 'trimestral' ? 3 : periodicidad === 'personalizado' ? Math.max(1, Number(actualizado.gr_meses_pago || 1)) : 1;
 
       setSuscripciones(prev => {
         const existingIdx = prev.findIndex(
-          s => s.cliente_id === actualizado.cliente_id || s.cliente_nombre.toLowerCase() === clienteNombre.toLowerCase()
+          s => s.servicio_id === actualizado.id || (!s.servicio_id && (s.cliente_id === actualizado.cliente_id || s.cliente_nombre.toLowerCase() === clienteNombre.toLowerCase()))
         );
         if (existingIdx >= 0) {
           const updated = [...prev];
+          const cur = updated[existingIdx];
+          const newTarifa = actualizado.gr_mensualidad_monto !== undefined ? tarifa : cur.tarifa_mensual;
+          const total = newTarifa * mesesPeriodo + (cur.deuda_acumulada || 0);
           updated[existingIdx] = {
-            ...updated[existingIdx],
-            sim_numero: sim || updated[existingIdx].sim_numero,
-            tipo_solucion: solucion || updated[existingIdx].tipo_solucion,
-            cliente_telefono: clienteTel || updated[existingIdx].cliente_telefono,
+            ...cur,
+            servicio_id: actualizado.id,
+            sim_numero: sim || cur.sim_numero,
+            tipo_solucion: solucion || cur.tipo_solucion,
+            cliente_telefono: clienteTel || cur.cliente_telefono,
+            moneda,
+            tarifa_mensual: newTarifa,
+            periodicidad_pago: periodicidad,
+            meses_periodo: mesesPeriodo,
+            monto_a_cobrar: total,
           };
           return updated;
         }
@@ -441,24 +469,25 @@ export const App: React.FC = () => {
           id: `sub-${Date.now()}`,
           codigo: subCode,
           cliente_id: actualizado.cliente_id,
+          servicio_id: actualizado.id,
           cliente_nombre: clienteNombre,
           cliente_telefono: clienteTel,
-          servicio_tipo: 'Gestion_Remota',
+          nombre_servicio: 'Gestión Remota 4G',
           tipo_solucion: solucion,
           sim_numero: sim,
-          moneda: 'CUP',
-          tarifa_mensual: actualizado.gr_recarga_monto ? Number(actualizado.gr_recarga_monto) : 0,
-          dia_pago_limite: 15,
-          mes_adelantado: true,
+          moneda,
+          tarifa_mensual: tarifa,
+          periodicidad_pago: periodicidad,
+          meses_periodo: mesesPeriodo,
+          dia_limite_pago: 15,
           tiene_deuda: false,
           meses_deuda_count: 0,
           meses_deuda_detalle: [],
           deuda_acumulada: 0,
-          ultimo_mes_pagado: '',
-          estado_cobro_mes_actual: 'Al_Dia',
-          monto_a_cobrar: actualizado.gr_recarga_monto ? Number(actualizado.gr_recarga_monto) : 0,
-          activo: true,
-          historial_pagos: [],
+          estado_cobro_mes_actual: 'Pendiente',
+          monto_a_cobrar: tarifa * mesesPeriodo,
+          activo: actualizado.estado !== 'Inactivo',
+          fecha_inicio: actualizado.fecha_instalacion || new Date().toISOString().split('T')[0],
           notas: 'Añadido automáticamente al actualizar a Gestión Remota.'
         };
         return [newSub, ...prev];
