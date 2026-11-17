@@ -6,28 +6,35 @@ import {
   MapPin, 
   Phone, 
   Mail, 
-  FileText, 
   Building2, 
   User, 
   ChevronDown, 
   ChevronUp,
+  CheckCircle2,
+  XCircle,
   X
 } from 'lucide-react';
 import { Cliente, ClienteUbicacion } from '../types';
-import { PROVINCIAS_CUBA } from '../data/mockData';
 
 interface ClientesViewProps {
   clientes: Cliente[];
   onAddCliente: (cliente: Cliente) => void;
-  onAddUbicacion: (clienteId: string, ubicacion: ClienteUbicacion) => void;
+  onUpdateCliente?: (cliente: Cliente) => void;
+  onDeleteCliente?: (id: string) => void;
+  onAddUbicacion?: (clienteId: string, ubicacion: ClienteUbicacion) => void;
+  onBulkUpdateClientesEstado?: (ids: string[], activo: boolean) => void;
 }
 
 export const ClientesView: React.FC<ClientesViewProps> = ({
   clientes,
   onAddCliente,
+  onUpdateCliente,
   onAddUbicacion,
+  onBulkUpdateClientesEstado,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [expandedClientId, setExpandedClientId] = useState<string | null>(clientes[0]?.id || null);
 
   // New Client Modal State
@@ -53,12 +60,59 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
   const [ubContacto, setUbContacto] = useState('');
   const [ubTelefono, setUbTelefono] = useState('');
 
-  const filteredClientes = clientes.filter(c =>
-    c.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (c.nombre_comercial && c.nombre_comercial.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (c.telefono && c.telefono.includes(searchTerm))
-  );
+  const filteredClientes = clientes.filter(c => {
+    const matchesSearch =
+      c.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (c.nombre_comercial && c.nombre_comercial.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (c.telefono && c.telefono.includes(searchTerm));
+
+    const matchesStatus =
+      statusFilter === 'all' ||
+      (statusFilter === 'active' && c.activo) ||
+      (statusFilter === 'inactive' && !c.activo);
+
+    return matchesSearch && matchesStatus;
+  });
+
+  const allVisibleSelected =
+    filteredClientes.length > 0 &&
+    filteredClientes.every((c) => selectedIds.includes(c.id));
+
+  const toggleSelectCliente = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAllVisible = () => {
+    if (allVisibleSelected) {
+      const visibleSet = new Set(filteredClientes.map((c) => c.id));
+      setSelectedIds((prev) => prev.filter((id) => !visibleSet.has(id)));
+    } else {
+      const merged = new Set([...selectedIds, ...filteredClientes.map((c) => c.id)]);
+      setSelectedIds(Array.from(merged));
+    }
+  };
+
+  const handleToggleActivoCliente = (cliente: Cliente) => {
+    onUpdateCliente?.({
+      ...cliente,
+      activo: !cliente.activo,
+    });
+  };
+
+  const handleBulkSetActivo = (activo: boolean) => {
+    if (selectedIds.length === 0) return;
+    if (onBulkUpdateClientesEstado) {
+      onBulkUpdateClientesEstado(selectedIds, activo);
+    } else if (onUpdateCliente) {
+      clientes
+        .filter((c) => selectedIds.includes(c.id))
+        .forEach((c) => onUpdateCliente({ ...c, activo }));
+    }
+    setSelectedIds([]);
+  };
 
   // Escape to close modals
   React.useEffect(() => {
@@ -132,7 +186,14 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
       activo: true
     };
 
-    onAddUbicacion(targetClienteForUb.id, newUb);
+    if (onAddUbicacion) {
+      onAddUbicacion(targetClienteForUb.id, newUb);
+    } else if (onUpdateCliente) {
+      onUpdateCliente({
+        ...targetClienteForUb,
+        ubicaciones: [...targetClienteForUb.ubicaciones, newUb],
+      });
+    }
     setTargetClienteForUb(null);
     setUbNombre('');
     setUbDireccion('');
@@ -162,30 +223,100 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
         </button>
       </div>
 
-      {/* Search Input */}
-      <div className="relative rounded-xl border border-slate-800 bg-slate-900/60 p-3">
-        <Search className="absolute left-6 top-5.5 h-3.5 w-3.5 text-slate-400" />
-        <input
-          type="text"
-          placeholder="Buscar por código, razón social, nombre comercial o teléfono..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full rounded-lg border border-slate-800 bg-slate-950 pl-9 pr-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:border-teal-500 focus:outline-none"
-        />
+      {/* Search & Status Filters + Bulk Actions */}
+      <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Buscar por código, razón social, nombre comercial o teléfono..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full rounded-lg border border-slate-800 bg-slate-950 pl-9 pr-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:border-teal-500 focus:outline-none"
+            />
+          </div>
+
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
+            className="rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-200 focus:border-teal-500 focus:outline-none"
+          >
+            <option value="all">Todos los estados ({clientes.length})</option>
+            <option value="active">Solo activos ({clientes.filter(c => c.activo).length})</option>
+            <option value="inactive">Solo inactivos ({clientes.filter(c => !c.activo).length})</option>
+          </select>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/70">
+          <label className="inline-flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={allVisibleSelected}
+              onChange={toggleSelectAllVisible}
+              disabled={filteredClientes.length === 0}
+              className="h-3.5 w-3.5 rounded border-slate-700 bg-slate-950 text-teal-500 focus:ring-teal-500"
+            />
+            <span>Seleccionar visibles ({filteredClientes.length})</span>
+          </label>
+
+          {selectedIds.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-medium text-teal-400">
+                {selectedIds.length} seleccionado(s)
+              </span>
+              <button
+                type="button"
+                onClick={() => handleBulkSetActivo(true)}
+                className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 px-3 py-1.5 text-xs font-semibold text-emerald-300 transition-colors cursor-pointer"
+              >
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Activar seleccionados
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBulkSetActivo(false)}
+                className="inline-flex items-center gap-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 px-3 py-1.5 text-xs font-semibold text-amber-300 transition-colors cursor-pointer"
+              >
+                <XCircle className="h-3.5 w-3.5" />
+                Desactivar seleccionados
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedIds([])}
+                className="rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-xs text-slate-300 hover:bg-slate-700 cursor-pointer"
+              >
+                Limpiar
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Clients Cards / List */}
       <div className="space-y-4">
         {filteredClientes.map((cliente) => {
           const isExpanded = expandedClientId === cliente.id;
+          const isSelected = selectedIds.includes(cliente.id);
 
           return (
             <div
               key={cliente.id}
-              className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-sm transition-all"
+              className={`rounded-2xl border p-5 shadow-sm transition-all ${
+                isSelected
+                  ? 'border-teal-500/60 bg-slate-900/90'
+                  : 'border-slate-800 bg-slate-900/70'
+              } ${!cliente.activo ? 'opacity-75' : ''}`}
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleSelectCliente(cliente.id)}
+                    aria-label={`Seleccionar ${cliente.nombre}`}
+                    className="mt-2.5 h-4 w-4 rounded border-slate-700 bg-slate-950 text-teal-500 focus:ring-teal-500 cursor-pointer"
+                  />
                   <div className="rounded-xl bg-slate-800 p-2.5 text-teal-400 border border-slate-700">
                     {cliente.tipo_persona === 'juridica' ? (
                       <Building2 className="h-5 w-5" />
@@ -194,7 +325,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                     )}
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-xs font-bold text-teal-400">{cliente.codigo}</span>
                       <span className={`px-2 py-0.2 rounded text-[10px] font-semibold uppercase ${
                         cliente.tipo_persona === 'juridica'
@@ -202,6 +333,13 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                           : 'bg-emerald-500/20 text-emerald-300'
                       }`}>
                         {cliente.tipo_persona === 'juridica' ? 'Persona Jurídica' : 'Persona Natural'}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
+                        cliente.activo
+                          ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                          : 'bg-rose-500/15 text-rose-300 border border-rose-500/30'
+                      }`}>
+                        {cliente.activo ? 'Activo' : 'Inactivo'}
                       </span>
                     </div>
                     <h3 className="text-base font-bold text-white mt-0.5">
@@ -215,8 +353,31 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
+                    type="button"
+                    onClick={() => handleToggleActivoCliente(cliente)}
+                    className={`flex items-center gap-1 rounded border px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
+                      cliente.activo
+                        ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30'
+                        : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                    }`}
+                  >
+                    {cliente.activo ? (
+                      <>
+                        <XCircle className="h-3.5 w-3.5" />
+                        Desactivar
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        Activar
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => {
                       setTargetClienteForUb(cliente);
                     }}
@@ -227,6 +388,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                   </button>
 
                   <button
+                    type="button"
                     onClick={() => setExpandedClientId(isExpanded ? null : cliente.id)}
                     className="rounded p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
                   >

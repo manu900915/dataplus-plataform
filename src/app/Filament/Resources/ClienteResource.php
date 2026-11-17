@@ -12,10 +12,12 @@ use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 
 class ClienteResource extends Resource
 {
@@ -425,9 +427,18 @@ class ClienteResource extends Resource
                     ->badge()
                     ->color('gray'),
 
-                Tables\Columns\IconColumn::make('activo')
+                Tables\Columns\ToggleColumn::make('activo')
                     ->label('Activo')
-                    ->boolean(),
+                    ->sortable()
+                    ->onColor('success')
+                    ->offColor('danger')
+                    ->afterStateUpdated(function (Cliente $record, bool $state): void {
+                        Notification::make()
+                            ->title($state ? 'Cliente activado' : 'Cliente desactivado')
+                            ->body("{$record->nombre} ahora está " . ($state ? 'activo' : 'inactivo') . '.')
+                            ->color($state ? 'success' : 'warning')
+                            ->send();
+                    }),
             ])
             ->defaultSort('id', 'asc')
             ->filters([
@@ -441,6 +452,20 @@ class ClienteResource extends Resource
                     ->label('Solo activos'),
             ])
             ->actions([
+                Tables\Actions\Action::make('toggleActivo')
+                    ->label(fn (Cliente $record): string => $record->activo ? 'Desactivar' : 'Activar')
+                    ->icon(fn (Cliente $record): string => $record->activo ? 'heroicon-o-x-circle' : 'heroicon-o-check-circle')
+                    ->color(fn (Cliente $record): string => $record->activo ? 'warning' : 'success')
+                    ->action(function (Cliente $record): void {
+                        $nuevoEstado = ! $record->activo;
+                        $record->update(['activo' => $nuevoEstado]);
+
+                        Notification::make()
+                            ->title($nuevoEstado ? 'Cliente activado' : 'Cliente desactivado')
+                            ->body("{$record->nombre} ahora está " . ($nuevoEstado ? 'activo' : 'inactivo') . '.')
+                            ->color($nuevoEstado ? 'success' : 'warning')
+                            ->send();
+                    }),
                 Tables\Actions\EditAction::make()
                     ->label('Editar'),
                 Tables\Actions\DeleteAction::make()
@@ -448,6 +473,40 @@ class ClienteResource extends Resource
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\BulkAction::make('activarSeleccionados')
+                        ->label('Activar seleccionados')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->requiresConfirmation()
+                        ->modalHeading('Activar clientes seleccionados')
+                        ->modalDescription('¿Confirmas que deseas activar todos los clientes seleccionados?')
+                        ->modalSubmitActionLabel('Sí, activar')
+                        ->deselectRecordsAfterCompletion()
+                        ->action(function (Collection $records): void {
+                            $count = Cliente::whereKey($records->modelKeys())->update(['activo' => true]);
+
+                            Notification::make()
+                                ->title("{$count} cliente(s) activado(s)")
+                                ->success()
+                                ->send();
+                        }),
+                    Tables\Actions\BulkAction::make('desactivarSeleccionados')
+                        ->label('Desactivar seleccionados')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('warning')
+                        ->requiresConfirmation()
+                        ->modalHeading('Desactivar clientes seleccionados')
+                        ->modalDescription('¿Confirmas que deseas desactivar todos los clientes seleccionados?')
+                        ->modalSubmitActionLabel('Sí, desactivar')
+                        ->deselectRecordsAfterCompletion()
+                        ->action(function (Collection $records): void {
+                            $count = Cliente::whereKey($records->modelKeys())->update(['activo' => false]);
+
+                            Notification::make()
+                                ->title("{$count} cliente(s) desactivado(s)")
+                                ->warning()
+                                ->send();
+                        }),
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);

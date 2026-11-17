@@ -693,6 +693,11 @@ export const App: React.FC = () => {
                 onAddCliente={handleAddCliente}
                 onUpdateCliente={handleUpdateCliente}
                 onDeleteCliente={handleDeleteCliente}
+                onBulkUpdateClientesEstado={(ids, activo) =>
+                  setClientes((prev) =>
+                    prev.map((c) => (ids.includes(c.id) ? { ...c, activo } : c))
+                  )
+                }
               />
             )}
 
