@@ -53,6 +53,8 @@ class FacturacionGestionRemotaPage extends Page
     public string $newSubSim = "";
     public string $newSubMoneda = "CUP";
     public string $newSubMonto = "0";
+    public string $newSubPeriodicidad = "mensual";
+    public int $newSubMesesPeriodo = 1;
     public string $newSubNotas = "";
 
     // Modal de Edición de Suscripción (Tarifa, Deuda Previa, Teléfono, SIM para la Contadora)
@@ -64,6 +66,8 @@ class FacturacionGestionRemotaPage extends Page
     public string $editSubSim = "";
     public string $editSubMoneda = "CUP";
     public string $editSubMonto = "0";
+    public string $editSubPeriodicidad = "mensual";
+    public int $editSubMesesPeriodo = 1;
     public string $editSubDeuda = "0";
     public int $editSubMesesDeuda = 0;
     public int $editSubDiaLimite = 15;
@@ -122,7 +126,8 @@ class FacturacionGestionRemotaPage extends Page
         $totalDeudores = 0;
 
         foreach ($subs as $sub) {
-            $totalCobrar = (float) $sub->monto_mensual + (float) $sub->deuda_acumulada;
+            $montoPeriodo = $sub->monto_periodo;
+            $totalCobrar = $sub->monto_a_cobrar;
 
             if ($sub->tiene_deuda || $sub->deuda_acumulada > 0 || $sub->meses_deuda_count > 0) {
                 $totalDeudores++;
@@ -135,9 +140,9 @@ class FacturacionGestionRemotaPage extends Page
 
             if ($sub->estado_cobro === "cobrado") {
                 if ($sub->moneda === "USD") {
-                    $recaudadoUsd += (float) $sub->monto_mensual;
+                    $recaudadoUsd += $montoPeriodo;
                 } else {
-                    $recaudadoCup += (float) $sub->monto_mensual;
+                    $recaudadoCup += $montoPeriodo;
                 }
             } else {
                 if ($sub->moneda === "USD") {
@@ -198,10 +203,24 @@ class FacturacionGestionRemotaPage extends Page
      */
     public function getSuscripciones()
     {
-        $query = SuscripcionGestionRemota::query()->where("activo", true);
+        $query = SuscripcionGestionRemota::query()
+            ->with(['servicio.ubicacion'])
+            ->where("activo", true);
 
         if ($this->filtroEstado !== "todos") {
-            $query->where("estado_cobro", $this->filtroEstado);
+            if (in_array($this->filtroEstado, ['cobrados', 'cobrado'], true)) {
+                $query->where("estado_cobro", "cobrado");
+            } elseif (in_array($this->filtroEstado, ['pendientes', 'pendiente'], true)) {
+                $query->where("estado_cobro", "pendiente");
+            } elseif (in_array($this->filtroEstado, ['mora', 'vencido'], true)) {
+                $query->where(function ($q) {
+                    $q->where("estado_cobro", "vencido")
+                      ->orWhere("tiene_deuda", true)
+                      ->orWhere("deuda_acumulada", ">", 0);
+                });
+            } else {
+                $query->where("estado_cobro", $this->filtroEstado);
+            }
         }
 
         if ($this->filtroMoneda !== "todas") {
@@ -411,69 +430,20 @@ class FacturacionGestionRemotaPage extends Page
 
         if ($serviciosGR->isNotEmpty()) {
             foreach ($serviciosGR as $srv) {
-                $cliente = $srv->ubicacion?->cliente;
-                if (!$cliente && $srv->cliente_ubicacion_id) {
-                    $ub = ClienteUbicacion::find($srv->cliente_ubicacion_id);
-                    $cliente = $ub ? Cliente::find($ub->cliente_id) : null;
-                }
-                if (!$cliente) continue;
+                $existed = SuscripcionGestionRemota::where('servicio_id', $srv->id)->exists();
+                $srv->sincronizarFacturacion();
+                $nowExists = SuscripcionGestionRemota::where('servicio_id', $srv->id)->exists();
 
-                $nombre = trim($cliente->nombre ?: ($cliente->nombre_comercial ?: ('Cliente #' . $cliente->id)));
-                $tel = trim($cliente->telefono ?: ($cliente->contactos()->first()?->telefono ?? ''));
-                $solucion = trim($srv->gr_tipo_solucion ?: ($srv->gr_marca_modelo ?: 'Router 4G LTE'));
-                $sim = trim($srv->gr_sim_numero ?: '');
-                $tarifa = max(0, (float) ($srv->gr_recarga_monto ?? 0));
-
-                $sub = SuscripcionGestionRemota::where('cliente_id', $cliente->id)
-                    ->orWhereRaw('LOWER(TRIM(cliente_nombre)) = ?', [strtolower($nombre)])
-                    ->first();
-
-                if (!$sub) {
-                    $nextNum = ((int) (SuscripcionGestionRemota::max('id') ?? 0)) + 1;
-                    $codigo = "SUB-" . str_pad((string) $nextNum, 3, "0", STR_PAD_LEFT);
-                    while (SuscripcionGestionRemota::where('codigo', $codigo)->exists()) {
-                        $nextNum++;
-                        $codigo = "SUB-" . str_pad((string) $nextNum, 3, "0", STR_PAD_LEFT);
-                    }
-
-                    SuscripcionGestionRemota::create([
-                        'codigo' => $codigo,
-                        'cliente_id' => $cliente->id,
-                        'cliente_nombre' => $nombre,
-                        'cliente_telefono' => $tel,
-                        'servicio_tipo' => 'Gestion_Remota',
-                        'tipo_solucion' => $solucion,
-                        'sim_numero' => $sim,
-                        'moneda' => 'CUP',
-                        'monto_mensual' => $tarifa,
-                        'dia_pago_limite' => 15,
-                        'mes_adelantado' => true,
-                        'tiene_deuda' => false,
-                        'meses_deuda_count' => 0,
-                        'meses_deuda_detalle' => json_encode([]),
-                        'deuda_acumulada' => 0.00,
-                        'ultimo_mes_pagado' => null,
-                        'estado_cobro' => 'pendiente',
-                        'activo' => true,
-                        'notas' => 'Sincronizado automáticamente desde Servicio de Gestión Remota.',
-                    ]);
+                if (!$existed && $nowExists) {
                     $agregados++;
-                } else {
-                    $cambios = [];
-                    if (!$sub->cliente_id) $cambios['cliente_id'] = $cliente->id;
-                    if (empty($sub->sim_numero) && !empty($sim)) $cambios['sim_numero'] = $sim;
-                    if (empty($sub->tipo_solucion) && !empty($solucion)) $cambios['tipo_solucion'] = $solucion;
-                    if (empty($sub->cliente_telefono) && !empty($tel)) $cambios['cliente_telefono'] = $tel;
-                    if (!empty($cambios)) {
-                        $sub->update($cambios);
-                        $actualizados++;
-                    }
+                } elseif ($nowExists) {
+                    $actualizados++;
                 }
             }
 
             Notification::make()
                 ->title('Clientes con Gestión Remota Sincronizados')
-                ->body("{$serviciosGR->count()} servicios de Gestión Remota procesados. {$agregados} clientes agregados a facturación y {$actualizados} actualizados.")
+                ->body("{$serviciosGR->count()} servicios de Gestión Remota procesados. {$agregados} registros agregados a facturación y {$actualizados} actualizados.")
                 ->success()
                 ->send();
             return;
@@ -579,6 +549,24 @@ class FacturacionGestionRemotaPage extends Page
             ->send();
     }
 
+    public function updatedNewSubPeriodicidad(string $value): void
+    {
+        $this->newSubMesesPeriodo = match ($value) {
+            'trimestral' => 3,
+            'personalizado' => max(2, (int) $this->newSubMesesPeriodo),
+            default => 1,
+        };
+    }
+
+    public function updatedEditSubPeriodicidad(string $value): void
+    {
+        $this->editSubMesesPeriodo = match ($value) {
+            'trimestral' => 3,
+            'personalizado' => max(2, (int) $this->editSubMesesPeriodo),
+            default => 1,
+        };
+    }
+
     /**
      * Abrir modal para editar suscripción (Contadora)
      */
@@ -597,6 +585,8 @@ class FacturacionGestionRemotaPage extends Page
         $this->editSubSim = $sub->sim_numero ?? '';
         $this->editSubMoneda = $sub->moneda ?? 'CUP';
         $this->editSubMonto = (string) ((float) $sub->monto_mensual);
+        $this->editSubPeriodicidad = $sub->periodicidad_efectiva;
+        $this->editSubMesesPeriodo = $sub->meses_facturacion;
         $this->editSubDeuda = (string) ((float) $sub->deuda_acumulada);
         $this->editSubMesesDeuda = (int) ($sub->meses_deuda_count ?? 0);
         $this->editSubDiaLimite = (int) ($sub->dia_pago_limite ?: 15);
@@ -622,6 +612,15 @@ class FacturacionGestionRemotaPage extends Page
         }
 
         $monto = max(0, floatval($this->editSubMonto));
+        $moneda = in_array($this->editSubMoneda, ['CUP', 'USD']) ? $this->editSubMoneda : 'CUP';
+        $periodicidad = in_array($this->editSubPeriodicidad, ['mensual', 'trimestral', 'personalizado'], true)
+            ? $this->editSubPeriodicidad
+            : 'mensual';
+        $mesesPeriodo = match ($periodicidad) {
+            'trimestral' => 3,
+            'personalizado' => max(1, intval($this->editSubMesesPeriodo)),
+            default => 1,
+        };
         $deuda = max(0, floatval($this->editSubDeuda));
         $meses = max(0, intval($this->editSubMesesDeuda));
         $tieneDeuda = ($deuda > 0 || $meses > 0);
@@ -641,8 +640,10 @@ class FacturacionGestionRemotaPage extends Page
             'cliente_telefono' => trim($this->editSubClienteTelefono),
             'tipo_solucion' => trim($this->editSubSolucion) ?: 'Router 4G LTE',
             'sim_numero' => trim($this->editSubSim),
-            'moneda' => in_array($this->editSubMoneda, ['CUP', 'USD']) ? $this->editSubMoneda : 'CUP',
+            'moneda' => $moneda,
             'monto_mensual' => $monto,
+            'periodicidad_pago' => $periodicidad,
+            'meses_periodo' => $mesesPeriodo,
             'deuda_acumulada' => $deuda,
             'meses_deuda_count' => $meses,
             'tiene_deuda' => $tieneDeuda,
@@ -652,11 +653,23 @@ class FacturacionGestionRemotaPage extends Page
             'activo' => $this->editSubActivo,
         ]);
 
+        // Mantener sincronizado el servicio de Gestión Remota vinculado si existe
+        if ($sub->servicio_id) {
+            Servicio::withoutEvents(function () use ($sub, $monto, $moneda, $periodicidad, $mesesPeriodo) {
+                Servicio::where('id', $sub->servicio_id)->update([
+                    'gr_mensualidad_monto' => $monto,
+                    'gr_mensualidad_moneda' => $moneda,
+                    'gr_periodicidad_pago' => $periodicidad,
+                    'gr_meses_pago' => $mesesPeriodo,
+                ]);
+            });
+        }
+
         $this->modalEditarSubOpen = false;
 
         Notification::make()
             ->title('Parámetros actualizados')
-            ->body("Tarifa y datos de {$sub->cliente_nombre} guardados exitosamente.")
+            ->body("Tarifa, periodicidad y datos de {$sub->cliente_nombre} guardados exitosamente.")
             ->success()
             ->send();
     }
@@ -670,7 +683,7 @@ class FacturacionGestionRemotaPage extends Page
         if (!$sub) return;
 
         $this->selectedSuscripcionId = $sub->id;
-        $totalCobrar = (float) $sub->monto_mensual + (float) $sub->deuda_acumulada;
+        $totalCobrar = $sub->monto_a_cobrar;
         $this->formMontoPagado = (string) $totalCobrar;
         $this->formFechaPago = now()->format("Y-m-d");
         $this->formMetodoPago = "transferencia";
@@ -709,7 +722,7 @@ class FacturacionGestionRemotaPage extends Page
             "mes_servicio" => "Octubre 2026",
             "fecha_pago" => $this->formFechaPago ?: now()->format("Y-m-d"),
             "moneda" => $sub->moneda,
-            "monto_esperado" => (float) $sub->monto_mensual + (float) $sub->deuda_acumulada,
+            "monto_esperado" => $sub->monto_a_cobrar,
             "monto_pagado" => $montoPagado,
             "metodo_pago" => $this->formMetodoPago,
             "numero_transaccion" => $this->formMetodoPago === "transferencia" ? $this->formNumeroTransaccion : null,
@@ -755,6 +768,15 @@ class FacturacionGestionRemotaPage extends Page
             $codigo = "SUB-" . str_pad((string) $nextNum, 3, "0", STR_PAD_LEFT);
         }
 
+        $periodicidad = in_array($this->newSubPeriodicidad, ['mensual', 'trimestral', 'personalizado'], true)
+            ? $this->newSubPeriodicidad
+            : 'mensual';
+        $mesesPeriodo = match ($periodicidad) {
+            'trimestral' => 3,
+            'personalizado' => max(1, intval($this->newSubMesesPeriodo)),
+            default => 1,
+        };
+
         SuscripcionGestionRemota::create([
             "codigo" => $codigo,
             "cliente_nombre" => $this->newSubClienteNombre,
@@ -763,7 +785,9 @@ class FacturacionGestionRemotaPage extends Page
             "tipo_solucion" => $this->newSubSolucion ?: "Router 4G LTE",
             "sim_numero" => $this->newSubSim,
             "moneda" => $this->newSubMoneda,
-            "monto_mensual" => (float) $this->newSubMonto ?: 0.00,
+            "monto_mensual" => max(0, (float) $this->newSubMonto),
+            "periodicidad_pago" => $periodicidad,
+            "meses_periodo" => $mesesPeriodo,
             "dia_pago_limite" => 15,
             "mes_adelantado" => true,
             "tiene_deuda" => false,
@@ -780,6 +804,8 @@ class FacturacionGestionRemotaPage extends Page
         $this->newSubClienteNombre = "";
         $this->newSubClienteTelefono = "";
         $this->newSubSim = "";
+        $this->newSubPeriodicidad = "mensual";
+        $this->newSubMesesPeriodo = 1;
         $this->newSubNotas = "";
 
         Notification::make()
@@ -821,6 +847,11 @@ class FacturacionGestionRemotaPage extends Page
         $this->modalVisorOpen = true;
     }
 
+    public function abrirModalRecibo(int $suscripcionId): void
+    {
+        $this->verRecibo($suscripcionId);
+    }
+
     /**
      * Ver y emitir recibo oficial
      */
@@ -830,21 +861,37 @@ class FacturacionGestionRemotaPage extends Page
         if (!$sub) return;
 
         $ultimoPago = $sub->pagos()->latest()->first();
+        $folio = $ultimoPago ? $ultimoPago->codigo_pago : "REC-" . $sub->codigo;
+        $fecha = $ultimoPago && $ultimoPago->fecha_pago ? $ultimoPago->fecha_pago->format("d/m/Y") : now()->format("d/m/Y");
+        $mesNombre = $ultimoPago?->mes_servicio ?: now()->translatedFormat('F Y');
+        $montoPagado = $ultimoPago ? (float) $ultimoPago->monto_pagado : $sub->monto_a_cobrar;
+        $metodo = $ultimoPago ? ucfirst($ultimoPago->metodo_pago) : "Pendiente";
 
         $this->reciboActual = [
-            "folio" => $ultimoPago ? $ultimoPago->codigo_pago : "REC-" . $sub->codigo,
-            "fecha" => $ultimoPago && $ultimoPago->fecha_pago ? $ultimoPago->fecha_pago->format("d/m/Y") : now()->format("d/m/Y"),
+            "folio" => $folio,
+            "codigo_pago" => $folio,
+            "fecha" => $fecha,
+            "fecha_pago" => $fecha,
             "cliente" => $sub->cliente_nombre,
+            "cliente_nombre" => $sub->cliente_nombre,
             "telefono" => $sub->cliente_telefono ?: "No especificado",
-            "servicio" => "Gestión Remota 4G LTE",
+            "cliente_telefono" => $sub->cliente_telefono ?: "",
+            "servicio" => "Gestión Remota (" . $sub->periodicidad_label . ")",
+            "servicio_nombre" => "Gestión Remota (" . $sub->periodicidad_label . ")",
             "solucion" => $sub->tipo_solucion,
             "sim" => $sub->sim_numero ?: "SIM Principal",
-            "mes" => "Octubre 2026",
+            "mes" => $mesNombre,
+            "mes_nombre" => $mesNombre,
+            "periodicidad" => $sub->periodicidad_label,
             "mensualidad" => number_format((float) $sub->monto_mensual, 2) . " " . $sub->moneda,
+            "monto_periodo" => number_format($sub->monto_periodo, 2) . " " . $sub->moneda,
             "deuda" => number_format((float) $sub->deuda_acumulada, 2) . " " . $sub->moneda,
-            "total" => number_format((float) ($sub->monto_mensual + $sub->deuda_acumulada), 2) . " " . $sub->moneda,
+            "total" => number_format($sub->monto_a_cobrar, 2) . " " . $sub->moneda,
+            "monto_pagado" => $montoPagado,
+            "moneda" => $sub->moneda,
             "estado" => $sub->estado_cobro,
-            "metodo" => $ultimoPago ? ucfirst($ultimoPago->metodo_pago) : "Pendiente",
+            "metodo" => $metodo,
+            "metodo_pago" => $metodo,
             "transaccion" => $ultimoPago?->numero_transaccion ?: "N/A",
             "receptor" => $ultimoPago?->efectivo_quien_recibe ?: (Auth::user()?->name ?? "Admin Finanzas"),
         ];
@@ -872,8 +919,9 @@ class FacturacionGestionRemotaPage extends Page
             return;
         }
 
-        $monto = number_format((float) ($sub->tiene_deuda ? ($sub->monto_mensual + $sub->deuda_acumulada) : $sub->monto_mensual), 2);
-        $mensaje = "Hola {$sub->cliente_nombre}, le contactamos de DataPlus (Asistencia Técnica) para recordarle el pago de su servicio de Gestión Remota por un total de \${$monto} {$sub->moneda}. Recuerde enviar el comprobante de su transferencia a este mismo chat para procesarlo de inmediato. ¡Muchas gracias!";
+        $monto = number_format($sub->monto_a_cobrar, 2);
+        $cicloTxt = strtolower($sub->periodicidad_label);
+        $mensaje = "Hola {$sub->cliente_nombre}, le contactamos de DataPlus (Asistencia Técnica) para recordarle el pago {$cicloTxt} de su servicio de Gestión Remota por un total de \${$monto} {$sub->moneda}. Recuerde enviar el comprobante de su transferencia a este mismo chat para procesarlo de inmediato. ¡Muchas gracias!";
 
         /** @var ChatwootService $chatwoot */
         $chatwoot = app(ChatwootService::class);
@@ -915,8 +963,8 @@ class FacturacionGestionRemotaPage extends Page
         }
 
         $meses = $sub->meses_deuda_count ?: 1;
-        $monto = number_format((float) ($sub->monto_mensual + $sub->deuda_acumulada), 2);
-        $mensaje = "Hola {$sub->cliente_nombre}, le contactamos del equipo de DataPlus (Asistencia Técnica). Le informamos que presenta {$meses} meses pendientes de pago correspondientes a su servicio de Gestión Remota, acumulando un total de \${$monto} {$sub->moneda}. Le solicitamos realizar la liquidación o reportar su comprobante a este chat a la brevedad. Quedamos a su disposición para cualquier aclaración.";
+        $monto = number_format($sub->monto_a_cobrar, 2);
+        $mensaje = "Hola {$sub->cliente_nombre}, le contactamos del equipo de DataPlus (Asistencia Técnica). Le informamos que presenta {$meses} meses pendientes de pago correspondientes a su servicio de Gestión Remota ({$sub->periodicidad_label}), acumulando un total de \${$monto} {$sub->moneda}. Le solicitamos realizar la liquidación o reportar su comprobante a este chat a la brevedad. Quedamos a su disposición para cualquier aclaración.";
 
         /** @var ChatwootService $chatwoot */
         $chatwoot = app(ChatwootService::class);

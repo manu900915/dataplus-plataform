@@ -232,6 +232,63 @@ class UbicacionesRelationManager extends RelationManager
                                 Forms\Components\DatePicker::make('gr_ultima_recarga')
                                     ->label('Fecha de última recarga')
                                     ->native(false),
+
+                                Forms\Components\Fieldset::make('Facturación (Mensualidad y Periodicidad)')
+                                    ->columnSpanFull()
+                                    ->columns(2)
+                                    ->schema([
+                                        Forms\Components\TextInput::make('gr_mensualidad_monto')
+                                            ->label('Precio de la mensualidad')
+                                            ->numeric()
+                                            ->minValue(0)
+                                            ->step('0.01')
+                                            ->default(0)
+                                            ->prefix('$')
+                                            ->live(onBlur: true),
+
+                                        Forms\Components\Select::make('gr_mensualidad_moneda')
+                                            ->label('Moneda')
+                                            ->options([
+                                                'CUP' => 'CUP',
+                                                'USD' => 'USD',
+                                            ])
+                                            ->default('CUP')
+                                            ->native(false)
+                                            ->live(),
+
+                                        Forms\Components\Select::make('gr_periodicidad_pago')
+                                            ->label('Periodicidad de pago')
+                                            ->options([
+                                                'mensual' => 'Mensual (1 mes)',
+                                                'trimestral' => 'Trimestral (3 meses)',
+                                                'personalizado' => 'Personalizado',
+                                            ])
+                                            ->default('mensual')
+                                            ->required()
+                                            ->native(false)
+                                            ->live()
+                                            ->afterStateUpdated(function (?string $state, $set, $get) {
+                                                if ($state === 'mensual') {
+                                                    $set('gr_meses_pago', 1);
+                                                } elseif ($state === 'trimestral') {
+                                                    $set('gr_meses_pago', 3);
+                                                } elseif ($state === 'personalizado' && ((int) ($get('gr_meses_pago') ?? 0)) < 2) {
+                                                    $set('gr_meses_pago', 2);
+                                                }
+                                            }),
+
+                                        Forms\Components\TextInput::make('gr_meses_pago')
+                                            ->label('Meses (Personalizado)')
+                                            ->numeric()
+                                            ->integer()
+                                            ->minValue(1)
+                                            ->maxValue(60)
+                                            ->default(1)
+                                            ->suffix('meses')
+                                            ->live(onBlur: true)
+                                            ->visible(fn ($get) => $get('gr_periodicidad_pago') === 'personalizado')
+                                            ->required(fn ($get) => $get('gr_periodicidad_pago') === 'personalizado'),
+                                    ]),
                             ]),
                     ])
                                         ->action(function (array $data, $record): void {
@@ -258,6 +315,12 @@ class UbicacionesRelationManager extends RelationManager
                         
                         // Gestión remota
                         if ($data['tipo'] === 'Gestion_Remota') {
+                            $periodicidad = $data['gr_periodicidad_pago'] ?? 'mensual';
+                            $mesesPago = match ($periodicidad) {
+                                'trimestral' => 3,
+                                'personalizado' => max(1, (int) ($data['gr_meses_pago'] ?? 1)),
+                                default => 1,
+                            };
                             $servicioData['gr_tipo_solucion'] = $data['gr_tipo_solucion'] ?? null;
                             $servicioData['gr_sim_numero'] = $data['gr_sim_numero'] ?? null;
                             $servicioData['gr_marca_modelo'] = $data['gr_marca_modelo'] ?? null;
@@ -265,6 +328,10 @@ class UbicacionesRelationManager extends RelationManager
                             $servicioData['gr_recarga_por'] = $data['gr_recarga_por'] ?? 'Cliente';
                             $servicioData['gr_recarga_monto'] = $data['gr_recarga_monto'] ?? 360;
                             $servicioData['gr_ultima_recarga'] = $data['gr_ultima_recarga'] ?? null;
+                            $servicioData['gr_mensualidad_monto'] = $data['gr_mensualidad_monto'] ?? 0;
+                            $servicioData['gr_mensualidad_moneda'] = $data['gr_mensualidad_moneda'] ?? 'CUP';
+                            $servicioData['gr_periodicidad_pago'] = $periodicidad;
+                            $servicioData['gr_meses_pago'] = $mesesPago;
                         }
                         
                         \App\Models\Servicio::create($servicioData);

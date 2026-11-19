@@ -33,6 +33,7 @@ import {
   Cliente, 
   Moneda, 
   MetodoPagoServicio,
+  PeriodicidadPagoServicio,
   Servicio
 } from '../types';
 import { createSampleVoucher } from '../data/mockData';
@@ -76,6 +77,8 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
   const [subToEdit, setSubToEdit] = useState<SuscripcionServicio | null>(null);
   const [editTarifa, setEditTarifa] = useState<number>(0);
   const [editMoneda, setEditMoneda] = useState<Moneda>('CUP');
+  const [editPeriodicidad, setEditPeriodicidad] = useState<PeriodicidadPagoServicio>('mensual');
+  const [editMesesPeriodo, setEditMesesPeriodo] = useState<number>(1);
   const [editDeuda, setEditDeuda] = useState<number>(0);
   const [editMesesDeuda, setEditMesesDeuda] = useState<number>(0);
   const [editTelefono, setEditTelefono] = useState<string>('');
@@ -107,6 +110,8 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
   const [subSimNumero, setSubSimNumero] = useState<string>('5352849102');
   const [subMoneda, setSubMoneda] = useState<Moneda>('CUP');
   const [subTarifa, setSubTarifa] = useState<number>(3500);
+  const [subPeriodicidad, setSubPeriodicidad] = useState<PeriodicidadPagoServicio>('mensual');
+  const [subMesesPeriodo, setSubMesesPeriodo] = useState<number>(1);
   const [subNotas, setSubNotas] = useState<string>('');
 
   // Filtro temporal para el reporte gráfico
@@ -133,17 +138,33 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Helpers de periodicidad
+  const getMesesPeriodo = (sub: Pick<SuscripcionServicio, 'periodicidad_pago' | 'meses_periodo'>) => {
+    if (sub.periodicidad_pago === 'trimestral') return 3;
+    if (sub.periodicidad_pago === 'personalizado') return Math.max(1, sub.meses_periodo || 1);
+    return 1;
+  };
+
+  const getPeriodicidadLabel = (sub: Pick<SuscripcionServicio, 'periodicidad_pago' | 'meses_periodo'>) => {
+    const m = getMesesPeriodo(sub);
+    if (sub.periodicidad_pago === 'trimestral') return 'Trimestral (3m)';
+    if (sub.periodicidad_pago === 'personalizado') return `Cada ${m} ${m === 1 ? 'mes' : 'meses'}`;
+    return 'Mensual (1m)';
+  };
+
   // Abrir modal de edición para contabilidad
   const handleOpenEdit = (sub: SuscripcionServicio) => {
     setSubToEdit(sub);
     setEditTarifa(sub.tarifa_mensual);
     setEditMoneda(sub.moneda);
+    setEditPeriodicidad(sub.periodicidad_pago || 'mensual');
+    setEditMesesPeriodo(getMesesPeriodo(sub));
     setEditDeuda(sub.deuda_acumulada);
     setEditMesesDeuda(sub.meses_deuda_count || 0);
     setEditTelefono(sub.cliente_telefono || '');
     setEditSim(sub.sim_numero || '');
     setEditSolucion(sub.tipo_solucion || 'Router 4G Huawei B310');
-    setEditDiaLimite(sub.dia_pago_limite || 15);
+    setEditDiaLimite(sub.dia_limite_pago || 15);
     setEditNotas(sub.notas || '');
     setEditActivo(sub.activo);
     setIsEditModalOpen(true);
@@ -153,7 +174,8 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
   const handleSaveEdit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!subToEdit) return;
-    const montoTotal = Number(editTarifa) + Number(editDeuda);
+    const meses = editPeriodicidad === 'trimestral' ? 3 : editPeriodicidad === 'personalizado' ? Math.max(1, Number(editMesesPeriodo) || 1) : 1;
+    const montoTotal = Number(editTarifa) * meses + Number(editDeuda);
     const tieneDeuda = Number(editDeuda) > 0 || Number(editMesesDeuda) > 0;
     const estado = tieneDeuda 
       ? 'En_Mora' 
@@ -163,6 +185,8 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
       ...subToEdit,
       tarifa_mensual: Number(editTarifa),
       moneda: editMoneda,
+      periodicidad_pago: editPeriodicidad,
+      meses_periodo: meses,
       deuda_acumulada: Number(editDeuda),
       meses_deuda_count: Number(editMesesDeuda),
       monto_a_cobrar: montoTotal,
@@ -171,7 +195,7 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
       cliente_telefono: editTelefono,
       sim_numero: editSim,
       tipo_solucion: editSolucion,
-      dia_pago_limite: Number(editDiaLimite) || 15,
+      dia_limite_pago: Number(editDiaLimite) || 15,
       notas: editNotas,
       activo: editActivo
     };
@@ -193,45 +217,58 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
         const clienteTel = c?.telefono || '';
         const solucion = srv.gr_tipo_solucion || srv.gr_marca_modelo || 'Router 4G LTE Huawei B310';
         const sim = srv.gr_sim_numero || '';
-        const tarifa = srv.gr_recarga_monto ? Number(srv.gr_recarga_monto) : 0;
+        const tarifa = srv.gr_mensualidad_monto !== undefined ? Number(srv.gr_mensualidad_monto) : 0;
+        const moneda = srv.gr_mensualidad_moneda || 'CUP';
+        const periodicidad = srv.gr_periodicidad_pago || 'mensual';
+        const mesesPeriodo =
+          periodicidad === 'trimestral' ? 3 : periodicidad === 'personalizado' ? Math.max(1, Number(srv.gr_meses_pago || 1)) : 1;
 
         const subExistente = suscripciones.find(
-          s => s.cliente_id === srv.cliente_id || s.cliente_nombre.trim().toLowerCase() === clienteNombre.trim().toLowerCase()
+          s => s.servicio_id === srv.id || (!s.servicio_id && (s.cliente_id === srv.cliente_id || s.cliente_nombre.trim().toLowerCase() === clienteNombre.trim().toLowerCase()))
         );
 
         if (!subExistente) {
           const codeNumber = suscripciones.length + agregados + 1;
           const code = `SUB-${String(codeNumber).padStart(3, '0')}`;
-          const newSub: SuscripcionServicio = {
-            id: `sub-${Date.now()}-${agregados}`,
+          const newSub: Omit<SuscripcionServicio, 'id' | 'codigo'> & { codigo: string } = {
             codigo: code,
             cliente_id: srv.cliente_id,
+            servicio_id: srv.id,
             cliente_nombre: clienteNombre,
             cliente_telefono: clienteTel,
-            servicio_tipo: 'Gestion_Remota',
+            nombre_servicio: 'Gestión Remota 4G',
             tipo_solucion: solucion,
             sim_numero: sim,
-            moneda: 'CUP',
+            moneda,
             tarifa_mensual: tarifa,
-            dia_pago_limite: 15,
-            mes_adelantado: true,
+            periodicidad_pago: periodicidad,
+            meses_periodo: mesesPeriodo,
+            dia_limite_pago: 15,
             tiene_deuda: false,
             meses_deuda_count: 0,
             meses_deuda_detalle: [],
             deuda_acumulada: 0,
-            monto_a_cobrar: tarifa,
-            estado_cobro_mes_actual: 'Al_Dia',
-            activo: true,
+            monto_a_cobrar: tarifa * mesesPeriodo,
+            estado_cobro_mes_actual: 'Pendiente',
+            activo: srv.estado !== 'Inactivo',
+            fecha_inicio: srv.fecha_instalacion || new Date().toISOString().split('T')[0],
             notas: 'Sincronizado desde servicio de Gestión Remota activo.'
           };
           onAddSuscripcion(newSub);
           agregados++;
         } else {
-          // Si ya existe pero le faltan datos técnicos, actualizarlos
-          if (!subExistente.sim_numero && sim) {
-            onUpdateSuscripcion({ ...subExistente, sim_numero: sim });
-            actualizados++;
-          }
+          const newTarifa = tarifa > 0 ? tarifa : subExistente.tarifa_mensual;
+          onUpdateSuscripcion({
+            ...subExistente,
+            servicio_id: srv.id,
+            sim_numero: sim || subExistente.sim_numero,
+            moneda,
+            tarifa_mensual: newTarifa,
+            periodicidad_pago: periodicidad,
+            meses_periodo: mesesPeriodo,
+            monto_a_cobrar: newTarifa * mesesPeriodo + (subExistente.deuda_acumulada || 0),
+          });
+          actualizados++;
         }
       });
 
@@ -426,7 +463,7 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
       meses_deuda_count: saldoRestante > 0 ? 1 : 0,
       meses_deuda_detalle: saldoRestante > 0 ? ['Saldo restante pendiente'] : [],
       deuda_acumulada: saldoRestante,
-      monto_a_cobrar: saldoRestante > 0 ? saldoRestante : selectedSub.tarifa_mensual,
+      monto_a_cobrar: saldoRestante > 0 ? saldoRestante : selectedSub.tarifa_mensual * getMesesPeriodo(selectedSub),
       estado_cobro_mes_actual: saldoRestante === 0 ? 'Al_Dia' : 'Pago_Parcial',
       ultimo_pago_fecha: pagoFecha,
       ultimo_pago_monto: pagoMonto,
@@ -444,6 +481,9 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
     const cli = clientes.find(c => c.id === subClienteId) || clientes[0];
     if (!cli) return;
 
+    const mesesPeriodo =
+      subPeriodicidad === 'trimestral' ? 3 : subPeriodicidad === 'personalizado' ? Math.max(1, Number(subMesesPeriodo) || 1) : 1;
+
     onAddSuscripcion({
       cliente_id: cli.id,
       cliente_nombre: cli.nombre,
@@ -453,13 +493,17 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
       sim_numero: subSimNumero,
       moneda: subMoneda,
       tarifa_mensual: subTarifa,
+      periodicidad_pago: subPeriodicidad,
+      meses_periodo: mesesPeriodo,
+      dia_limite_pago: 15,
       deuda_acumulada: 0,
       meses_deuda_count: 0,
       meses_deuda_detalle: [],
       tiene_deuda: false,
-      monto_a_cobrar: subTarifa,
+      monto_a_cobrar: subTarifa * mesesPeriodo,
       estado_cobro_mes_actual: 'Pendiente',
       activo: true,
+      fecha_inicio: new Date().toISOString().split('T')[0],
       notas: subNotas
     });
 
@@ -544,25 +588,25 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
   const totalCobradoCUP = useMemo(() => {
     return suscripciones
       .filter(s => s.moneda === 'CUP' && s.estado_cobro_mes_actual === 'Al_Dia')
-      .reduce((acc, s) => acc + (s.ultimo_pago_monto || s.tarifa_mensual), 0);
+      .reduce((acc, s) => acc + (s.ultimo_pago_monto || s.tarifa_mensual * getMesesPeriodo(s)), 0);
   }, [suscripciones]);
 
   const metaCobroCUP = useMemo(() => {
     return suscripciones
       .filter(s => s.moneda === 'CUP')
-      .reduce((acc, s) => acc + s.tarifa_mensual, 0);
+      .reduce((acc, s) => acc + s.tarifa_mensual * getMesesPeriodo(s), 0);
   }, [suscripciones]);
 
   const totalCobradoUSD = useMemo(() => {
     return suscripciones
       .filter(s => s.moneda === 'USD' && s.estado_cobro_mes_actual === 'Al_Dia')
-      .reduce((acc, s) => acc + (s.ultimo_pago_monto || s.tarifa_mensual), 0);
+      .reduce((acc, s) => acc + (s.ultimo_pago_monto || s.tarifa_mensual * getMesesPeriodo(s)), 0);
   }, [suscripciones]);
 
   const metaCobroUSD = useMemo(() => {
     return suscripciones
       .filter(s => s.moneda === 'USD')
-      .reduce((acc, s) => acc + s.tarifa_mensual, 0);
+      .reduce((acc, s) => acc + s.tarifa_mensual * getMesesPeriodo(s), 0);
   }, [suscripciones]);
 
   // Cálculos de reportes temporales
@@ -956,11 +1000,22 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
                             </span>
                           </td>
 
-                          {/* Mensualidad */}
+                          {/* Mensualidad / Ciclo */}
                           <td className="py-3.5 px-4 font-mono font-semibold text-slate-200 whitespace-nowrap">
-                            {sub.moneda === 'USD' 
-                              ? `$${sub.tarifa_mensual}.00 USD` 
-                              : `$${sub.tarifa_mensual.toLocaleString()}.00 CUP`}
+                            <div>
+                              {sub.moneda === 'USD'
+                                ? `$${sub.tarifa_mensual}.00 USD`
+                                : `$${sub.tarifa_mensual.toLocaleString()}.00 CUP`}
+                              <span className="text-[10px] text-slate-400 font-sans">/mes</span>
+                            </div>
+                            <div className="text-[10px] font-sans text-sky-400 mt-0.5">
+                              {getPeriodicidadLabel(sub)}
+                              {getMesesPeriodo(sub) > 1 && (
+                                <span className="font-mono text-cyan-300 ml-1">
+                                  (${(sub.tarifa_mensual * getMesesPeriodo(sub)).toLocaleString()})
+                                </span>
+                              )}
+                            </div>
                           </td>
 
                           {/* Deuda Anterior */}
@@ -1643,7 +1698,7 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-medium text-slate-400 mb-1">Tarifa Mensual *</label>
+                  <label className="block text-[11px] font-medium text-slate-400 mb-1">Precio Mensualidad *</label>
                   <input
                     type="number"
                     required
@@ -1652,6 +1707,38 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
                     className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-mono font-bold text-white focus:border-sky-500 focus:outline-none"
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-400 mb-1">Periodicidad</label>
+                  <select
+                    value={subPeriodicidad}
+                    onChange={(e) => {
+                      const val = e.target.value as PeriodicidadPagoServicio;
+                      setSubPeriodicidad(val);
+                      setSubMesesPeriodo(val === 'trimestral' ? 3 : val === 'personalizado' ? Math.max(2, subMesesPeriodo || 2) : 1);
+                    }}
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-200 focus:border-sky-500 focus:outline-none"
+                  >
+                    <option value="mensual">Mensual (1 mes)</option>
+                    <option value="trimestral">Trimestral (3 meses)</option>
+                    <option value="personalizado">Personalizado</option>
+                  </select>
+                </div>
+                {subPeriodicidad === 'personalizado' && (
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-400 mb-1">Cantidad de Meses</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="60"
+                      value={subMesesPeriodo}
+                      onChange={(e) => setSubMesesPeriodo(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-mono font-bold text-white focus:border-sky-500 focus:outline-none"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end gap-2 pt-4 border-t border-slate-800">
@@ -1890,6 +1977,39 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
                 </div>
               </div>
 
+              {/* Periodicidad y Meses */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-medium mb-1">Periodicidad de Pago</label>
+                  <select
+                    value={editPeriodicidad}
+                    onChange={(e) => {
+                      const val = e.target.value as PeriodicidadPagoServicio;
+                      setEditPeriodicidad(val);
+                      setEditMesesPeriodo(val === 'trimestral' ? 3 : val === 'personalizado' ? Math.max(2, editMesesPeriodo || 2) : 1);
+                    }}
+                    className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white focus:border-sky-500 focus:outline-none"
+                  >
+                    <option value="mensual">Mensual (1 mes)</option>
+                    <option value="trimestral">Trimestral (3 meses)</option>
+                    <option value="personalizado">Personalizado</option>
+                  </select>
+                </div>
+                {editPeriodicidad === 'personalizado' && (
+                  <div>
+                    <label className="block text-slate-400 font-medium mb-1">Cantidad de Meses</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="60"
+                      value={editMesesPeriodo}
+                      onChange={(e) => setEditMesesPeriodo(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white font-mono focus:border-sky-500 focus:outline-none"
+                    />
+                  </div>
+                )}
+              </div>
+
               {/* Deuda y Meses de Mora */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -1918,9 +2038,9 @@ export const FacturacionServiciosView: React.FC<FacturacionServiciosViewProps> =
 
               {/* Cuadro de Total Exigible */}
               <div className="bg-sky-500/10 border border-sky-500/30 rounded-xl p-3 flex justify-between items-center">
-                <span className="text-slate-300 font-semibold">Total Exigible al Cliente en el mes:</span>
+                <span className="text-slate-300 font-semibold">Total Exigible al Cliente:</span>
                 <span className="font-mono text-sm font-extrabold text-sky-400">
-                  ${(Number(editTarifa) + Number(editDeuda)).toLocaleString()} {editMoneda}
+                  ${(Number(editTarifa) * (editPeriodicidad === 'trimestral' ? 3 : editPeriodicidad === 'personalizado' ? Math.max(1, editMesesPeriodo) : 1) + Number(editDeuda)).toLocaleString()} {editMoneda}
                 </span>
               </div>
 

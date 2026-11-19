@@ -237,21 +237,22 @@ class Dashboard extends Page
                 $grSubs = SuscripcionGestionRemota::where('activo', true)->get();
                 $grSubsTotal = $grSubs->count();
                 foreach ($grSubs as $sub) {
-                    $tot = (float) $sub->monto_mensual + (float) $sub->deuda_acumulada;
+                    $montoPeriodo = $sub->monto_periodo;
+                    $tot = $sub->monto_a_cobrar;
                     if ($sub->tiene_deuda || $sub->deuda_acumulada > 0) {
                         $grDeudoresCount++;
                     }
                     if ($sub->moneda === 'USD') {
                         $grDeudaUsd += (float) $sub->deuda_acumulada;
                         if ($sub->estado_cobro === 'cobrado') {
-                            $grRecaudadoUsd += (float) $sub->monto_mensual;
+                            $grRecaudadoUsd += $montoPeriodo;
                         } else {
                             $grPendienteUsd += $tot;
                         }
                     } else {
                         $grDeudaCup += (float) $sub->deuda_acumulada;
                         if ($sub->estado_cobro === 'cobrado') {
-                            $grRecaudadoCup += (float) $sub->monto_mensual;
+                            $grRecaudadoCup += $montoPeriodo;
                         } else {
                             $grPendienteCup += $tot;
                         }

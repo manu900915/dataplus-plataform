@@ -60,7 +60,11 @@ export const ServiciosView: React.FC<ServiciosViewProps> = ({
     gr_tipo_internet: 'Filtrado' as 'Abierto' | 'Filtrado' | 'Cerrado',
     gr_recarga_por: 'Nosotros' as 'Nosotros' | 'Cliente',
     gr_recarga_monto: 360,
-    gr_ultima_recarga: new Date().toISOString().split('T')[0]
+    gr_ultima_recarga: new Date().toISOString().split('T')[0],
+    gr_mensualidad_monto: 3500,
+    gr_mensualidad_moneda: 'CUP' as 'CUP' | 'USD',
+    gr_periodicidad_pago: 'mensual' as 'mensual' | 'trimestral' | 'personalizado',
+    gr_meses_pago: 1,
   });
 
   const selectedCliente = clientes.find(c => c.id === formData.cliente_id);
@@ -92,7 +96,11 @@ export const ServiciosView: React.FC<ServiciosViewProps> = ({
       gr_tipo_internet: 'Filtrado',
       gr_recarga_por: 'Nosotros',
       gr_recarga_monto: 360,
-      gr_ultima_recarga: new Date().toISOString().split('T')[0]
+      gr_ultima_recarga: new Date().toISOString().split('T')[0],
+      gr_mensualidad_monto: 3500,
+      gr_mensualidad_moneda: 'CUP',
+      gr_periodicidad_pago: 'mensual',
+      gr_meses_pago: 1,
     });
     setIsModalOpen(true);
   };
@@ -113,7 +121,11 @@ export const ServiciosView: React.FC<ServiciosViewProps> = ({
       gr_tipo_internet: s.gr_tipo_internet || 'Filtrado',
       gr_recarga_por: s.gr_recarga_por || 'Nosotros',
       gr_recarga_monto: s.gr_recarga_monto ?? 360,
-      gr_ultima_recarga: s.gr_ultima_recarga || ''
+      gr_ultima_recarga: s.gr_ultima_recarga || '',
+      gr_mensualidad_monto: s.gr_mensualidad_monto ?? 0,
+      gr_mensualidad_moneda: s.gr_mensualidad_moneda || 'CUP',
+      gr_periodicidad_pago: s.gr_periodicidad_pago || 'mensual',
+      gr_meses_pago: s.gr_meses_pago ?? (s.gr_periodicidad_pago === 'trimestral' ? 3 : 1),
     });
     setIsModalOpen(true);
   };
@@ -123,6 +135,13 @@ export const ServiciosView: React.FC<ServiciosViewProps> = ({
     const cli = clientes.find(c => c.id === formData.cliente_id);
     const ub = cli?.ubicaciones.find(u => u.id === formData.cliente_ubicacion_id);
     const brig = brigadas.find(b => b.id === formData.brigada_id);
+
+    const normalizedMeses =
+      formData.gr_periodicidad_pago === 'trimestral'
+        ? 3
+        : formData.gr_periodicidad_pago === 'personalizado'
+        ? Math.max(1, Number(formData.gr_meses_pago) || 1)
+        : 1;
 
     if (editingServicio) {
       onUpdateServicio({
@@ -144,6 +163,10 @@ export const ServiciosView: React.FC<ServiciosViewProps> = ({
         gr_recarga_por: formData.tipo === 'Gestion_Remota' ? formData.gr_recarga_por : undefined,
         gr_recarga_monto: formData.tipo === 'Gestion_Remota' ? formData.gr_recarga_monto : undefined,
         gr_ultima_recarga: formData.tipo === 'Gestion_Remota' ? formData.gr_ultima_recarga : undefined,
+        gr_mensualidad_monto: formData.tipo === 'Gestion_Remota' ? Number(formData.gr_mensualidad_monto) || 0 : undefined,
+        gr_mensualidad_moneda: formData.tipo === 'Gestion_Remota' ? formData.gr_mensualidad_moneda : undefined,
+        gr_periodicidad_pago: formData.tipo === 'Gestion_Remota' ? formData.gr_periodicidad_pago : undefined,
+        gr_meses_pago: formData.tipo === 'Gestion_Remota' ? normalizedMeses : undefined,
       });
     } else {
       onAddServicio({
@@ -164,6 +187,10 @@ export const ServiciosView: React.FC<ServiciosViewProps> = ({
         gr_recarga_por: formData.tipo === 'Gestion_Remota' ? formData.gr_recarga_por : undefined,
         gr_recarga_monto: formData.tipo === 'Gestion_Remota' ? formData.gr_recarga_monto : undefined,
         gr_ultima_recarga: formData.tipo === 'Gestion_Remota' ? formData.gr_ultima_recarga : undefined,
+        gr_mensualidad_monto: formData.tipo === 'Gestion_Remota' ? Number(formData.gr_mensualidad_monto) || 0 : undefined,
+        gr_mensualidad_moneda: formData.tipo === 'Gestion_Remota' ? formData.gr_mensualidad_moneda : undefined,
+        gr_periodicidad_pago: formData.tipo === 'Gestion_Remota' ? formData.gr_periodicidad_pago : undefined,
+        gr_meses_pago: formData.tipo === 'Gestion_Remota' ? normalizedMeses : undefined,
       });
     }
     setIsModalOpen(false);
@@ -334,9 +361,14 @@ export const ServiciosView: React.FC<ServiciosViewProps> = ({
                             <Phone className="h-3 w-3" /> SIM: {s.gr_sim_numero}
                           </p>
                         )}
-                        <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-1">
+                        <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-400 mt-1">
                           <span className="bg-slate-800 px-1.5 py-0.5 rounded">Net: {s.gr_tipo_internet || 'Filtrado'}</span>
                           <span className="bg-slate-800 px-1.5 py-0.5 rounded">Recarga: ${s.gr_recarga_monto || 360} CUP ({s.gr_recarga_por || 'Nosotros'})</span>
+                          {(s.gr_mensualidad_monto ?? 0) > 0 && (
+                            <span className="bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-1.5 py-0.5 rounded font-mono">
+                              Mensualidad: ${s.gr_mensualidad_monto} {s.gr_mensualidad_moneda || 'CUP'} ({s.gr_periodicidad_pago === 'trimestral' ? 'Trimestral 3m' : s.gr_periodicidad_pago === 'personalizado' ? `Cada ${s.gr_meses_pago || 1}m` : 'Mensual'})
+                            </span>
+                          )}
                         </div>
                       </div>
                     ) : (
@@ -577,6 +609,78 @@ export const ServiciosView: React.FC<ServiciosViewProps> = ({
                         <option value="Nosotros">Nosotros (DataPlus)</option>
                         <option value="Cliente">El Cliente</option>
                       </select>
+                    </div>
+                  </div>
+
+                  {/* Facturación: Mensualidad y Periodicidad */}
+                  <div className="pt-2 border-t border-sky-500/20 space-y-2">
+                    <p className="text-[11px] font-bold text-sky-300">Facturación (Mensualidad y Periodicidad)</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-400 mb-1">
+                          Precio Mensualidad
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={formData.gr_mensualidad_monto}
+                          onChange={(e) => setFormData({ ...formData, gr_mensualidad_monto: parseFloat(e.target.value) || 0 })}
+                          className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-mono font-bold text-emerald-400 focus:border-sky-500 focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-400 mb-1">
+                          Moneda
+                        </label>
+                        <select
+                          value={formData.gr_mensualidad_moneda}
+                          onChange={(e) => setFormData({ ...formData, gr_mensualidad_moneda: e.target.value as 'CUP' | 'USD' })}
+                          className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-200 focus:border-sky-500 focus:outline-none"
+                        >
+                          <option value="CUP">CUP</option>
+                          <option value="USD">USD</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-400 mb-1">
+                          Periodicidad de Pago
+                        </label>
+                        <select
+                          value={formData.gr_periodicidad_pago}
+                          onChange={(e) => {
+                            const val = e.target.value as 'mensual' | 'trimestral' | 'personalizado';
+                            setFormData({
+                              ...formData,
+                              gr_periodicidad_pago: val,
+                              gr_meses_pago: val === 'trimestral' ? 3 : val === 'personalizado' ? Math.max(2, formData.gr_meses_pago || 2) : 1,
+                            });
+                          }}
+                          className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-200 focus:border-sky-500 focus:outline-none"
+                        >
+                          <option value="mensual">Mensual (1 mes)</option>
+                          <option value="trimestral">Trimestral (3 meses)</option>
+                          <option value="personalizado">Personalizado</option>
+                        </select>
+                      </div>
+
+                      {formData.gr_periodicidad_pago === 'personalizado' && (
+                        <div>
+                          <label className="block text-[11px] font-medium text-slate-400 mb-1">
+                            Meses
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="60"
+                            value={formData.gr_meses_pago}
+                            onChange={(e) => setFormData({ ...formData, gr_meses_pago: Math.max(1, parseInt(e.target.value) || 1) })}
+                            className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-mono text-slate-200 focus:border-sky-500 focus:outline-none"
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

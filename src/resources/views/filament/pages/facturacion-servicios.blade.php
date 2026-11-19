@@ -728,7 +728,7 @@
                                 <th>Código</th>
                                 <th>Cliente / Teléfono</th>
                                 <th>Solución / SIM</th>
-                                <th style="text-align: right;">Mensualidad</th>
+                                <th style="text-align: right;">Mensualidad / Ciclo</th>
                                 <th style="text-align: right;">Deuda Previa</th>
                                 <th style="text-align: right; color: #ffffff;">Total Exigible</th>
                                 <th style="text-align: center;">Estado</th>
@@ -741,6 +741,7 @@
                                     $esMora = $sub->estado_cobro_mes_actual === 'En_Mora' || $sub->tiene_deuda;
                                     $esCobrado = $sub->estado_cobro_mes_actual === 'Al_Dia';
                                     $esPendiente = $sub->estado_cobro_mes_actual === 'Pendiente';
+                                    $ubicacionNombre = $sub->servicio?->ubicacion?->nombre;
                                 @endphp
                                 <tr>
                                     <td style="font-family: ui-monospace, monospace; font-weight: 700; color: #38bdf8;">
@@ -758,10 +759,19 @@
                                         <div style="color: #f1f5f9; font-weight: 500;">{{ $sub->tipo_solucion ?: $sub->nombre_servicio }}</div>
                                         <div style="font-size: 0.7rem; color: #64748b; font-family: ui-monospace, monospace; margin-top: 2px;">
                                             SIM: {{ $sub->sim_numero ?: 'Sin asignar' }}
+                                            @if($ubicacionNombre)
+                                                · {{ $ubicacionNombre }}
+                                            @endif
                                         </div>
                                     </td>
                                     <td style="text-align: right; font-family: ui-monospace, monospace; font-weight: 600; color: #e2e8f0;">
-                                        ${{ number_format($sub->tarifa_mensual, 2) }} {{ $sub->moneda }}
+                                        <div>${{ number_format($sub->tarifa_mensual, 2) }} {{ $sub->moneda }}/mes</div>
+                                        <div style="font-size: 0.68rem; color: #38bdf8; font-family: sans-serif; margin-top: 2px;">
+                                            {{ $sub->periodicidad_label }}
+                                            @if($sub->meses_facturacion > 1)
+                                                · <strong style="font-family: ui-monospace, monospace; color: #a5f3fc;">${{ number_format($sub->monto_periodo, 2) }}</strong>
+                                            @endif
+                                        </div>
                                     </td>
                                     <td style="text-align: right; font-family: ui-monospace, monospace;">
                                         @if($sub->tiene_deuda && $sub->deuda_acumulada > 0)
@@ -1390,6 +1400,10 @@
                                 <span style="color: #ffffff;">{{ $reciboActual['servicio_nombre'] ?? 'Gestión Remota' }}</span>
                             </div>
                             <div style="display: flex; justify-content: space-between;">
+                                <span style="color: #64748b;">Periodicidad:</span>
+                                <span style="color: #38bdf8;">{{ $reciboActual['periodicidad'] ?? 'Mensual (1 mes)' }}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
                                 <span style="color: #64748b;">Mes Liquidado:</span>
                                 <span style="color: #ffffff;">{{ $reciboActual['mes_nombre'] ?? 'Octubre 2026' }}</span>
                             </div>
@@ -1498,15 +1512,47 @@
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
                             <div class="dp-input-group">
                                 <label class="dp-input-label">Moneda</label>
-                                <select wire:model="newSubMoneda" class="dp-input-field dp-select-field">
+                                <select wire:model.live="newSubMoneda" class="dp-input-field dp-select-field">
                                     <option value="CUP">Pesos Cubanos (CUP)</option>
                                     <option value="USD">Dólares (USD)</option>
                                 </select>
                             </div>
                             <div class="dp-input-group">
-                                <label class="dp-input-label">Tarifa Mensual</label>
-                                <input wire:model="newSubMonto" type="number" step="0.01" class="dp-input-field" style="font-family: monospace; font-weight: 700; color: #38bdf8;" />
+                                <label class="dp-input-label">Precio Mensualidad</label>
+                                <input wire:model.live="newSubMonto" type="number" step="0.01" min="0" class="dp-input-field" style="font-family: monospace; font-weight: 700; color: #38bdf8;" />
                             </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: {{ $newSubPeriodicidad === 'personalizado' ? '2fr 1fr' : '1fr' }}; gap: 0.75rem;">
+                            <div class="dp-input-group">
+                                <label class="dp-input-label">Periodicidad de Pago</label>
+                                <select wire:model.live="newSubPeriodicidad" class="dp-input-field dp-select-field">
+                                    <option value="mensual">Mensual (1 mes)</option>
+                                    <option value="trimestral">Trimestral (3 meses)</option>
+                                    <option value="personalizado">Personalizado</option>
+                                </select>
+                            </div>
+                            @if($newSubPeriodicidad === 'personalizado')
+                                <div class="dp-input-group">
+                                    <label class="dp-input-label">Meses</label>
+                                    <input wire:model.live="newSubMesesPeriodo" type="number" step="1" min="1" max="60" class="dp-input-field" style="font-family: monospace; font-weight: 700;" />
+                                </div>
+                            @endif
+                        </div>
+
+                        @php
+                            $newCalcMeses = match($newSubPeriodicidad) {
+                                'trimestral' => 3,
+                                'personalizado' => max(1, intval($newSubMesesPeriodo)),
+                                default => 1,
+                            };
+                            $newCalcTotal = max(0, floatval($newSubMonto)) * $newCalcMeses;
+                        @endphp
+                        <div style="background: rgba(30, 41, 59, 0.4); border: 1px dashed rgba(56, 189, 248, 0.3); border-radius: 0.5rem; padding: 0.55rem 0.85rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem;">
+                            <span style="color: #94a3b8;">Total por ciclo ({{ $newCalcMeses }} {{ $newCalcMeses === 1 ? 'mes' : 'meses' }}):</span>
+                            <span style="font-family: monospace; font-size: 0.95rem; font-weight: 800; color: #38bdf8;">
+                                ${{ number_format($newCalcTotal, 2) }} {{ $newSubMoneda }}
+                            </span>
                         </div>
 
                         <div class="dp-input-group">
@@ -1541,7 +1587,7 @@
                             <div>
                                 <h3 class="dp-modal-title">Editar Parámetros de Facturación</h3>
                                 <p style="font-size: 0.75rem; color: #94a3b8; margin: 0.2rem 0 0;">
-                                    Asignar mensualidad, deuda previa y datos técnicos del cliente
+                                    Asignar mensualidad, periodicidad, deuda previa y datos técnicos del cliente
                                 </p>
                             </div>
                         </div>
@@ -1567,23 +1613,41 @@
                         {{-- Mensualidad y Moneda --}}
                         <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 0.75rem;">
                             <div class="dp-input-group">
-                                <label class="dp-input-label">Mensualidad a Cobrar</label>
-                                <input wire:model="editSubMonto" type="number" step="0.01" min="0" class="dp-input-field" style="font-family: monospace; font-weight: 800; font-size: 0.95rem; color: #34d399;" />
+                                <label class="dp-input-label">Precio de la Mensualidad (1 mes)</label>
+                                <input wire:model.live="editSubMonto" type="number" step="0.01" min="0" class="dp-input-field" style="font-family: monospace; font-weight: 800; font-size: 0.95rem; color: #34d399;" />
                             </div>
                             <div class="dp-input-group">
                                 <label class="dp-input-label">Moneda</label>
-                                <select wire:model="editSubMoneda" class="dp-input-field dp-select-field">
+                                <select wire:model.live="editSubMoneda" class="dp-input-field dp-select-field">
                                     <option value="CUP">CUP ($)</option>
                                     <option value="USD">USD ($)</option>
                                 </select>
                             </div>
                         </div>
 
+                        {{-- Periodicidad de Pago --}}
+                        <div style="display: grid; grid-template-columns: {{ $editSubPeriodicidad === 'personalizado' ? '2fr 1fr' : '1fr' }}; gap: 0.75rem;">
+                            <div class="dp-input-group">
+                                <label class="dp-input-label">Periodicidad de Pago</label>
+                                <select wire:model.live="editSubPeriodicidad" class="dp-input-field dp-select-field">
+                                    <option value="mensual">Mensual (1 mes)</option>
+                                    <option value="trimestral">Trimestral (3 meses)</option>
+                                    <option value="personalizado">Personalizado</option>
+                                </select>
+                            </div>
+                            @if($editSubPeriodicidad === 'personalizado')
+                                <div class="dp-input-group">
+                                    <label class="dp-input-label">Cantidad de Meses</label>
+                                    <input wire:model.live="editSubMesesPeriodo" type="number" step="1" min="1" max="60" class="dp-input-field" style="font-family: monospace; font-weight: 700;" />
+                                </div>
+                            @endif
+                        </div>
+
                         {{-- Deuda Previa y Meses de Mora --}}
                         <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 0.75rem;">
                             <div class="dp-input-group">
                                 <label class="dp-input-label">Deuda Previa Acumulada</label>
-                                <input wire:model="editSubDeuda" type="number" step="0.01" min="0" class="dp-input-field" style="font-family: monospace; font-weight: 800; font-size: 0.95rem; color: #fb7185;" />
+                                <input wire:model.live="editSubDeuda" type="number" step="0.01" min="0" class="dp-input-field" style="font-family: monospace; font-weight: 800; font-size: 0.95rem; color: #fb7185;" />
                             </div>
                             <div class="dp-input-group">
                                 <label class="dp-input-label">Meses de Mora</label>
@@ -1593,12 +1657,23 @@
 
                         {{-- Cuadro Informativo de Total Exigible --}}
                         @php
-                            $calcMonto = floatval($editSubMonto);
-                            $calcDeuda = floatval($editSubDeuda);
-                            $calcTotal = $calcMonto + $calcDeuda;
+                            $calcMonto = max(0, floatval($editSubMonto));
+                            $calcMeses = match($editSubPeriodicidad) {
+                                'trimestral' => 3,
+                                'personalizado' => max(1, intval($editSubMesesPeriodo)),
+                                default => 1,
+                            };
+                            $calcPeriodo = $calcMonto * $calcMeses;
+                            $calcDeuda = max(0, floatval($editSubDeuda));
+                            $calcTotal = $calcPeriodo + $calcDeuda;
                         @endphp
                         <div style="background: rgba(30, 41, 59, 0.4); border: 1px dashed rgba(56, 189, 248, 0.3); border-radius: 0.5rem; padding: 0.65rem 0.85rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem;">
-                            <span style="color: #94a3b8;">Total Exigible al Cliente en el mes:</span>
+                            <div>
+                                <div style="color: #94a3b8;">Total Exigible al Cliente:</div>
+                                <div style="font-size: 0.7rem; color: #64748b; font-family: monospace;">
+                                    (${{ number_format($calcMonto, 2) }} × {{ $calcMeses }}m = ${{ number_format($calcPeriodo, 2) }}) + Deuda ${{ number_format($calcDeuda, 2) }}
+                                </div>
+                            </div>
                             <span style="font-family: monospace; font-size: 1rem; font-weight: 800; color: #38bdf8;">
                                 ${{ number_format($calcTotal, 2) }} {{ $editSubMoneda }}
                             </span>

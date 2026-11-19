@@ -215,6 +215,10 @@ export interface Servicio {
   gr_recarga_por?: 'Nosotros' | 'Cliente';
   gr_recarga_monto?: number;
   gr_ultima_recarga?: string;
+  gr_mensualidad_monto?: number;
+  gr_mensualidad_moneda?: Moneda;
+  gr_periodicidad_pago?: PeriodicidadPagoServicio;
+  gr_meses_pago?: number;
 }
 
 export interface Contrato {
@@ -268,6 +272,7 @@ export interface UserAccount {
 export type Moneda = 'CUP' | 'USD';
 export type MetodoPagoServicio = 'Transferencia' | 'Efectivo';
 export type EstadoCobroServicio = 'Al_Dia' | 'Pendiente' | 'En_Mora' | 'Pago_Parcial';
+export type PeriodicidadPagoServicio = 'mensual' | 'trimestral' | 'personalizado';
 
 export interface SuscripcionServicio {
   id: string;
@@ -282,6 +287,8 @@ export interface SuscripcionServicio {
   sim_numero?: string;
   moneda: Moneda;
   tarifa_mensual: number;
+  periodicidad_pago?: PeriodicidadPagoServicio;
+  meses_periodo?: number;
   dia_limite_pago: number; // Por defecto 15 (primeros 15 días del mes)
   activo: boolean;
   fecha_inicio: string;

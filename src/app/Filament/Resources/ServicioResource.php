@@ -10,6 +10,7 @@ use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
+use Filament\Forms\Set;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -434,6 +435,88 @@ class ServicioResource extends Resource
                     Forms\Components\DatePicker::make('gr_ultima_recarga')
                         ->label('Última recarga')
                         ->native(false),
+
+                    Forms\Components\Fieldset::make('Facturación del Servicio (Mensualidad y Periodicidad)')
+                        ->columnSpanFull()
+                        ->columns(4)
+                        ->schema([
+                            Forms\Components\TextInput::make('gr_mensualidad_monto')
+                                ->label('Precio de la mensualidad')
+                                ->numeric()
+                                ->minValue(0)
+                                ->step('0.01')
+                                ->default(0)
+                                ->prefix('$')
+                                ->live(onBlur: true)
+                                ->helperText('Tarifa base correspondiente a 1 mes.'),
+
+                            Forms\Components\Select::make('gr_mensualidad_moneda')
+                                ->label('Moneda')
+                                ->options([
+                                    'CUP' => 'CUP',
+                                    'USD' => 'USD',
+                                ])
+                                ->default('CUP')
+                                ->native(false)
+                                ->live(),
+
+                            Forms\Components\Select::make('gr_periodicidad_pago')
+                                ->label('Periodicidad de pago')
+                                ->options([
+                                    'mensual'       => 'Mensual (1 mes)',
+                                    'trimestral'    => 'Trimestral (3 meses)',
+                                    'personalizado' => 'Personalizado',
+                                ])
+                                ->default('mensual')
+                                ->required()
+                                ->native(false)
+                                ->live()
+                                ->afterStateUpdated(function (?string $state, Set $set, Get $get) {
+                                    if ($state === 'mensual') {
+                                        $set('gr_meses_pago', 1);
+                                    } elseif ($state === 'trimestral') {
+                                        $set('gr_meses_pago', 3);
+                                    } elseif ($state === 'personalizado' && ((int) ($get('gr_meses_pago') ?? 0)) < 2) {
+                                        $set('gr_meses_pago', 2);
+                                    }
+                                }),
+
+                            Forms\Components\TextInput::make('gr_meses_pago')
+                                ->label('Meses (Personalizado)')
+                                ->numeric()
+                                ->integer()
+                                ->minValue(1)
+                                ->maxValue(60)
+                                ->default(1)
+                                ->suffix('meses')
+                                ->live(onBlur: true)
+                                ->visible(fn (Get $get) => $get('gr_periodicidad_pago') === 'personalizado')
+                                ->required(fn (Get $get) => $get('gr_periodicidad_pago') === 'personalizado'),
+
+                            Forms\Components\Placeholder::make('gr_calculo_facturacion')
+                                ->label('Vista previa en Facturación')
+                                ->columnSpanFull()
+                                ->content(function (Get $get): string {
+                                    $monto = max(0, (float) ($get('gr_mensualidad_monto') ?? 0));
+                                    $moneda = $get('gr_mensualidad_moneda') ?: 'CUP';
+                                    $periodicidad = $get('gr_periodicidad_pago') ?: 'mensual';
+                                    $meses = match ($periodicidad) {
+                                        'trimestral' => 3,
+                                        'personalizado' => max(1, (int) ($get('gr_meses_pago') ?: 1)),
+                                        default => 1,
+                                    };
+                                    $etiqueta = match ($periodicidad) {
+                                        'trimestral' => 'Trimestral',
+                                        'personalizado' => 'Personalizado',
+                                        default => 'Mensual',
+                                    };
+                                    $total = $monto * $meses;
+                                    return '$' . number_format($monto, 2) . " {$moneda}/mes × {$meses} "
+                                        . ($meses === 1 ? 'mes' : 'meses')
+                                        . " ({$etiqueta}) = Total por ciclo: $"
+                                        . number_format($total, 2) . " {$moneda}";
+                                }),
+                        ]),
                 ]),
 
             // ─── 6. Documentos de Referencia (documentos o imágenes) ───
@@ -506,6 +589,24 @@ class ServicioResource extends Resource
                     })
                     ->badge()
                     ->color('gray'),
+
+                Tables\Columns\TextColumn::make('facturacion_gr')
+                    ->label('Mensualidad / Ciclo')
+                    ->getStateUsing(function ($record): string {
+                        if ($record->tipo !== 'Gestion_Remota') {
+                            return '—';
+                        }
+                        $monto = (float) ($record->gr_mensualidad_monto ?? 0);
+                        $moneda = $record->gr_mensualidad_moneda ?: 'CUP';
+                        $meses = $record->getGrMesesFacturacion();
+                        $ciclo = match ($record->getGrPeriodicidadNormalizada()) {
+                            'trimestral' => 'Trimestral (3m)',
+                            'personalizado' => "Cada {$meses}m",
+                            default => 'Mensual',
+                        };
+                        return '$' . number_format($monto, 2) . " {$moneda} · {$ciclo}";
+                    })
+                    ->toggleable(),
 
                 Tables\Columns\BadgeColumn::make('estado')
                     ->colors([
