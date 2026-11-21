@@ -13,6 +13,7 @@ import {
   DollarSign, 
   History, 
   ListFilter,
+  Image as ImageIcon,
   X
 } from 'lucide-react';
 import { ItemInventario, Almacen, InventarioMovimiento, MovementType } from '../types';
@@ -22,9 +23,14 @@ interface InventarioViewProps {
   almacenes: Almacen[];
   movimientos: InventarioMovimiento[];
   onAddItem: (item: ItemInventario) => void;
-  onAddMovimiento: (mov: InventarioMovimiento) => void;
-  quickRestockItem: ItemInventario | null;
-  onClearQuickRestock: () => void;
+  onUpdateItem?: (item: ItemInventario) => void;
+  onDeleteItem?: (id: string) => void;
+  onAddMovimiento?: (mov: InventarioMovimiento) => void;
+  onRegisterMovement?: (mov: Omit<InventarioMovimiento, 'id' | 'fecha'>) => void;
+  quickRestockItem?: ItemInventario | null;
+  highlightItem?: ItemInventario | null;
+  onClearQuickRestock?: () => void;
+  onClearHighlight?: () => void;
 }
 
 export const InventarioView: React.FC<InventarioViewProps> = ({
@@ -33,9 +39,18 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
   movimientos,
   onAddItem,
   onAddMovimiento,
+  onRegisterMovement,
   quickRestockItem,
+  highlightItem,
   onClearQuickRestock,
+  onClearHighlight,
 }) => {
+  const activeQuickItem = quickRestockItem || highlightItem || null;
+  const clearQuickItem = () => {
+    onClearQuickRestock?.();
+    onClearHighlight?.();
+  };
+
   const [activeTab, setActiveTab] = useState<'items' | 'movimientos'>('items');
   const [searchTerm, setSearchTerm] = useState('');
   const [almacenFilter, setAlmacenFilter] = useState('todos');
@@ -47,29 +62,31 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
   const [newCodigo, setNewCodigo] = useState(`ITM-${Date.now().toString().slice(-4)}`);
   const [newNombre, setNewNombre] = useState('');
   const [newEsEquip, setNewEsEquip] = useState(true);
-  const [newPrecio, setNewPrecio] = useState(100);
+  const [newCosto, setNewCosto] = useState(100);
+  const [newMargen, setNewMargen] = useState(60);
   const [newStock, setNewStock] = useState(10);
   const [newStockMin, setNewStockMin] = useState(5);
   const [newUnidad, setNewUnidad] = useState('u');
   const [newSerie, setNewSerie] = useState('');
   const [newAlmacenId, setNewAlmacenId] = useState(almacenes[0]?.id || '');
   const [newDesc, setNewDesc] = useState('');
+  const [newImagen, setNewImagen] = useState<string>('');
 
   // Movement Modal
   const [showMovementModal, setShowMovementModal] = useState(false);
-  const [movItemId, setMovItemId] = useState(quickRestockItem ? quickRestockItem.id : items[0]?.id || '');
+  const [movItemId, setMovItemId] = useState(activeQuickItem ? activeQuickItem.id : items[0]?.id || '');
   const [movTipo, setMovTipo] = useState<MovementType>('entrada');
   const [movCantidad, setMovCantidad] = useState(5);
   const [movMotivo, setMovMotivo] = useState('Reabastecimiento de stock');
 
   React.useEffect(() => {
-    if (quickRestockItem) {
-      setMovItemId(quickRestockItem.id);
+    if (activeQuickItem) {
+      setMovItemId(activeQuickItem.id);
       setMovTipo('entrada');
       setMovMotivo('Reposición por alerta de stock bajo');
       setShowMovementModal(true);
     }
-  }, [quickRestockItem]);
+  }, [activeQuickItem]);
 
   const filteredItems = items.filter((item) => {
     const matchesSearch =
@@ -93,18 +110,31 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
       if (e.key === 'Escape') {
         setShowMovementModal(false);
         setShowItemModal(false);
-        if (onClearQuickRestock) onClearQuickRestock();
+        clearQuickItem();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClearQuickRestock]);
+  }, []);
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setNewImagen(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleCreateItem = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newNombre || !newCodigo) return;
 
     const alm = almacenes.find(a => a.id === newAlmacenId) || almacenes[0];
+    const precioVenta = Math.round(newCosto * (1 + newMargen / 100) * 100) / 100;
 
     const newItem: ItemInventario = {
       id: `itm-${Date.now()}`,
@@ -113,14 +143,18 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
       categoria_id: newEsEquip ? 'cat-eq' : 'cat-mat',
       categoria_nombre: newEsEquip ? 'Equipamiento' : 'Material',
       descripcion: newDesc,
+      imagen: newImagen || undefined,
       unidad_medida: newUnidad,
-      precio_unitario: newPrecio,
+      precio_costo: newCosto,
+      margen_ganancia: newMargen,
+      precio_venta: precioVenta,
+      precio_unitario: precioVenta,
       stock_actual: newStock,
       stock_minimo: newStockMin,
       es_equipamiento: newEsEquip,
       numero_serie: newSerie || undefined,
-      almacen_id: alm.id,
-      almacen_nombre: alm.nombre
+      almacen_id: alm?.id || '',
+      almacen_nombre: alm?.nombre || 'Almacén Principal'
     };
 
     onAddItem(newItem);
@@ -128,6 +162,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
     setNewNombre('');
     setNewDesc('');
     setNewSerie('');
+    setNewImagen('');
   };
 
   const handleCreateMovimiento = (e: React.FormEvent) => {
@@ -135,23 +170,29 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
     const item = items.find(i => i.id === movItemId);
     if (!item) return;
 
-    const newMov: InventarioMovimiento = {
-      id: `mov-${Date.now()}`,
-      fecha: new Date().toISOString().replace('T', ' ').slice(0, 16),
+    const newMovPayload = {
       item_id: item.id,
       item_nombre: item.nombre,
       almacen_id: item.almacen_id,
       almacen_nombre: item.almacen_nombre,
       tipo: movTipo,
       cantidad: movCantidad,
-      costo_unitario: item.precio_unitario,
+      costo_unitario: item.precio_costo ?? item.precio_unitario,
       motivo: movMotivo,
       usuario: 'Administrador'
     };
 
-    onAddMovimiento(newMov);
+    if (onRegisterMovement) {
+      onRegisterMovement(newMovPayload);
+    } else if (onAddMovimiento) {
+      onAddMovimiento({
+        ...newMovPayload,
+        id: `mov-${Date.now()}`,
+        fecha: new Date().toISOString().replace('T', ' ').slice(0, 16),
+      });
+    }
     setShowMovementModal(false);
-    onClearQuickRestock();
+    clearQuickItem();
   };
 
   return (
@@ -171,7 +212,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={() => {
-              onClearQuickRestock();
+              clearQuickItem();
               setShowMovementModal(true);
             }}
             className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold px-3 py-2 text-xs transition-colors cursor-pointer"
@@ -277,11 +318,12 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-slate-800 bg-slate-950/80 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                   <tr>
+                    <th className="px-4 py-3">Foto</th>
                     <th className="px-4 py-3">Código</th>
                     <th className="px-4 py-3">Nombre & Descripción</th>
                     <th className="px-4 py-3">Categoría</th>
                     <th className="px-4 py-3">Almacén</th>
-                    <th className="px-4 py-3 text-right">Precio Unit.</th>
+                    <th className="px-4 py-3 text-right">Precio Venta</th>
                     <th className="px-4 py-3 text-center">Stock Actual</th>
                     <th className="px-4 py-3 text-center">Stock Mín.</th>
                     <th className="px-4 py-3 text-center">Acciones</th>
@@ -293,6 +335,19 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                       const isLow = item.stock_actual <= item.stock_minimo;
                       return (
                         <tr key={item.id} className="hover:bg-slate-800/40 transition-colors">
+                          <td className="px-4 py-3">
+                            {item.imagen ? (
+                              <img
+                                src={item.imagen}
+                                alt={item.nombre}
+                                className="h-10 w-10 rounded-lg object-cover border border-slate-700"
+                              />
+                            ) : (
+                              <div className="h-10 w-10 rounded-lg border border-dashed border-slate-700 bg-slate-950/60 flex items-center justify-center text-slate-600">
+                                <ImageIcon className="h-4 w-4" />
+                              </div>
+                            )}
+                          </td>
                           <td className="px-4 py-3 font-mono font-bold text-teal-400">
                             {item.codigo}
                             {item.numero_serie && (
@@ -318,7 +373,10 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                             {item.almacen_nombre}
                           </td>
                           <td className="px-4 py-3 text-right font-mono font-medium text-white">
-                            ${item.precio_unitario.toFixed(2)}
+                            ${(item.precio_venta ?? item.precio_unitario).toFixed(2)}
+                            {item.margen_ganancia !== undefined && (
+                              <div className="text-[10px] text-emerald-400">+{item.margen_ganancia}% margen</div>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-center">
                             <span className={`inline-flex items-center gap-1 font-mono font-bold px-2 py-0.5 rounded text-xs ${
@@ -350,7 +408,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                     })
                   ) : (
                     <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
+                      <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
                         No se encontraron ítems con los filtros aplicados.
                       </td>
                     </tr>
@@ -420,7 +478,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
 
       {/* Movement Modal */}
       {showMovementModal && (
-        <div onClick={() => { setShowMovementModal(false); if (onClearQuickRestock) onClearQuickRestock(); }} className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm cursor-pointer">
+        <div onClick={() => { setShowMovementModal(false); clearQuickItem(); }} className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm cursor-pointer">
           <div onClick={(e) => e.stopPropagation()} className="w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden cursor-default">
             <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 bg-slate-950/60">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
@@ -430,7 +488,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
               <button
                 onClick={() => {
                   setShowMovementModal(false);
-                  onClearQuickRestock();
+                  clearQuickItem();
                 }}
                 className="text-slate-400 hover:text-white"
               >
@@ -507,7 +565,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                   type="button"
                   onClick={() => {
                     setShowMovementModal(false);
-                    onClearQuickRestock();
+                    clearQuickItem();
                   }}
                   className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-medium text-slate-300 hover:bg-slate-700 cursor-pointer"
                 >
@@ -588,18 +646,47 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-[11px] font-medium text-slate-400 mb-1">
-                    Precio Unitario ($)
+                    Precio Costo ($)
                   </label>
                   <input
                     type="number"
                     min="0"
                     step="0.01"
                     required
-                    value={newPrecio}
-                    onChange={(e) => setNewPrecio(parseFloat(e.target.value) || 0)}
+                    value={newCosto}
+                    onChange={(e) => setNewCosto(parseFloat(e.target.value) || 0)}
                     className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-mono text-slate-200 focus:border-teal-500 focus:outline-none"
                   />
                 </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-400 mb-1">
+                    Margen (%)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="1000"
+                    step="0.1"
+                    required
+                    value={newMargen}
+                    onChange={(e) => setNewMargen(parseFloat(e.target.value) || 0)}
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-mono text-emerald-400 focus:border-teal-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-400 mb-1">
+                    P. Venta Calc. ($)
+                  </label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={(newCosto * (1 + newMargen / 100)).toFixed(2)}
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2 text-xs font-mono text-teal-400 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-medium text-slate-400 mb-1">
                     Stock Inicial
@@ -654,6 +741,42 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                     onChange={(e) => setNewSerie(e.target.value)}
                     className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-mono text-slate-200 focus:border-teal-500 focus:outline-none"
                   />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-medium text-slate-400 mb-1">
+                  Imagen del Producto (Opcional)
+                </label>
+                <div className="flex items-center gap-3">
+                  {newImagen ? (
+                    <img
+                      src={newImagen}
+                      alt="Vista previa"
+                      className="h-14 w-14 rounded-lg object-cover border border-slate-700"
+                    />
+                  ) : (
+                    <div className="h-14 w-14 rounded-lg border border-dashed border-slate-700 bg-slate-950 flex items-center justify-center text-slate-500">
+                      <ImageIcon className="h-5 w-5" />
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageFileChange}
+                      className="block w-full text-xs text-slate-400 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-800 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-teal-300 hover:file:bg-slate-700 cursor-pointer"
+                    />
+                    {newImagen && (
+                      <button
+                        type="button"
+                        onClick={() => setNewImagen('')}
+                        className="mt-1 text-[11px] text-rose-400 hover:underline"
+                      >
+                        Quitar imagen
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 

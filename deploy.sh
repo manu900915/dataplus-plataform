@@ -75,8 +75,9 @@ docker compose -f "$COMPOSE_FILE" run --rm app php artisan migrate --force
 log "Relanzando servicios..."
 docker compose -f "$COMPOSE_FILE" up -d
 
-# 7) Caches de producción
+# 7) Enlace público de almacenamiento (imágenes de productos) y caches de producción
 log "Optimizando Laravel..."
+docker compose -f "$COMPOSE_FILE" exec -T app php artisan storage:link || true
 docker compose -f "$COMPOSE_FILE" exec -T app php artisan config:cache
 docker compose -f "$COMPOSE_FILE" exec -T app php artisan route:cache
 docker compose -f "$COMPOSE_FILE" exec -T app php artisan view:cache

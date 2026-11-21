@@ -664,10 +664,80 @@ export const App: React.FC = () => {
                 ventas={ventas}
                 gastos={gastos}
                 clientes={clientes}
+                items={items}
+                almacenes={almacenes}
                 servicios={servicios}
                 suscripciones={suscripciones}
                 pagosServicio={pagosServicio}
-                onAddVenta={(v) => setVentas([...ventas, { ...v, id: `vta-${Date.now()}`, codigo: `VTA-${String(ventas.length + 1).padStart(3, '0')}` }])}
+                onAddVenta={(v) => {
+                  const codigo = `VTA-${new Date().getFullYear()}-${String(ventas.length + 1).padStart(4, '0')}`;
+                  const nuevaVenta: Venta = { ...v, id: `vta-${Date.now()}`, codigo };
+                  setVentas((prev) => [nuevaVenta, ...prev]);
+
+                  if ((v.estado === 'completada' || v.estado === 'cobrado') && v.items && v.items.length > 0) {
+                    const nuevasSalidas: InventarioMovimiento[] = v.items.map((line, idx) => ({
+                      id: `mov-vta-${Date.now()}-${idx}`,
+                      fecha: new Date().toISOString().replace('T', ' ').slice(0, 16),
+                      item_id: line.item_id,
+                      item_nombre: line.item_nombre,
+                      almacen_id: line.almacen_id || v.almacen_id || '',
+                      almacen_nombre: line.almacen_nombre || v.almacen_nombre || 'Almacén Principal',
+                      tipo: 'salida',
+                      cantidad: line.cantidad,
+                      costo_unitario: line.precio_costo_unitario,
+                      motivo: `Venta ${codigo} — ${v.cliente_nombre}`,
+                      usuario: 'Vendedor',
+                    }));
+
+                    setMovimientos((prev) => [...nuevasSalidas, ...prev]);
+                    setItems((prev) =>
+                      prev.map((it) => {
+                        const qtySold = v.items!
+                          .filter((l) => l.item_id === it.id)
+                          .reduce((sum, l) => sum + l.cantidad, 0);
+                        return qtySold > 0
+                          ? { ...it, stock_actual: Math.max(0, it.stock_actual - qtySold) }
+                          : it;
+                      })
+                    );
+                  }
+                }}
+                onAnularVenta={(ventaId) => {
+                  const target = ventas.find((v) => v.id === ventaId);
+                  if (!target || target.estado === 'anulada' || target.estado === 'anulado') return;
+
+                  setVentas((prev) =>
+                    prev.map((v) => (v.id === ventaId ? { ...v, estado: 'anulada' } : v))
+                  );
+
+                  if (target.items && target.items.length > 0 && target.estado !== 'pendiente') {
+                    const devoluciones: InventarioMovimiento[] = target.items.map((line, idx) => ({
+                      id: `mov-dev-${Date.now()}-${idx}`,
+                      fecha: new Date().toISOString().replace('T', ' ').slice(0, 16),
+                      item_id: line.item_id,
+                      item_nombre: line.item_nombre,
+                      almacen_id: line.almacen_id || target.almacen_id || '',
+                      almacen_nombre: line.almacen_nombre || target.almacen_nombre || 'Almacén Principal',
+                      tipo: 'devolucion',
+                      cantidad: line.cantidad,
+                      costo_unitario: line.precio_costo_unitario,
+                      motivo: `Anulación Venta ${target.codigo}`,
+                      usuario: 'Administrador',
+                    }));
+
+                    setMovimientos((prev) => [...devoluciones, ...prev]);
+                    setItems((prev) =>
+                      prev.map((it) => {
+                        const qtyRestored = target.items!
+                          .filter((l) => l.item_id === it.id)
+                          .reduce((sum, l) => sum + l.cantidad, 0);
+                        return qtyRestored > 0
+                          ? { ...it, stock_actual: it.stock_actual + qtyRestored }
+                          : it;
+                      })
+                    );
+                  }
+                }}
                 onAddGasto={(g) => setGastos([...gastos, { ...g, id: `gst-${Date.now()}`, codigo: `GST-${String(gastos.length + 1).padStart(3, '0')}` }])}
                 onAddPagoServicio={handleAddPagoServicio}
                 onAddSuscripcion={handleAddSuscripcion}

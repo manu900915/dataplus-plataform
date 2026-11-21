@@ -90,7 +90,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const equipamientoStockTotal = items.filter(i => i.es_equipamiento).reduce((acc, i) => acc + i.stock_actual, 0);
   const materialesStockTotal = items.filter(i => !i.es_equipamiento).reduce((acc, i) => acc + i.stock_actual, 0);
 
-  const totalVentas = ventas.reduce((acc, v) => acc + (v.estado === 'cobrado' ? v.monto_total : 0), 0);
+  const totalVentas = ventas.reduce(
+    (acc, v) => acc + (v.estado === 'cobrado' || v.estado === 'completada' ? v.monto_total : 0),
+    0
+  );
   const totalGastos = gastos.reduce((acc, g) => acc + g.monto, 0);
 
   const serviciosCCTV = servicios.filter(s => s.tipo === 'CCTV').length;

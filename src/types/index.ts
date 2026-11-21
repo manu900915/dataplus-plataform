@@ -139,9 +139,12 @@ export interface ItemInventario {
   categoria_id: string;
   categoria_nombre: string;
   descripcion?: string;
+  imagen?: string;
   unidad_medida: string;
   precio_unitario: number;
   precio_costo?: number;
+  precio_venta?: number;
+  margen_ganancia?: number;
   stock_actual: number;
   stock_minimo: number;
   es_equipamiento: boolean;
@@ -235,16 +238,41 @@ export interface Contrato {
   renovacion_automatica: boolean;
 }
 
+export type MetodoPagoVenta = 'CUP' | 'USD' | 'Transferencia CUP' | 'Tarjeta Clasica';
+
+export interface VentaItemLine {
+  item_id: string;
+  item_nombre: string;
+  item_imagen?: string;
+  almacen_id?: string;
+  almacen_nombre?: string;
+  cantidad: number;
+  precio_costo_unitario: number;
+  margen_ganancia: number;
+  precio_unitario: number;
+  subtotal: number;
+  ganancia_linea: number;
+}
+
 export interface Venta {
   id: string;
   codigo: string;
   cliente_id: string;
   cliente_nombre: string;
+  almacen_id?: string;
+  almacen_nombre?: string;
   concepto: string;
   fecha: string;
+  moneda?: Moneda;
+  tasa_cambio?: number;
+  margen_ganancia_global?: number;
+  referencia_pago?: string;
+  costo_total?: number;
   monto_total: number;
-  metodo_pago: 'Transferencia CUP' | 'Efectivo' | 'USD / MLC';
-  estado: 'cobrado' | 'pendiente' | 'anulado';
+  ganancia_total?: number;
+  metodo_pago: MetodoPagoVenta;
+  items?: VentaItemLine[];
+  estado: 'cobrado' | 'completada' | 'pendiente' | 'anulado' | 'anulada';
 }
 
 export interface Gasto {

@@ -12,6 +12,7 @@ use Filament\Forms\Set;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -76,6 +77,18 @@ class ItemResource extends Resource
                         ->label('Descripción')
                         ->columnSpanFull()
                         ->rows(3),
+
+                    Forms\Components\FileUpload::make('imagen')
+                        ->label('Imagen del Producto')
+                        ->image()
+                        ->imageEditor()
+                        ->disk('public')
+                        ->directory('productos')
+                        ->visibility('public')
+                        ->maxSize(4096)
+                        ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
+                        ->helperText('Opcional · Máx. 4 MB (JPG, PNG, WEBP). Se mostrará en inventario y catálogo de ventas.')
+                        ->columnSpanFull(),
                 ]),
 
             Forms\Components\Section::make('Precios')
@@ -89,10 +102,11 @@ class ItemResource extends Resource
                         ->required()
                         ->default(0)
                         ->minValue(0)
-                        ->live()
+                        ->live(onBlur: true)
                         ->afterStateUpdated(function ($state, Set $set, Get $get) {
-                            $margen = $get('margen_ganancia') ?? 60;
-                            $precioVenta = $state * (1 + ($margen / 100));
+                            $costo = (float) ($state ?? 0);
+                            $margen = (float) ($get('margen_ganancia') ?? 60);
+                            $precioVenta = $costo * (1 + ($margen / 100));
                             $set('precio_venta', round($precioVenta, 2));
                         }),
 
@@ -103,13 +117,12 @@ class ItemResource extends Resource
                         ->minValue(0)
                         ->maxValue(1000)
                         ->suffix('%')
-                        ->live()
+                        ->live(onBlur: true)
                         ->afterStateUpdated(function ($state, Set $set, Get $get) {
-                            $costo = $get('precio_costo');
-                            if ($costo) {
-                                $precioVenta = $costo * (1 + ($state / 100));
-                                $set('precio_venta', round($precioVenta, 2));
-                            }
+                            $costo = (float) ($get('precio_costo') ?? 0);
+                            $margen = (float) ($state ?? 0);
+                            $precioVenta = $costo * (1 + ($margen / 100));
+                            $set('precio_venta', round($precioVenta, 2));
                         }),
 
                     Forms\Components\TextInput::make('precio_venta')
@@ -118,8 +131,9 @@ class ItemResource extends Resource
                         ->prefix('$')
                         ->required()
                         ->default(0)
-                        ->disabled()
-                        ->helperText('Se calcula automáticamente'),
+                        ->readOnly()
+                        ->dehydrated()
+                        ->helperText('Se calcula automáticamente según costo y margen'),
                 ]),
 
             Forms\Components\Section::make('Control de Stock')
@@ -182,6 +196,12 @@ class ItemResource extends Resource
     {
         return $table
             ->columns([
+                ImageColumn::make('imagen')
+                    ->label('Foto')
+                    ->disk('public')
+                    ->square()
+                    ->size(42),
+
                 TextColumn::make('codigo')
                     ->label('Código')
                     ->searchable()
